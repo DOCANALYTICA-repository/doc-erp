@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal, engine
 from app.models import Base
 from app.models.user import User
-from app.models.club import Club, ClubMember, Event, Budget, Reimbursement, Sponsorship
+from app.models.club import Club, ClubMember, Event, Budget, Reimbursement, Sponsorship, AnnualPlan, ClubDocument, EventAttendance
 from app.models.claim import Claim, ClaimParticipant, AttendanceEntry, SupportingDocument, TimetableSession
 from app.models.faculty import Note, Document, Meeting, Task
 from app.models.notification import Notification
@@ -85,7 +85,18 @@ def seed_database():
             designation="Assistant Professor",
             office_location="Block IV, Room 218",
         )
-        db.add_all([fac1, fac2, fac3])
+        fac4 = User(
+            id="fac_cultural_coordinator",
+            email="faculty.cultural@christuniversity.in",
+            hashed_password=get_password_hash("faculty123"),
+            name="Dr. Meera Nair",
+            primary_role="faculty",
+            status="active",
+            role_tags_str="Cultural Coordinator",
+            designation="Associate Professor",
+            office_location="Block IV, Room 220",
+        )
+        db.add_all([fac1, fac2, fac3, fac4])
 
         # 4. Students
         std_leader = User(
@@ -218,6 +229,41 @@ def seed_database():
             contract_url="/storage/sponsorships/hdfc_agreement.pdf"
         )
         db.add(spon1)
+
+        print("Generating annual plan, club documents & attendance...")
+        aplan1 = AnnualPlan(
+            id="aplan_comm_2025",
+            club_id="club_commerce",
+            academic_year="2025-2026",
+            vision="Become the department's leading platform for applied finance and economics learning.",
+            objectives="Run 4 flagship events; onboard 30 new members; secure 2 new sponsors.",
+            major_initiatives="National Commerce Conclave, Junior Recruitment Drive, Alumni Mentorship Series.",
+            tentative_event_calendar="Conclave: July 2026; Recruitment: Aug 2026; Mentorship: Sept 2026.",
+            budget_allocation=50000.0,
+            expected_outcomes="Higher event attendance and stronger sponsor relationships.",
+            strategic_priorities="Industry engagement, member retention.",
+            key_deadlines="Conclave venue booking by June 30, 2026.",
+            status="faculty_coordinator_review",
+            submitted_by="std_president",
+        )
+        db.add(aplan1)
+
+        doc1_club = ClubDocument(
+            id="cdoc_1",
+            club_id="club_commerce",
+            uploaded_by="std_president",
+            name="Commerce Club Brand Guidelines.pdf",
+            file_url="/storage/club_documents/club_commerce/brand_guidelines.pdf",
+            category="Brand Assets",
+            tags="branding,knowledge-base",
+            version="1",
+        )
+        db.add(doc1_club)
+
+        att1 = EventAttendance(id="att_1", event_id="evt_conclave", student_id="std_regular_1", attended="present")
+        att2 = EventAttendance(id="att_2", event_id="evt_conclave", student_id="std_regular_2", attended="absent")
+        db.add_all([att1, att2])
+        db.commit()
 
         print("Generating timetable template sessions...")
         # Create standard timetable sessions for B.Com 5th Sem Sec A

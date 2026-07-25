@@ -26,9 +26,15 @@ class ClubMemberOut(BaseModel):
     status: str
     academic_year: str
     join_date: Optional[str] = None
+    permission_template: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class PermissionTemplateAssign(BaseModel):
+    # Club Head, Documentation Head, Events Head, Sponsorship Head, Finance Head, or null to clear
+    permission_template: Optional[str] = None
 
 class EventBase(BaseModel):
     title: str
@@ -140,6 +146,60 @@ class AnnouncementOut(AnnouncementBase):
     id: str
     club_id: str
     author_id: str
+
+    class Config:
+        from_attributes = True
+
+
+class AnnualPlanBase(BaseModel):
+    academic_year: str
+    vision: Optional[str] = None
+    objectives: Optional[str] = None
+    major_initiatives: Optional[str] = None
+    tentative_event_calendar: Optional[str] = None
+    budget_allocation: float = 0.0
+    expected_outcomes: Optional[str] = None
+    strategic_priorities: Optional[str] = None
+    key_deadlines: Optional[str] = None
+
+class AnnualPlanCreate(AnnualPlanBase):
+    pass
+
+class AnnualPlanUpdate(BaseModel):
+    vision: Optional[str] = None
+    objectives: Optional[str] = None
+    major_initiatives: Optional[str] = None
+    tentative_event_calendar: Optional[str] = None
+    budget_allocation: Optional[float] = None
+    expected_outcomes: Optional[str] = None
+    strategic_priorities: Optional[str] = None
+    key_deadlines: Optional[str] = None
+
+class AnnualPlanReviewAction(BaseModel):
+    action: str  # "approve" or "reject"
+    comments: Optional[str] = None
+
+class AnnualPlanOut(AnnualPlanBase):
+    id: str
+    club_id: str
+    status: str
+    review_comments: Optional[str] = None
+    submitted_by: str
+
+    class Config:
+        from_attributes = True
+
+
+class ClubDocumentOut(BaseModel):
+    id: str
+    club_id: str
+    uploaded_by: str
+    name: str
+    file_url: str
+    category: str
+    tags: str
+    version: str
+    previous_version_id: Optional[str] = None
 
     class Config:
         from_attributes = True

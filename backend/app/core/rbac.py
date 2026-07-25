@@ -47,13 +47,17 @@ ROLE_PERMISSIONS = {
         "events:create",
         "budget:manage",
         "reimbursement:request",
-        "sponsorship:manage"
+        "sponsorship:manage",
+        "annual_plan:manage",
+        "documents:manage_club"
     },
     "Vice President": {
         "clubs:manage_members",
         "events:create",
         "budget:manage",
-        "reimbursement:request"
+        "reimbursement:request",
+        "annual_plan:manage",
+        "documents:manage_club"
     },
     "Core Member": {
         "events:create",
@@ -65,10 +69,15 @@ ROLE_PERMISSIONS = {
     },
     "Club Faculty Coordinator": {
         "clubs:approve_plan",
+        "clubs:approve_plan_faculty_coordinator",  # Annual Plan workflow, stage 1 (Clubs PRD §24.3)
         "events:approve",
         "budget:manage",
         "reimbursement:approve",
         "claims:review_faculty_coordinator"  # Initial reviewer for club-submitted claims
+    },
+    "Cultural Coordinator": {
+        "clubs:approve_plan",
+        "clubs:approve_plan_cultural_coordinator",  # Annual Plan workflow, stage 2 (Clubs PRD §24.3)
     },
     "Course Coordinator": {
         "claims:approve_coordinator"
@@ -76,6 +85,7 @@ ROLE_PERMISSIONS = {
     "HOD": {
         "claims:approve_coordinator",
         "clubs:approve_plan",
+        "clubs:approve_plan_hod",  # Annual Plan workflow, stage 3 — final approval (Clubs PRD §24.3)
         "events:approve",
         "rbac:assign_roles",
         "claims:manage_timetable"

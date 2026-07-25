@@ -1,6 +1,9 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from app.models.club import Club, ClubMember, Event, Budget, Reimbursement, Sponsorship, RecruitmentDrive, RecruitmentApplication, Announcement
+from app.models.club import (
+    Club, ClubMember, Event, Budget, Reimbursement, Sponsorship, RecruitmentDrive, RecruitmentApplication,
+    Announcement, AnnualPlan, ClubDocument, EventAttendance,
+)
 from app.repositories.base import BaseRepository
 
 class ClubRepository(BaseRepository[Club]):
@@ -62,6 +65,48 @@ class AnnouncementRepository(BaseRepository[Announcement]):
             Announcement.created_at.desc()
         ).all()
 
+class AnnualPlanRepository(BaseRepository[AnnualPlan]):
+    def get_by_club(self, db: Session, *, club_id: str) -> List[AnnualPlan]:
+        return db.query(AnnualPlan).filter(AnnualPlan.club_id == club_id).order_by(
+            AnnualPlan.academic_year.desc()
+        ).all()
+
+    def get_current(self, db: Session, *, club_id: str, academic_year: str) -> Optional[AnnualPlan]:
+        return db.query(AnnualPlan).filter(
+            AnnualPlan.club_id == club_id, AnnualPlan.academic_year == academic_year
+        ).first()
+
+class ClubDocumentRepository(BaseRepository[ClubDocument]):
+    def get_by_club(self, db: Session, *, club_id: str, category: Optional[str] = None) -> List[ClubDocument]:
+        q = db.query(ClubDocument).filter(ClubDocument.club_id == club_id)
+        if category:
+            q = q.filter(ClubDocument.category == category)
+        return q.order_by(ClubDocument.created_at.desc()).all()
+
+    def get_knowledge_base(self, db: Session, *, club_id: str) -> List[ClubDocument]:
+        return [
+            d for d in db.query(ClubDocument).filter(ClubDocument.club_id == club_id).all()
+            if "knowledge-base" in [t.strip() for t in d.tags.split(",")]
+        ]
+
+    def get_versions(self, db: Session, *, document_id: str) -> List[ClubDocument]:
+        """Walk the previous_version_id chain, newest first."""
+        versions = []
+        current = self.get(db, document_id)
+        while current:
+            versions.append(current)
+            current = self.get(db, current.previous_version_id) if current.previous_version_id else None
+        return versions
+
+class EventAttendanceRepository(BaseRepository[EventAttendance]):
+    def get_by_event(self, db: Session, *, event_id: str) -> List[EventAttendance]:
+        return db.query(EventAttendance).filter(EventAttendance.event_id == event_id).all()
+
+    def get_by_club(self, db: Session, *, club_id: str) -> List[EventAttendance]:
+        return db.query(EventAttendance).join(Event, EventAttendance.event_id == Event.id).filter(
+            Event.club_id == club_id
+        ).all()
+
 club_repo = ClubRepository(Club)
 member_repo = ClubMemberRepository(ClubMember)
 event_repo = EventRepository(Event)
@@ -71,3 +116,6 @@ sponsorship_repo = SponsorshipRepository(Sponsorship)
 recruitment_drive_repo = RecruitmentDriveRepository(RecruitmentDrive)
 recruitment_application_repo = RecruitmentApplicationRepository(RecruitmentApplication)
 announcement_repo = AnnouncementRepository(Announcement)
+annual_plan_repo = AnnualPlanRepository(AnnualPlan)
+club_document_repo = ClubDocumentRepository(ClubDocument)
+event_attendance_repo = EventAttendanceRepository(EventAttendance)

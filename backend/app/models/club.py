@@ -32,6 +32,11 @@ class ClubMember(Base, TimestampMixin):
     status = Column(String, default="active", nullable=False) # active, alumni
     academic_year = Column(String, nullable=False) # e.g. "2025-2026"
     join_date = Column(String, nullable=True)
+    # Permission Templates (Clubs PRD §17) — Club Head, Documentation Head,
+    # Events Head, Sponsorship Head, Finance Head, or None (plain member).
+    # Assigned by Club Head / faculty / super_admin; layered on top of the
+    # member's global role_tags rather than replacing them.
+    permission_template = Column(String, nullable=True)
 
     # Relationships
     student = relationship("User", back_populates="memberships")
@@ -143,3 +148,68 @@ class Announcement(Base, TimestampMixin):
 
     club = relationship("Club")
     author = relationship("User")
+
+
+class AnnualPlan(Base, TimestampMixin):
+    """Clubs PRD §24 — one official Annual Plan per club per academic year,
+    carrying its own multi-stage approval workflow. Had no model at all
+    before Phase 4 remainder."""
+    __tablename__ = "annual_plans"
+
+    id = Column(String, primary_key=True, index=True)
+    club_id = Column(String, ForeignKey("clubs.id"), nullable=False)
+    academic_year = Column(String, nullable=False)
+
+    vision = Column(String, nullable=True)
+    objectives = Column(String, nullable=True)
+    major_initiatives = Column(String, nullable=True)
+    tentative_event_calendar = Column(String, nullable=True)
+    budget_allocation = Column(Float, default=0.0, nullable=False)
+    expected_outcomes = Column(String, nullable=True)
+    strategic_priorities = Column(String, nullable=True)
+    key_deadlines = Column(String, nullable=True)
+
+    # draft, faculty_coordinator_review, cultural_coordinator_review,
+    # hod_review, approved, locked
+    status = Column(String, default="draft", nullable=False)
+    review_comments = Column(String, nullable=True)
+    submitted_by = Column(String, ForeignKey("users.id"), nullable=False)
+
+    club = relationship("Club")
+    submitter = relationship("User")
+
+
+class ClubDocument(Base, TimestampMixin):
+    """Clubs PRD §28 Documents Workspace + §29 Knowledge Base (the KB is a
+    tag-filtered view over these same records, not a separate store —
+    a document tagged "knowledge-base" surfaces there)."""
+    __tablename__ = "club_documents"
+
+    id = Column(String, primary_key=True, index=True)
+    club_id = Column(String, ForeignKey("clubs.id"), nullable=False)
+    uploaded_by = Column(String, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    file_url = Column(String, nullable=False)
+    # Annual Plans, Reports, Meeting Documents, Policies, Templates,
+    # Recruitment Material, Financial Documents, Brand Assets, Presentations
+    category = Column(String, default="Templates", nullable=False)
+    tags = Column(String, default="", nullable=False)  # comma-separated
+    version = Column(String, default="1", nullable=False)
+    previous_version_id = Column(String, ForeignKey("club_documents.id"), nullable=True)
+
+    club = relationship("Club")
+    uploader = relationship("User")
+
+
+class EventAttendance(Base, TimestampMixin):
+    """Backs the Clubs Attendance Report (PRD §47.2) — per-member attendance
+    at a club event, since no such record existed anywhere before."""
+    __tablename__ = "event_attendance"
+
+    id = Column(String, primary_key=True, index=True)
+    event_id = Column(String, ForeignKey("events.id"), nullable=False)
+    student_id = Column(String, ForeignKey("users.id"), nullable=False)
+    attended = Column(String, default="present", nullable=False)  # present, absent
+
+    event = relationship("Event")
+    student = relationship("User")
