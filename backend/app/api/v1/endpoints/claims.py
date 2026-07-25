@@ -13,6 +13,7 @@ from app.models.claim import Claim, ClaimParticipant, AttendanceEntry, Supportin
 from app.services.engines.storage import storage_engine
 from app.services.engines.ai import ai_engine
 from app.services.engines.reporting import reporting_engine
+from app.services.engines.notification import notification_engine
 import uuid
 from datetime import datetime, timezone
 
@@ -158,6 +159,14 @@ def submit_attendance_claim(
 
     db.commit()
     db.refresh(db_claim)
+
+    for s_id in student_ids:
+        notification_engine.send_notification(
+            db, user_id=s_id, title="Claim submitted",
+            content=f"Your {claim_in.category} claim ({ref_num}) has been submitted for initial review.",
+            source_module="claims",
+        )
+
     return _to_claim_out(db_claim)
 
 
@@ -349,6 +358,31 @@ def approve_claim_stage(
 
     db.add(claim)
     db.commit()
+
+    participant_ids = {p.student_id for p in claim.participants}
+    for s_id in participant_ids:
+        notification_engine.send_notification(
+            db, user_id=s_id, title=f"Claim {claim.reference_number} update",
+            content=f"Your claim moved to stage '{claim.current_workflow_stage}' (status: {claim.status}).",
+            source_module="claims",
+        )
+    # The stage that just approved forward to Subject Faculty review is the
+    # one moment a SPECIFIC reviewer (not a role-wide permission holder) is
+    # known — each attendance entry names its own subject_faculty_id.
+    if stage == "initial_review" and claim.current_workflow_stage == "subject_faculty":
+        faculty_ids = {
+            entry.subject_faculty_id
+            for participant in claim.participants
+            for entry in participant.entries
+            if entry.status == "pending"
+        }
+        for f_id in faculty_ids:
+            notification_engine.send_notification(
+                db, user_id=f_id, title="Claim pending your review",
+                content=f"Claim {claim.reference_number} has attendance entries awaiting your approval.",
+                source_module="claims",
+            )
+
     return {"status": "success", "new_stage": claim.current_workflow_stage, "claim_status": claim.status}
 
 

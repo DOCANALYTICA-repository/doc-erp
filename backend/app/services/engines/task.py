@@ -1,6 +1,7 @@
 import uuid
 from sqlalchemy.orm import Session
 from app.models.faculty import Task
+from app.services.engines.notification import notification_engine
 
 class TaskEngine:
     def create_task(
@@ -18,7 +19,11 @@ class TaskEngine:
         related_entity_id: str = None
     ) -> Task:
         """
-        Spawns a new task entity, assigning it to a user.
+        Spawns a new task entity, assigning it to a user. Every task
+        producer gets a real "Assigned" notification for free from here
+        (Master Plan §26.5 / §44's Task -> Notification chain) rather than
+        each module having to remember to call the Notification Engine
+        itself after creating a task.
         """
         task_in = {
             "id": f"task_{uuid.uuid4().hex[:12]}",
@@ -33,11 +38,18 @@ class TaskEngine:
             "related_entity_id": related_entity_id,
             "status": "pending"
         }
-        
+
         db_task = Task(**task_in)
         db.add(db_task)
         db.commit()
         db.refresh(db_task)
+
+        if assignee_id != creator_id:
+            notification_engine.send_notification(
+                db, user_id=assignee_id, title="New task assigned",
+                content=f"You've been assigned: {title}", source_module=source_module,
+                task_id=db_task.id,
+            )
         return db_task
 
     def sync_meeting_action_items(

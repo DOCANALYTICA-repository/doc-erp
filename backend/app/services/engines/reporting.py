@@ -188,24 +188,36 @@ class ReportingEngine:
         }
 
     def generate_contribution_report(self, db: Session, *, club_id: str) -> Dict[str, Any]:
-        """Clubs PRD §26.4 — task completion is the only contribution signal in v1."""
+        """
+        Clubs PRD §26.4 — task completion is the only contribution signal in
+        v1. One query for members' tasks (not one query per member) — this
+        report backs the Contribution Leaderboard widget on every Analytics
+        page load, so an O(members) query count here is exactly the kind of
+        thing Phase 7's NFR pass exists to catch.
+        """
         club = db.query(Club).filter(Club.id == club_id).first()
         if not club:
             return {"error": "Club not found"}
         members = db.query(ClubMember).filter(
             ClubMember.club_id == club_id, ClubMember.status == "active"
         ).all()
+        member_ids = [m.student_id for m in members]
+        tasks = db.query(Task).filter(
+            Task.assignee_id.in_(member_ids), Task.source_module == "clubs"
+        ).all() if member_ids else []
+        tasks_by_assignee: Dict[str, List[Task]] = {}
+        for t in tasks:
+            tasks_by_assignee.setdefault(t.assignee_id, []).append(t)
+
         rows = []
         for m in members:
-            tasks = db.query(Task).filter(
-                Task.assignee_id == m.student_id, Task.source_module == "clubs"
-            ).all()
-            completed = sum(1 for t in tasks if t.status == "completed")
+            member_tasks = tasks_by_assignee.get(m.student_id, [])
+            completed = sum(1 for t in member_tasks if t.status == "completed")
             rows.append({
                 "student_id": m.student_id,
                 "student_name": m.student.name if m.student else "Unknown",
                 "role": m.role,
-                "tasks_assigned": len(tasks),
+                "tasks_assigned": len(member_tasks),
                 "tasks_completed": completed,
             })
         rows.sort(key=lambda r: r["tasks_completed"], reverse=True)

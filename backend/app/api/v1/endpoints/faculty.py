@@ -13,6 +13,8 @@ from app.models.user import User
 from app.models.faculty import Note, Document, Meeting
 from app.services.engines.storage import storage_engine
 from app.services.engines.task import task_engine
+from app.services.engines.notification import notification_engine
+from app.repositories.club import member_repo
 import uuid
 
 router = APIRouter()
@@ -105,7 +107,20 @@ def create_meeting(meet_in: MeetingCreate, db: Session = Depends(get_db), curren
     meet_dict["id"] = f"meet_{uuid.uuid4().hex[:12]}"
     meet_dict["organizer_id"] = current_user.id
     meet_dict["status"] = "scheduled"
-    return meeting_repo.create(db, obj_in=meet_dict)
+    created = meeting_repo.create(db, obj_in=meet_dict)
+
+    # Cross-module regression fix (Phase 7): a club-linked meeting used to
+    # notify nobody in that club — Master Plan §44's Meeting -> Notification
+    # Engine -> Faculty Notified chain, mirrored here for the club side.
+    if created.club_id:
+        for m in member_repo.get_club_members(db, club_id=created.club_id):
+            if m.status == "active" and m.role in ("President", "Vice President"):
+                notification_engine.send_notification(
+                    db, user_id=m.student_id, title="New club meeting scheduled",
+                    content=f"{created.title} on {created.date} at {created.time}.",
+                    source_module="faculty",
+                )
+    return created
 
 @router.post("/meetings/{meeting_id}/minutes", response_model=MeetingOut)
 def record_meeting_minutes(

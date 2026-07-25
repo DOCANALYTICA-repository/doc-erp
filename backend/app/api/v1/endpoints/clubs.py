@@ -122,7 +122,18 @@ def create_club_event(
     event_dict = event_in.dict()
     event_dict["id"] = f"evt_{uuid.uuid4().hex[:12]}"
     event_dict["club_id"] = club_id
-    return event_repo.create(db, obj_in=event_dict)
+    created = event_repo.create(db, obj_in=event_dict)
+
+    # Cross-module regression fix (Phase 7): event proposals used to be
+    # created with zero signal to anyone who needed to act on them.
+    club = club_repo.get(db, club_id)
+    for coordinator in db.query(User).filter(User.role_tags_str.like("%Club Faculty Coordinator%")).all():
+        notification_engine.send_notification(
+            db, user_id=coordinator.id, title="New event proposal",
+            content=f"{club.name if club else club_id} proposed a new event: {created.title}.",
+            source_module="clubs",
+        )
+    return created
 
 # 4. Budget
 @router.get("/{club_id}/budgets", response_model=List[BudgetOut])
