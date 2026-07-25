@@ -146,7 +146,9 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const tokenObj = localStorage.getItem('doc_user_session');
   let headers: HeadersInit = {};
 
-  if (!(options?.body instanceof URLSearchParams)) {
+  // FormData must NOT get an explicit Content-Type — the browser sets the
+  // multipart boundary itself; setting it manually breaks the upload.
+  if (!(options?.body instanceof URLSearchParams) && !(options?.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
 
@@ -339,8 +341,12 @@ function mockHandler<T>(endpoint: string, options?: RequestInit): T {
     }
     if (endpoint.includes('documents')) {
       if (method === 'POST') {
-        const body = JSON.parse(options?.body as string);
-        const newDoc = { ...body, id: `doc_${Date.now()}`, owner_id: 'fac_class_teacher', shared_link: `share_${Date.now()}`, is_link_revoked: false };
+        // Real uploads send FormData, not JSON — mock mode (offline-only)
+        // can't fabricate a stored file, so just acknowledge with a
+        // plausible placeholder rather than crashing on JSON.parse(FormData).
+        const isFormData = options?.body instanceof FormData;
+        const name = isFormData ? (options!.body as FormData).get('name') || 'Untitled' : JSON.parse(options?.body as string).name;
+        const newDoc = { name, id: `doc_${Date.now()}`, owner_id: 'fac_class_teacher', file_url: '', folder_path: '/', tags: '', is_favorite: false, shared_link: `share_${Date.now()}`, is_link_revoked: false };
         MOCK_DATA.documents.push(newDoc);
         return newDoc as any;
       }
@@ -393,4 +399,8 @@ export const api = {
     });
   },
   delete: <T>(endpoint: string) => request<T>(endpoint, { method: 'DELETE' }),
+  // Real multipart file upload (Phase 1C/6) — used by Faculty Documents and
+  // Claims supporting-document upload, both backed by the real Storage Engine.
+  upload: <T>(endpoint: string, formData: FormData) =>
+    request<T>(endpoint, { method: 'POST', body: formData }),
 };

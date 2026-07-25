@@ -5,13 +5,17 @@ import { SideNav, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav
 import { Calendar, CheckSquare, FileText, Folder, BookOpen, Clock, Compass, Plus, Pin, Star, Share2, Info, Users } from 'lucide-react';
 
 export const FacultyDashboard: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'calendar' | 'tasks' | 'meetings' | 'notes' | 'documents' | 'directory'>('dashboard');
+  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'calendar' | 'tasks' | 'meetings' | 'notes' | 'documents' | 'directory' | 'reminders'>('dashboard');
   const user = useStore(state => state.user);
 
   const [notes, setNotes] = useState<any[]>([]);
   const [docs, setDocs] = useState<any[]>([]);
   const [meetings, setMeetings] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
+  const [directory, setDirectory] = useState<any[]>([]);
+  const [directorySearch, setDirectorySearch] = useState('');
+  const [reminders, setReminders] = useState<any[]>([]);
 
   // Notes Form State
   const [noteTitle, setNoteTitle] = useState('');
@@ -24,14 +28,18 @@ export const FacultyDashboard: React.FC = () => {
   const [meetVenue, setMeetVenue] = useState('');
 
   // Document Form State
-  const [docName, setDocName] = useState('');
+  const [docFile, setDocFile] = useState<File | null>(null);
+
+  // Reminder Form State
+  const [reminderTitle, setReminderTitle] = useState('');
+  const [reminderDueDate, setReminderDueDate] = useState('');
 
   useEffect(() => {
     async function loadData() {
       try {
         const nList = await api.get<any[]>('/faculty/notes');
         setNotes(nList);
-        
+
         const dList = await api.get<any[]>('/faculty/documents');
         setDocs(dList);
 
@@ -40,12 +48,42 @@ export const FacultyDashboard: React.FC = () => {
 
         const tList = await api.get<any[]>('/tasks');
         setTasks(tList);
+
+        const rList = await api.get<any[]>('/faculty/reminders');
+        setReminders(rList);
+
+        if (activeSubTab === 'calendar' || activeSubTab === 'dashboard') {
+          const cal = await api.get<any[]>('/calendar/');
+          setCalendarEvents(cal);
+        }
+        if (activeSubTab === 'directory') {
+          const dir = await api.get<any[]>(`/users/directory${directorySearch ? `?q=${encodeURIComponent(directorySearch)}` : ''}`);
+          setDirectory(dir);
+        }
       } catch (e) {
         console.error(e);
       }
     }
     loadData();
-  }, [activeSubTab]);
+  }, [activeSubTab, directorySearch]);
+
+  const togglePin = async (note: any) => {
+    const updated = await api.put<any>(`/faculty/notes/${note.id}`, { is_pinned: !note.is_pinned });
+    setNotes(notes.map(n => n.id === note.id ? updated : n));
+  };
+
+  const handleCreateReminder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reminderTitle || !reminderDueDate) return;
+    const created = await api.post<any>('/faculty/reminders', { title: reminderTitle, due_date: reminderDueDate, reminder_type: 'due_date' });
+    setReminders([...reminders, created]);
+    setReminderTitle(''); setReminderDueDate('');
+  };
+
+  const completeReminder = async (reminder: any) => {
+    const updated = await api.put<any>(`/faculty/reminders/${reminder.id}`, { status: 'completed' });
+    setReminders(reminders.map(r => r.id === reminder.id ? updated : r));
+  };
 
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,10 +115,13 @@ export const FacultyDashboard: React.FC = () => {
 
   const handleUploadDocument = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!docName) return;
+    if (!docFile) return;
     try {
-      await api.post('/faculty/documents', { name: docName, file_url: '/storage/docs/' + docName });
-      setDocName('');
+      const formData = new FormData();
+      formData.append('file', docFile);
+      formData.append('name', docFile.name);
+      await api.upload('/faculty/documents', formData);
+      setDocFile(null);
       setActiveSubTab('documents');
     } catch (e) {
       console.error(e);
@@ -98,7 +139,8 @@ export const FacultyDashboard: React.FC = () => {
           { id: 'meetings', label: 'Meetings Desk' },
           { id: 'notes', label: 'Personal Notes' },
           { id: 'documents', label: 'Documents Locker' },
-          { id: 'directory', label: 'Faculty Directory' }
+          { id: 'directory', label: 'Faculty Directory' },
+          { id: 'reminders', label: 'Reminders' }
         ].map(item => (
           <button
             key={item.id}
@@ -179,29 +221,35 @@ export const FacultyDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Tab 2: Calendar Schedule */}
+        {/* Tab 2: Calendar Schedule — real, via the Calendar Engine (Phase 6).
+            Was previously a hardcoded 3-day literal array with zero API calls. */}
         {activeSubTab === 'calendar' && (
           <div className="space-y-6">
-            <h3 className="font-bold text-slate-900 dark:text-white text-sm">Weekly Timetable Schedule</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {[
-                { day: "Monday", slots: [{ h: "09:00 AM", sub: "Corporate Accounting", room: "OAT-1" }, { h: "10:00 AM", sub: "Financial Management", room: "OAT-1" }] },
-                { day: "Tuesday", slots: [{ h: "09:00 AM", sub: "Corporate Accounting", room: "OAT-1" }, { h: "10:00 AM", sub: "Financial Management", room: "OAT-1" }] },
-                { day: "Wednesday", slots: [{ h: "11:15 AM", sub: "Taxation Law", room: "Lab-4" }] }
-              ].map((dayItem, idx) => (
-                <div key={idx} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-4">
-                  <h4 className="font-bold text-slate-900 dark:text-white text-xs">{dayItem.day}</h4>
-                  <div className="space-y-3">
-                    {dayItem.slots.map((s, sIdx) => (
-                      <div key={sIdx} className="p-3 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/80 text-[10px]">
-                        <div className="font-bold text-slate-900 dark:text-white">{s.sub}</div>
-                        <div className="text-slate-400 mt-1">{s.h} | Room {s.room}</div>
+            <h3 className="font-bold text-slate-900 dark:text-white text-sm">Unified Calendar</h3>
+            {(['timetable', 'meeting', 'club_event', 'task'] as const).map(type => {
+              const items = calendarEvents.filter(ev => ev.type === type);
+              if (items.length === 0) return null;
+              const labels: Record<string, string> = {
+                timetable: 'Teaching Timetable', meeting: 'Meetings', club_event: 'Club Events', task: 'Tasks Due',
+              };
+              return (
+                <div key={type}>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{labels[type]}</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {items.map((ev, idx) => (
+                      <div key={idx} className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm text-xs">
+                        <div className="font-bold text-slate-900 dark:text-white">{ev.title}</div>
+                        <div className="text-slate-400 mt-1">
+                          {ev.start} {ev.hour ? `| ${ev.hour}` : ''} {ev.venue ? `| ${ev.venue}` : ''}
+                        </div>
+                        {ev.description && <p className="text-slate-500 mt-1.5 leading-relaxed">{ev.description}</p>}
                       </div>
                     ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
+            {calendarEvents.length === 0 && <div className="text-xs text-slate-400">No calendar events to show yet.</div>}
           </div>
         )}
 
@@ -328,8 +376,10 @@ export const FacultyDashboard: React.FC = () => {
                       <h4 className="font-bold text-slate-900 dark:text-white text-xs">{note.title}</h4>
                       <p className="text-slate-500 mt-2 text-xs leading-relaxed">{note.content}</p>
                     </div>
-                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/60 flex gap-2 justify-end text-[10px]">
-                      {note.is_pinned && <Pin className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />}
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/60 flex gap-2 justify-end text-[10px] items-center">
+                      <button onClick={() => togglePin(note)} title={note.is_pinned ? 'Unpin' : 'Pin'}>
+                        <Pin className={`w-3.5 h-3.5 ${note.is_pinned ? 'text-yellow-500 fill-yellow-500' : 'text-slate-300'}`} />
+                      </button>
                       {note.is_favorite && <Star className="w-3.5 h-3.5 text-orange-500 fill-orange-500" />}
                     </div>
                   </div>
@@ -347,7 +397,7 @@ export const FacultyDashboard: React.FC = () => {
                 <h3 className="font-bold text-slate-900 dark:text-white text-sm">Upload Document</h3>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-slate-400 font-semibold">Name</label>
-                  <input type="text" placeholder="LessonPlan.pdf" value={docName} onChange={e => setDocName(e.target.value)} required className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+                  <input type="file" onChange={e => setDocFile(e.target.files?.[0] ?? null)} required className="text-xs text-slate-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white" />
                 </div>
                 <button
                   type="submit"
@@ -369,10 +419,23 @@ export const FacultyDashboard: React.FC = () => {
                       <h4 className="font-bold text-slate-900 dark:text-white mt-1 text-xs">{doc.name}</h4>
                     </div>
                     <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-[10px]">
-                      <button onClick={() => alert(`Shared Link: http://localhost:8000/storage/share/${doc.shared_link}`)} className="inline-flex items-center gap-1 text-indigo-600 hover:underline">
-                        <Share2 className="w-3.5 h-3.5" /> Share
+                      <button
+                        onClick={() => navigator.clipboard.writeText(`${window.location.origin}/shared/${doc.shared_link}`)}
+                        className="inline-flex items-center gap-1 text-indigo-600 hover:underline"
+                      >
+                        <Share2 className="w-3.5 h-3.5" /> Copy Share Link
                       </button>
-                      <a href="#" onClick={e => { e.preventDefault(); alert('Downloading file...'); }} className="text-slate-400 hover:underline">Download</a>
+                      <a
+                        href="#"
+                        onClick={async e => {
+                          e.preventDefault();
+                          const { url } = await api.get<{ url: string }>(`/faculty/documents/${doc.id}/download-url`);
+                          window.open(url, '_blank');
+                        }}
+                        className="text-slate-400 hover:underline"
+                      >
+                        Download
+                      </a>
                     </div>
                   </div>
                 ))}
@@ -381,22 +444,73 @@ export const FacultyDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Tab 7: Faculty Directory */}
+        {/* Tab 7: Faculty Directory — real, via GET /users/directory (Phase 6).
+            No such endpoint existed before; this tab was 100% static JSX. */}
         {activeSubTab === 'directory' && (
           <div className="space-y-6">
-            <h3 className="font-bold text-slate-900 dark:text-white text-sm">Department Faculty Directory</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 dark:text-white text-sm">Department Faculty Directory</h3>
+              <input
+                type="text"
+                placeholder="Search by name, designation, role..."
+                value={directorySearch}
+                onChange={e => setDirectorySearch(e.target.value)}
+                className="text-xs px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg w-64"
+              />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              {[
-                { name: "Dr. Joy Kishor", role: "Professor & HOD", email: "hod.commerce@christuniversity.in" },
-                { name: "Prof. Sarah Abraham", role: "Class Teacher", email: "teacher.class@christuniversity.in" },
-                { name: "Dr. Anil Kumar", role: "Subject Professor", email: "faculty.finance@christuniversity.in" }
-              ].map((fct, idx) => (
-                <div key={idx} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-2 text-xs">
+              {directory.map((fct) => (
+                <div key={fct.id} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-2 text-xs">
                   <h4 className="font-bold text-slate-900 dark:text-white">{fct.name}</h4>
-                  <div className="text-slate-500 font-semibold">{fct.role}</div>
+                  <div className="text-slate-500 font-semibold">{fct.designation || fct.role_tags_str || 'Faculty'}</div>
                   <div className="text-slate-400">{fct.email}</div>
+                  {fct.office_location && <div className="text-slate-400 text-[10px]">{fct.office_location}</div>}
+                  {fct.office_hours && <div className="text-slate-400 text-[10px]">Office hours: {fct.office_hours}</div>}
+                  <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                    fct.availability_status === 'available' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'
+                  }`}>{fct.availability_status}</span>
                 </div>
               ))}
+              {directory.length === 0 && <div className="text-xs text-slate-400">No faculty found.</div>}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 8: Reminders (Phase 6 — new; no model/endpoints existed before) */}
+        {activeSubTab === 'reminders' && (
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm">
+              <form onSubmit={handleCreateReminder} className="space-y-4 text-xs">
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm">New Reminder</h3>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-400 font-semibold">Title</label>
+                  <input type="text" value={reminderTitle} onChange={e => setReminderTitle(e.target.value)} required className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-slate-400 font-semibold">Due Date</label>
+                  <input type="date" value={reminderDueDate} onChange={e => setReminderDueDate(e.target.value)} required className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+                </div>
+                <button type="submit" className="w-full py-2 bg-slate-900 text-white rounded-lg font-semibold hover:bg-slate-800 transition-colors">
+                  Create Reminder
+                </button>
+              </form>
+            </div>
+            <div className="md:col-span-2 space-y-3">
+              <h3 className="font-bold text-slate-900 dark:text-white text-sm">Your Reminders</h3>
+              {reminders.map(r => (
+                <div key={r.id} className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm flex items-center justify-between text-xs">
+                  <div>
+                    <div className={`font-bold ${r.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-white'}`}>{r.title}</div>
+                    <div className="text-slate-400 mt-0.5">Due: {r.due_date}</div>
+                  </div>
+                  {r.status !== 'completed' && (
+                    <button onClick={() => completeReminder(r)} className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded font-semibold text-[10px]">
+                      Mark Done
+                    </button>
+                  )}
+                </div>
+              ))}
+              {reminders.length === 0 && <div className="text-xs text-slate-400">No reminders yet.</div>}
             </div>
           </div>
         )}
