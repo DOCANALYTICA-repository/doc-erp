@@ -97,3 +97,49 @@ class Sponsorship(Base, TimestampMixin):
 
     # Relationships
     club = relationship("Club", back_populates="sponsorships")
+
+
+class RecruitmentDrive(Base, TimestampMixin):
+    """Clubs PRD v1 — 'replaces Google Forms' for recruitment. Had no model
+    or endpoints at all before Phase 4."""
+    __tablename__ = "recruitment_drives"
+
+    id = Column(String, primary_key=True, index=True)
+    club_id = Column(String, ForeignKey("clubs.id"), nullable=False)
+    title = Column(String, nullable=False)
+    recruitment_period = Column(String, nullable=False)  # e.g. "Aug 2026"
+    eligibility = Column(String, nullable=True)
+    positions_available = Column(String, nullable=True)
+    status = Column(String, default="open", nullable=False)  # open, closed, archived
+
+    club = relationship("Club")
+    applications = relationship("RecruitmentApplication", back_populates="drive", cascade="all, delete-orphan")
+
+
+class RecruitmentApplication(Base, TimestampMixin):
+    __tablename__ = "recruitment_applications"
+
+    id = Column(String, primary_key=True, index=True)
+    drive_id = Column(String, ForeignKey("recruitment_drives.id"), nullable=False)
+    applicant_id = Column(String, ForeignKey("users.id"), nullable=False)
+    motivation_statement = Column(String, nullable=True)
+    # Applied, Shortlisted, Interview Scheduled, Interview Completed, Selected, Rejected, Joined
+    status = Column(String, default="applied", nullable=False)
+
+    drive = relationship("RecruitmentDrive", back_populates="applications")
+    applicant = relationship("User")
+
+
+class Announcement(Base, TimestampMixin):
+    __tablename__ = "announcements"
+
+    id = Column(String, primary_key=True, index=True)
+    club_id = Column(String, ForeignKey("clubs.id"), nullable=False)
+    author_id = Column(String, ForeignKey("users.id"), nullable=False)
+    title = Column(String, nullable=False)
+    body = Column(String, nullable=False)
+    # general, recruitment, event, meeting, deadline, congratulations, emergency
+    announcement_type = Column(String, default="general", nullable=False)
+
+    club = relationship("Club")
+    author = relationship("User")

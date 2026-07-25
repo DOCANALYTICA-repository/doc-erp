@@ -92,3 +92,54 @@ class SponsorshipOut(SponsorshipBase):
 
     class Config:
         from_attributes = True
+
+class RecruitmentDriveBase(BaseModel):
+    title: str
+    recruitment_period: str
+    eligibility: Optional[str] = None
+    positions_available: Optional[str] = None
+    status: Optional[str] = "open"
+
+class RecruitmentDriveCreate(RecruitmentDriveBase):
+    club_id: str
+
+class RecruitmentDriveOut(RecruitmentDriveBase):
+    id: str
+    club_id: str
+
+    class Config:
+        from_attributes = True
+
+class RecruitmentApplicationBase(BaseModel):
+    motivation_statement: Optional[str] = None
+
+class RecruitmentApplicationCreate(RecruitmentApplicationBase):
+    pass
+
+class RecruitmentApplicationUpdate(BaseModel):
+    status: str  # Applied, Shortlisted, Interview Scheduled, Interview Completed, Selected, Rejected, Joined
+
+class RecruitmentApplicationOut(RecruitmentApplicationBase):
+    id: str
+    drive_id: str
+    applicant_id: str
+    status: str
+
+    class Config:
+        from_attributes = True
+
+class AnnouncementBase(BaseModel):
+    title: str
+    body: str
+    announcement_type: str = "general"
+
+class AnnouncementCreate(AnnouncementBase):
+    club_id: str
+
+class AnnouncementOut(AnnouncementBase):
+    id: str
+    club_id: str
+    author_id: str
+
+    class Config:
+        from_attributes = True

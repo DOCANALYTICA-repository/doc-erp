@@ -1,6 +1,6 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from app.models.club import Club, ClubMember, Event, Budget, Reimbursement, Sponsorship
+from app.models.club import Club, ClubMember, Event, Budget, Reimbursement, Sponsorship, RecruitmentDrive, RecruitmentApplication, Announcement
 from app.repositories.base import BaseRepository
 
 class ClubRepository(BaseRepository[Club]):
@@ -45,9 +45,29 @@ class SponsorshipRepository(BaseRepository[Sponsorship]):
     def get_by_club(self, db: Session, *, club_id: str) -> List[Sponsorship]:
         return db.query(Sponsorship).filter(Sponsorship.club_id == club_id).all()
 
+class RecruitmentDriveRepository(BaseRepository[RecruitmentDrive]):
+    def get_by_club(self, db: Session, *, club_id: str) -> List[RecruitmentDrive]:
+        return db.query(RecruitmentDrive).filter(RecruitmentDrive.club_id == club_id).all()
+
+class RecruitmentApplicationRepository(BaseRepository[RecruitmentApplication]):
+    def get_by_drive(self, db: Session, *, drive_id: str) -> List[RecruitmentApplication]:
+        return db.query(RecruitmentApplication).filter(RecruitmentApplication.drive_id == drive_id).all()
+
+    def get_by_applicant(self, db: Session, *, applicant_id: str) -> List[RecruitmentApplication]:
+        return db.query(RecruitmentApplication).filter(RecruitmentApplication.applicant_id == applicant_id).all()
+
+class AnnouncementRepository(BaseRepository[Announcement]):
+    def get_by_club(self, db: Session, *, club_id: str) -> List[Announcement]:
+        return db.query(Announcement).filter(Announcement.club_id == club_id).order_by(
+            Announcement.created_at.desc()
+        ).all()
+
 club_repo = ClubRepository(Club)
 member_repo = ClubMemberRepository(ClubMember)
 event_repo = EventRepository(Event)
 budget_repo = BudgetRepository(Budget)
 reimbursement_repo = ReimbursementRepository(Reimbursement)
 sponsorship_repo = SponsorshipRepository(Sponsorship)
+recruitment_drive_repo = RecruitmentDriveRepository(RecruitmentDrive)
+recruitment_application_repo = RecruitmentApplicationRepository(RecruitmentApplication)
+announcement_repo = AnnouncementRepository(Announcement)

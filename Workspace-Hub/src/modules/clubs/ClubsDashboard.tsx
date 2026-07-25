@@ -4,51 +4,114 @@ import { SideNav, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav
 import { Users, Calendar, Wallet, FileText, Award, Layers, Plus, CheckCircle, Clock } from 'lucide-react';
 
 export const ClubsDashboard: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'members' | 'events' | 'budget' | 'reimbursements' | 'sponsorships'>('dashboard');
-  
+  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'members' | 'events' | 'budget' | 'reimbursements' | 'sponsorships' | 'recruitment' | 'announcements'>('dashboard');
+
+  // Club selector (Phase 4) — replaces the previous hardcoded club_commerce.
+  // A user only ever sees/switches between clubs they're actually a member
+  // of (or every club, for super_admin) — see GET /clubs/my-memberships.
+  const [myClubs, setMyClubs] = useState<any[]>([]);
+  const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
+
   const [clubInfo, setClubInfo] = useState<any>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [budgets, setBudgets] = useState<any[]>([]);
   const [reimbursements, setReimbursements] = useState<any[]>([]);
   const [sponsorships, setSponsorships] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [recruitmentDrives, setRecruitmentDrives] = useState<any[]>([]);
 
-  // Load Commerce Club details as mock default
+  // Event proposal form (fixes the previously dead "Submit Event Proposal" button)
+  const [eventFormOpen, setEventFormOpen] = useState(false);
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventDate, setEventDate] = useState('');
+  const [eventVenue, setEventVenue] = useState('');
+  const [eventBudget, setEventBudget] = useState('');
+
+  // Reimbursement request form (fixes the previously dead "New Voucher Request" button)
+  const [voucherFormOpen, setVoucherFormOpen] = useState(false);
+  const [voucherAmount, setVoucherAmount] = useState('');
+  const [voucherReceiptUrl, setVoucherReceiptUrl] = useState('');
+
+  // Announcement form
+  const [announcementFormOpen, setAnnouncementFormOpen] = useState(false);
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementBody, setAnnouncementBody] = useState('');
+  const [announcementType, setAnnouncementType] = useState('general');
+
   useEffect(() => {
+    api.get<any[]>('/clubs/my-memberships').then(clubs => {
+      setMyClubs(clubs);
+      if (clubs.length > 0) setSelectedClubId(prev => prev ?? clubs[0].id);
+    }).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedClubId) return;
     async function loadData() {
       try {
-        const club = await api.get<any>('/clubs/club_commerce');
+        const club = await api.get<any>(`/clubs/${selectedClubId}`);
         setClubInfo(club);
-        
-        const mbrs = await api.get<any[]>('/clubs/club_commerce/members');
+
+        const mbrs = await api.get<any[]>(`/clubs/${selectedClubId}/members`);
         setMembers(mbrs);
-        
-        const evts = await api.get<any[]>('/clubs/club_commerce/events');
+
+        const evts = await api.get<any[]>(`/clubs/${selectedClubId}/events`);
         setEvents(evts);
-        
-        const bdg = await api.get<any[]>('/clubs/club_commerce/budgets');
+
+        const bdg = await api.get<any[]>(`/clubs/${selectedClubId}/budgets`);
         setBudgets(bdg);
 
-        const re = await api.get<any[]>('/clubs/club_commerce/reimbursements');
+        const re = await api.get<any[]>(`/clubs/${selectedClubId}/reimbursements`);
         setReimbursements(re);
 
-        const sp = await api.get<any[]>('/clubs/club_commerce/sponsorships');
+        const sp = await api.get<any[]>(`/clubs/${selectedClubId}/sponsorships`);
         setSponsorships(sp);
+
+        const ann = await api.get<any[]>(`/clubs/${selectedClubId}/announcements`);
+        setAnnouncements(ann);
+
+        const drives = await api.get<any[]>(`/clubs/${selectedClubId}/recruitment-drives`);
+        setRecruitmentDrives(drives);
       } catch (e) {
         console.error(e);
       }
     }
     loadData();
-  }, [activeSubTab]);
+  }, [activeSubTab, selectedClubId]);
+
+  if (myClubs.length === 0) {
+    return (
+      <div className="w-full min-h-[calc(100vh-4rem)] flex items-center justify-center text-sm text-slate-400">
+        You are not currently a member of any club.
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-[#0c0c0c] flex flex-col">
+      {/* Club Selector */}
+      {myClubs.length > 1 && (
+        <div className="w-full border-b border-slate-200/40 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-2 flex gap-2 items-center">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Club:</span>
+          <select
+            value={selectedClubId ?? ''}
+            onChange={(e) => setSelectedClubId(e.target.value)}
+            className="text-xs px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-950 dark:text-white"
+          >
+            {myClubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+      )}
+
       {/* Sub Navbar (Horizontal Top Bar) */}
       <div className="w-full border-b border-slate-200/40 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-2.5 flex gap-4 overflow-x-auto scrollbar-none z-10 shadow-sm">
         {[
           { id: 'dashboard', label: 'Dashboard' },
           { id: 'members', label: 'Members' },
+          { id: 'recruitment', label: 'Recruitment' },
           { id: 'events', label: 'Annual Events' },
+          { id: 'announcements', label: 'Announcements' },
           { id: 'budget', label: 'Club Budget' },
           { id: 'reimbursements', label: 'Reimbursements' },
           { id: 'sponsorships', label: 'Sponsorships' }
@@ -57,8 +120,8 @@ export const ClubsDashboard: React.FC = () => {
             key={item.id}
             onClick={() => setActiveSubTab(item.id as any)}
             className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap focus:outline-none ${
-              activeSubTab === item.id 
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm' 
+              activeSubTab === item.id
+                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
                 : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
             }`}
           >
@@ -167,10 +230,33 @@ export const ClubsDashboard: React.FC = () => {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-slate-900 dark:text-white text-sm">Annual Event Schedule</h3>
-              <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors">
+              <button
+                onClick={() => setEventFormOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors"
+              >
                 <Plus className="w-3.5 h-3.5" /> Submit Event Proposal
               </button>
             </div>
+            {eventFormOpen && (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  await api.post(`/clubs/${selectedClubId}/events`, {
+                    club_id: selectedClubId, title: eventTitle, date: eventDate, venue: eventVenue, budget: Number(eventBudget) || 0,
+                  });
+                  setEventTitle(''); setEventDate(''); setEventVenue(''); setEventBudget('');
+                  setEventFormOpen(false);
+                  setActiveSubTab('dashboard'); setActiveSubTab('events');
+                }}
+                className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs"
+              >
+                <input required placeholder="Event title" value={eventTitle} onChange={e => setEventTitle(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
+                <input required type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
+                <input required placeholder="Venue" value={eventVenue} onChange={e => setEventVenue(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
+                <input required type="number" placeholder="Budget (Rs)" value={eventBudget} onChange={e => setEventBudget(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
+                <button type="submit" className="sm:col-span-4 py-2 bg-slate-900 text-white rounded-lg font-semibold">Submit Proposal</button>
+              </form>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {events.map(evt => (
                 <div key={evt.id} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm flex flex-col justify-between">
@@ -224,10 +310,31 @@ export const ClubsDashboard: React.FC = () => {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="font-bold text-slate-900 dark:text-white text-sm">Reimbursement Vouchers</h3>
-              <button className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors">
+              <button
+                onClick={() => setVoucherFormOpen(true)}
+                className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors"
+              >
                 New Voucher Request
               </button>
             </div>
+            {voucherFormOpen && (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  await api.post(`/clubs/${selectedClubId}/reimbursements`, {
+                    club_id: selectedClubId, amount: Number(voucherAmount) || 0, receipt_url: voucherReceiptUrl || null,
+                  });
+                  setVoucherAmount(''); setVoucherReceiptUrl('');
+                  setVoucherFormOpen(false);
+                  setActiveSubTab('dashboard'); setActiveSubTab('reimbursements');
+                }}
+                className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs"
+              >
+                <input required type="number" placeholder="Amount (Rs)" value={voucherAmount} onChange={e => setVoucherAmount(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
+                <input placeholder="Receipt link (optional)" value={voucherReceiptUrl} onChange={e => setVoucherReceiptUrl(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
+                <button type="submit" className="py-2 bg-slate-900 text-white rounded-lg font-semibold">Submit Request</button>
+              </form>
+            )}
             <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-semibold uppercase">
@@ -273,6 +380,82 @@ export const ClubsDashboard: React.FC = () => {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 7: Recruitment (Phase 4 — new) */}
+        {activeSubTab === 'recruitment' && (
+          <div className="space-y-6">
+            <h3 className="font-bold text-slate-900 dark:text-white text-sm">Recruitment Drives</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {recruitmentDrives.map(drive => (
+                <div key={drive.id} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      drive.status === 'open' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600'
+                    }`}>{drive.status}</span>
+                    <span className="text-[10px] text-slate-400">{drive.recruitment_period}</span>
+                  </div>
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">{drive.title}</h4>
+                  <p className="text-xs text-slate-500 mt-2 leading-relaxed">{drive.eligibility}</p>
+                  <div className="mt-3 text-[10px] text-slate-400">Positions available: {drive.positions_available}</div>
+                </div>
+              ))}
+              {recruitmentDrives.length === 0 && (
+                <div className="text-xs text-slate-400">No recruitment drives yet for this club.</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 8: Announcements (Phase 4 — new) */}
+        {activeSubTab === 'announcements' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-slate-900 dark:text-white text-sm">Club Announcements</h3>
+              <button
+                onClick={() => setAnnouncementFormOpen(true)}
+                className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors"
+              >
+                New Announcement
+              </button>
+            </div>
+            {announcementFormOpen && (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  await api.post(`/clubs/${selectedClubId}/announcements`, {
+                    club_id: selectedClubId, title: announcementTitle, body: announcementBody, announcement_type: announcementType,
+                  });
+                  setAnnouncementTitle(''); setAnnouncementBody('');
+                  setAnnouncementFormOpen(false);
+                  setActiveSubTab('dashboard'); setActiveSubTab('announcements');
+                }}
+                className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-3 text-xs"
+              >
+                <input required placeholder="Title" value={announcementTitle} onChange={e => setAnnouncementTitle(e.target.value)} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
+                <textarea required rows={3} placeholder="Message" value={announcementBody} onChange={e => setAnnouncementBody(e.target.value)} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
+                <select value={announcementType} onChange={e => setAnnouncementType(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg">
+                  <option value="general">General Update</option>
+                  <option value="recruitment">Recruitment</option>
+                  <option value="event">Event Update</option>
+                  <option value="deadline">Deadline Reminder</option>
+                </select>
+                <button type="submit" className="py-2 px-4 bg-slate-900 text-white rounded-lg font-semibold">Publish</button>
+              </form>
+            )}
+            <div className="space-y-4">
+              {announcements.map(a => (
+                <div key={a.id} className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-900 dark:text-white">{a.title}</span>
+                    <span className="text-[10px] uppercase text-slate-400">{a.announcement_type}</span>
+                  </div>
+                  <p className="text-slate-500 mt-2 leading-relaxed">{a.body}</p>
+                </div>
+              ))}
+              {announcements.length === 0 && <div className="text-xs text-slate-400">No announcements yet.</div>}
             </div>
           </div>
         )}
