@@ -42,6 +42,12 @@ class ClubMember(Base, TimestampMixin):
     student = relationship("User", back_populates="memberships")
     club = relationship("Club", back_populates="members")
 
+    @property
+    def student_name(self) -> str | None:
+        """Lets ClubMemberOut (from_attributes=True) expose the member's
+        real name without every caller having to join/hydrate it manually."""
+        return self.student.name if self.student else None
+
 
 class Event(Base, TimestampMixin):
     __tablename__ = "events"

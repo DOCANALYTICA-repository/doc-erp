@@ -273,7 +273,7 @@ export const ClubsDashboard: React.FC = () => {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
                 {members.map(mbr => (
                   <tr key={mbr.id}>
-                    <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{mbr.name}</td>
+                    <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{mbr.student_name ?? mbr.student_id}</td>
                     <td className="px-6 py-4">{mbr.role}</td>
                     <td className="px-6 py-4">{mbr.academic_year}</td>
                     <td className="px-6 py-4">
@@ -740,7 +740,7 @@ export const ClubsDashboard: React.FC = () => {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
                   {members.map(m => (
                     <tr key={m.id}>
-                      <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{m.name ?? m.student_id}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{m.student_name ?? m.student_id}</td>
                       <td className="px-6 py-4">{m.role}</td>
                       <td className="px-6 py-4">
                         <select

@@ -21,6 +21,7 @@ class ClubOut(ClubBase):
 class ClubMemberOut(BaseModel):
     id: str
     student_id: str
+    student_name: Optional[str] = None
     club_id: str
     role: str
     status: str

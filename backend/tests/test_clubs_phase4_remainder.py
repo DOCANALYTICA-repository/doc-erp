@@ -172,6 +172,15 @@ def test_event_attendance_marking(client):
     assert any(a["student_id"] == "std_regular_1" for a in r.json())
 
 
+def test_club_members_expose_real_student_names(client):
+    h = auth_headers(client, *PRESIDENT)
+    r = client.get("/api/v1/clubs/club_commerce/members", headers=h)
+    assert r.status_code == 200
+    names = {m["student_id"]: m["student_name"] for m in r.json()}
+    assert names["std_president"] == "Rahul Sharma"
+    assert names["std_vp"] == "Ananya Rao"
+
+
 def test_permission_template_assignment(client):
     president_h = auth_headers(client, *PRESIDENT)
 
