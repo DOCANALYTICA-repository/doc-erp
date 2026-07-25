@@ -56,6 +56,37 @@ class Meeting(Base, TimestampMixin):
     club = relationship("Club")
 
 
+class Reminder(Base, TimestampMixin):
+    """Faculty PRD v1 workspace — no model existed for this at all before
+    Phase 6; Reminders were named but never implemented anywhere."""
+    __tablename__ = "reminders"
+
+    id = Column(String, primary_key=True, index=True)
+    owner_id = Column(String, ForeignKey("users.id"), nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    reminder_type = Column(String, default="one_time", nullable=False)  # one_time, recurring, due_date
+    due_date = Column(String, nullable=False)
+    status = Column(String, default="scheduled", nullable=False)  # scheduled, active, completed, archived
+
+    owner = relationship("User")
+
+
+class DashboardWidgetPreference(Base, TimestampMixin):
+    """Minimum-viable Workspace Engine (v1 scope: order + show/hide only —
+    drag-and-drop/collapse is faculty.dashboard_customization_advanced,
+    flagged coming_soon)."""
+    __tablename__ = "dashboard_widget_preferences"
+
+    id = Column(String, primary_key=True, index=True)
+    owner_id = Column(String, ForeignKey("users.id"), nullable=False)
+    widget_key = Column(String, nullable=False)  # e.g. "todays_schedule", "tasks", "notes"
+    order = Column(String, nullable=False, default="0")
+    visible = Column(Boolean, default=True, nullable=False)
+
+    owner = relationship("User")
+
+
 class Task(Base, TimestampMixin):
     __tablename__ = "tasks"
 

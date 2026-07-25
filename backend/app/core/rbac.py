@@ -66,7 +66,8 @@ ROLE_PERMISSIONS = {
         "clubs:approve_plan",
         "events:approve",
         "budget:manage",
-        "reimbursement:approve"
+        "reimbursement:approve",
+        "claims:review_faculty_coordinator"  # Initial reviewer for club-submitted claims
     },
     "Course Coordinator": {
         "claims:approve_coordinator"
@@ -100,32 +101,37 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
         raise HTTPException(status_code=400, detail="Inactive user")
     return user
 
+def get_resolved_permissions(user: User) -> Set[str]:
+    """
+    Single source of truth for what a user is allowed to do. Used by
+    PermissionChecker below AND by GET /auth/me (see auth.py), so the
+    frontend never has to maintain its own copy of ROLE_PERMISSIONS again.
+    """
+    if user.primary_role == "super_admin":
+        return {"*"}
+
+    permissions: Set[str] = set()
+    permissions.update(ROLE_PERMISSIONS.get(user.primary_role, set()))
+    for tag in user.role_tags_list:
+        permissions.update(ROLE_PERMISSIONS.get(tag, set()))
+    return permissions
+
+
 class PermissionChecker:
     def __init__(self, required_permissions: List[str]):
         self.required_permissions = required_permissions
 
     def __call__(self, current_user: User = Depends(get_current_user)) -> User:
-        if current_user.primary_role == "super_admin":
+        user_permissions = get_resolved_permissions(current_user)
+
+        if "*" in user_permissions:
             return current_user
-            
-        # Resolve the union of all permissions
-        user_permissions: Set[str] = set()
-        
-        # Add primary role permissions
-        primary_perms = ROLE_PERMISSIONS.get(current_user.primary_role, set())
-        user_permissions.update(primary_perms)
-        
-        # Add permission tags based on user's active role tags
-        for tag in current_user.role_tags_list:
-            tag_perms = ROLE_PERMISSIONS.get(tag, set())
-            user_permissions.update(tag_perms)
-            
-        # Check if user has all required permissions
+
         for perm in self.required_permissions:
             if perm not in user_permissions:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail=f"Not enough permissions. Missing: {perm}"
                 )
-                
+
         return current_user

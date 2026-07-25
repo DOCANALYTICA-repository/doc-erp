@@ -4,7 +4,7 @@ import { LandingHome } from './modules/landing/Home';
 import { ClubsDashboard } from './modules/clubs/ClubsDashboard';
 import { ClaimsDashboard } from './modules/claims/ClaimsDashboard';
 import { FacultyDashboard } from './modules/faculty/FacultyDashboard';
-import { api } from './services/api';
+import { api, ApiError } from './services/api';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { TopNav, TopNavHeading } from '@astryxdesign/core/TopNav';
 import {
@@ -53,8 +53,8 @@ export default function App() {
     const saved = localStorage.getItem('doc_user_session');
     if (saved) {
       try {
-        const { user, token } = JSON.parse(saved);
-        login(user, token);
+        const { user, token, capabilities } = JSON.parse(saved);
+        if (user) login(user, token, capabilities || {});
       } catch (e) {
         localStorage.removeItem('doc_user_session');
       }
@@ -106,20 +106,25 @@ export default function App() {
       params.append('password', passwordInput);
 
       const res = await api.post<any>('/auth/login', params);
-      
+
       let userProfile = res.user_profile;
+      let capabilities = res.capabilities || {};
       const accessToken = res.access_token;
 
       if (!userProfile) {
         // Real backend: save token temporarily so client headers include it
-        localStorage.setItem('doc_user_session', JSON.stringify({ user: null, token: accessToken }));
-        userProfile = await api.get<UserState>('/auth/me');
+        localStorage.setItem('doc_user_session', JSON.stringify({ user: null, token: accessToken, capabilities: {} }));
+        const profile = await api.get<any>('/auth/me');
+        capabilities = profile.capabilities || {};
+        userProfile = profile;
       }
 
-      login(userProfile, accessToken);
+      login(userProfile, accessToken, capabilities);
     } catch (err) {
       localStorage.removeItem('doc_user_session');
-      setLoginError('Authentication failed. Check email or password.');
+      setLoginError(
+        err instanceof ApiError ? err.message : 'Authentication failed. Check email or password.'
+      );
     }
   };
 

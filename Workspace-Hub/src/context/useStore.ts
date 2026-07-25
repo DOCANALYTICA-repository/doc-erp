@@ -7,103 +7,54 @@ export interface UserState {
   primary_role: 'public' | 'student' | 'faculty' | 'super_admin';
   role_tags_str: string;
   status: string;
+  // Resolved server-side by GET /auth/me (backend/app/core/rbac.py::get_resolved_permissions).
+  // This is the ONLY permission source on the frontend now — do not
+  // reintroduce a local ROLE_PERMISSIONS map here; that duplication (once a
+  // real, shipped bug where this file and rbac.py silently drifted apart)
+  // is exactly what this field exists to prevent.
+  permissions: string[];
 }
 
 interface PlatformStore {
   user: UserState | null;
   token: string | null;
+  // Resolved server-side by GET /auth/me (backend/app/core/capabilities.py).
+  // slug -> "live" | "coming_soon". A slug absent from this map is "live".
+  capabilities: Record<string, string>;
   activeModule: 'landing' | 'launcher' | 'clubs' | 'claims' | 'faculty';
   activeTab: string;
   isSearchOpen: boolean;
   isNotificationsOpen: boolean;
-  
+
   // Actions
-  login: (user: UserState, token: string) => void;
+  login: (user: UserState, token: string, capabilities?: Record<string, string>) => void;
   logout: () => void;
   navigate: (module: 'landing' | 'launcher' | 'clubs' | 'claims' | 'faculty', tab?: string) => void;
   setSearchOpen: (open: boolean) => void;
   setNotificationsOpen: (open: boolean) => void;
-  
-  // Helpers
-  getPermissions: () => Set<string>;
-  hasPermission: (permission: string) => boolean;
-}
 
-const ROLE_PERMISSIONS: Record<string, string[]> = {
-  public: ["public:view"],
-  student: [
-    "public:view",
-    "claims:submit",
-    "claims:view_own",
-    "clubs:view",
-    "events:register",
-    "tasks:view_own"
-  ],
-  faculty: [
-    "public:view",
-    "claims:view_own",
-    "clubs:view",
-    "faculty:dashboard",
-    "notes:manage",
-    "documents:manage",
-    "meetings:manage",
-    "tasks:manage",
-    "directory:view",
-    "reports:view",
-    "claims:review_faculty"
-  ],
-  super_admin: ["*"],
-  
-  // Role Tags
-  "Club President": [
-    "clubs:manage_members",
-    "events:create",
-    "budget:manage",
-    "reimbursement:request",
-    "sponsorship:manage"
-  ],
-  "Vice President": [
-    "clubs:manage_members",
-    "events:create",
-    "budget:manage",
-    "reimbursement:request"
-  ],
-  "Core Member": [
-    "events:create",
-    "reimbursement:request"
-  ],
-  "Class Teacher": ["claims:review_class_teacher"],
-  "Club Faculty Coordinator": [
-    "clubs:approve_plan",
-    "events:approve",
-    "budget:manage",
-    "reimbursement:approve"
-  ],
-  "Course Coordinator": ["claims:approve_coordinator"],
-  "HOD": [
-    "claims:approve_coordinator",
-    "clubs:approve_plan",
-    "events:approve",
-    "rbac:assign_roles"
-  ]
-};
+  // Helpers
+  hasPermission: (permission: string) => boolean;
+  isEnabled: (slug: string) => boolean;
+}
 
 export const useStore = create<PlatformStore>((set, get) => ({
   user: null,
   token: null,
+  capabilities: {},
   activeModule: 'landing',
   activeTab: 'home',
   isSearchOpen: false,
   isNotificationsOpen: false,
 
-  login: (user, token) => {
-    localStorage.setItem('doc_user_session', JSON.stringify({ user, token }));
-    set({ user, token, activeModule: 'launcher', activeTab: 'main' });
+  login: (user, token, capabilities = {}) => {
+    localStorage.setItem('doc_user_session', JSON.stringify({ user, token, capabilities }));
+    set({ user, token, capabilities, activeModule: 'launcher', activeTab: 'main' });
   },
 
   logout: () => {
     localStorage.removeItem('doc_user_session');
-    set({ user: null, token: null, activeModule: 'landing', activeTab: 'home' });
+    set({ user: null, token: null, capabilities: {}, activeModule: 'landing', activeTab: 'home' });
   },
 
   navigate: (module, tab = 'dashboard') => {
@@ -113,32 +64,14 @@ export const useStore = create<PlatformStore>((set, get) => ({
   setSearchOpen: (open) => set({ isSearchOpen: open }),
   setNotificationsOpen: (open) => set({ isNotificationsOpen: open }),
 
-  getPermissions: () => {
-    const state = get();
-    if (!state.user) return new Set(ROLE_PERMISSIONS.public);
-    if (state.user.primary_role === 'super_admin') return new Set(["*"]);
-
-    const permissions = new Set<string>();
-    
-    // Primary Role
-    const primary = ROLE_PERMISSIONS[state.user.primary_role] || [];
-    primary.forEach(p => permissions.add(p));
-    
-    // Role Tags
-    if (state.user.role_tags_str) {
-      state.user.role_tags_str.split(',').forEach(tag => {
-        const trimmed = tag.trim();
-        const tagPerms = ROLE_PERMISSIONS[trimmed] || [];
-        tagPerms.forEach(p => permissions.add(p));
-      });
-    }
-
-    return permissions;
+  hasPermission: (permission) => {
+    const permissions = get().user?.permissions ?? [];
+    if (permissions.includes('*')) return true;
+    return permissions.includes(permission);
   },
 
-  hasPermission: (permission) => {
-    const permissions = get().getPermissions();
-    if (permissions.has("*")) return true;
-    return permissions.has(permission);
-  }
+  isEnabled: (slug) => {
+    const status = get().capabilities[slug];
+    return status === undefined || status === 'live';
+  },
 }));

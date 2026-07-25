@@ -33,7 +33,7 @@ def seed_database():
             status="active"
         )
         db.add(admin)
-        
+
         # 2. HOD
         hod = User(
             id="fac_hod",
@@ -42,10 +42,14 @@ def seed_database():
             name="Dr. Joy Kishor (HOD)",
             primary_role="faculty",
             status="active",
-            role_tags_str="HOD"
+            role_tags_str="HOD",
+            designation="Professor & HOD",
+            office_location="Block IV, Room 401",
+            office_hours="Mon-Fri, 10:00 AM - 12:00 PM",
+            bio="Head of the Department of Commerce.",
         )
         db.add(hod)
-        
+
         # 3. Class Teachers and Subject Faculty
         fac1 = User(
             id="fac_class_teacher",
@@ -54,7 +58,10 @@ def seed_database():
             name="Prof. Sarah Abraham",
             primary_role="faculty",
             status="active",
-            role_tags_str="Class Teacher,Course Coordinator"
+            role_tags_str="Class Teacher,Course Coordinator",
+            designation="Assistant Professor",
+            office_location="Block IV, Room 210",
+            office_hours="Mon/Wed/Fri, 02:00 PM - 03:00 PM",
         )
         fac2 = User(
             id="fac_subject_1",
@@ -63,7 +70,9 @@ def seed_database():
             name="Dr. Anil Kumar",
             primary_role="faculty",
             status="active",
-            role_tags_str="Subject Faculty"
+            role_tags_str="Subject Faculty",
+            designation="Associate Professor",
+            office_location="Block IV, Room 215",
         )
         fac3 = User(
             id="fac_subject_2",
@@ -72,10 +81,12 @@ def seed_database():
             name="Prof. David D'Souza",
             primary_role="faculty",
             status="active",
-            role_tags_str="Club Faculty Coordinator" # Co-ordinates commerce club
+            role_tags_str="Club Faculty Coordinator", # Co-ordinates commerce club
+            designation="Assistant Professor",
+            office_location="Block IV, Room 218",
         )
         db.add_all([fac1, fac2, fac3])
-        
+
         # 4. Students
         std_leader = User(
             id="std_president",
@@ -84,7 +95,8 @@ def seed_database():
             name="Rahul Sharma",
             primary_role="student",
             status="active",
-            role_tags_str="Club President"
+            role_tags_str="Club President",
+            programme="B.Com (Hons)", semester="5", section="A", enrollment_no="21COM5A001",
         )
         std_vp = User(
             id="std_vp",
@@ -93,7 +105,8 @@ def seed_database():
             name="Ananya Rao",
             primary_role="student",
             status="active",
-            role_tags_str="Vice President"
+            role_tags_str="Vice President",
+            programme="B.Com (Hons)", semester="5", section="A", enrollment_no="21COM5A002",
         )
         std_regular = User(
             id="std_regular_1",
@@ -102,7 +115,8 @@ def seed_database():
             name="Vikram Aditya",
             primary_role="student",
             status="active",
-            role_tags_str=""
+            role_tags_str="",
+            programme="B.Com (Hons)", semester="5", section="A", enrollment_no="21COM5A003",
         )
         std_regular2 = User(
             id="std_regular_2",
@@ -111,7 +125,8 @@ def seed_database():
             name="Neha Kapoor",
             primary_role="student",
             status="active",
-            role_tags_str=""
+            role_tags_str="",
+            programme="B.Com (Hons)", semester="5", section="A", enrollment_no="21COM5A004",
         )
         db.add_all([std_leader, std_vp, std_regular, std_regular2])
         db.commit()

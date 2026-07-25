@@ -119,15 +119,37 @@ const MOCK_DATA = {
   ]
 };
 
-// Fetch wrapper with automatic mock failover
+// A real, reachable-backend error (4xx/5xx). Callers should catch this
+// specifically and show ApiError.message / ApiError.body to the user —
+// it must NEVER be silently swallowed and replaced with mock data.
+export class ApiError extends Error {
+  status: number;
+  body: any;
+  constructor(status: number, body: any) {
+    super(
+      (body && typeof body.detail === 'string' && body.detail) ||
+      `Request failed with status ${status}`
+    );
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
+// Fetch wrapper. Mock failover is a DEV-ONLY convenience for when the
+// backend process itself isn't reachable (offline, not started, DNS/CORS
+// preflight failure) — it must never trigger for a real response from a
+// reachable backend, including auth failures and validation errors.
+// Confusing "wrong password" with "backend is down" was a real, shipped bug:
+// both used to fall through to the same mock-success path.
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const tokenObj = localStorage.getItem('doc_user_session');
   let headers: HeadersInit = {};
-  
+
   if (!(options?.body instanceof URLSearchParams)) {
     headers['Content-Type'] = 'application/json';
   }
-  
+
   if (tokenObj) {
     try {
       const parsed = JSON.parse(tokenObj);
@@ -135,50 +157,89 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     } catch (_) {}
   }
 
+  let response: Response;
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
+    response = await fetch(`${BASE_URL}${endpoint}`, {
       ...options,
       headers: {
         ...headers,
         ...options?.headers
       }
     });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.warn(`Backend connection failed for ${endpoint}. Falling back to client-side mocks.`);
+  } catch (networkError) {
+    // fetch() itself throwing means no response was ever received — this is
+    // the ONLY condition allowed to fall back to client-side mocks.
+    console.warn(`Backend unreachable for ${endpoint}. Falling back to client-side mocks (dev only).`);
     return mockHandler<T>(endpoint, options);
   }
+
+  if (!response.ok) {
+    let body: any = null;
+    try {
+      body = await response.json();
+    } catch (_) {
+      /* non-JSON error body */
+    }
+    throw new ApiError(response.status, body);
+  }
+
+  return await response.json();
+}
+
+// DEV-FALLBACK-ONLY approximation of backend/app/core/rbac.py's resolution,
+// used solely so the offline mock personas below behave sensibly when the
+// real backend is unreachable. This is NOT a second production RBAC engine —
+// nothing in the real (backend-connected) login path uses this; permissions
+// there always come from the server's /auth/me response.
+function mockPermissions(primaryRole: UserState['primary_role'], roleTagsStr: string): string[] {
+  const byRole: Record<string, string[]> = {
+    public: ['public:view'],
+    student: ['public:view', 'claims:submit', 'claims:view_own', 'clubs:view', 'events:register', 'tasks:view_own'],
+    faculty: ['public:view', 'claims:view_own', 'clubs:view', 'faculty:dashboard', 'notes:manage', 'documents:manage', 'meetings:manage', 'tasks:manage', 'directory:view', 'reports:view', 'claims:review_faculty'],
+    super_admin: ['*'],
+  };
+  const byTag: Record<string, string[]> = {
+    'Club President': ['clubs:manage_members', 'events:create', 'budget:manage', 'reimbursement:request', 'sponsorship:manage'],
+    'Vice President': ['clubs:manage_members', 'events:create', 'budget:manage', 'reimbursement:request'],
+    'Core Member': ['events:create', 'reimbursement:request'],
+    'Class Teacher': ['claims:review_class_teacher'],
+    'Club Faculty Coordinator': ['clubs:approve_plan', 'events:approve', 'budget:manage', 'reimbursement:approve', 'claims:review_faculty_coordinator'],
+    'Course Coordinator': ['claims:approve_coordinator'],
+    HOD: ['claims:approve_coordinator', 'clubs:approve_plan', 'events:approve', 'rbac:assign_roles'],
+  };
+  const perms = new Set(byRole[primaryRole] ?? []);
+  roleTagsStr.split(',').map(t => t.trim()).filter(Boolean).forEach(tag => {
+    (byTag[tag] ?? []).forEach(p => perms.add(p));
+  });
+  return Array.from(perms);
 }
 
 // Client Mock Handler simulating API behavior
 function mockHandler<T>(endpoint: string, options?: RequestInit): T {
   const method = options?.method || 'GET';
-  
+
   if (endpoint.startsWith('/auth/login') && method === 'POST') {
     const body = new URLSearchParams(options?.body as any);
     const username = body.get('username') || '';
-    
+
     // Simulate user logs based on role email
     let user: UserState;
     if (username.includes('admin')) {
-      user = { id: 'admin_1', email: 'admin@christuniversity.in', name: 'Super Admin', primary_role: 'super_admin', role_tags_str: '', status: 'active' };
+      user = { id: 'admin_1', email: 'admin@christuniversity.in', name: 'Super Admin', primary_role: 'super_admin', role_tags_str: '', status: 'active', permissions: [] };
     } else if (username.includes('hod')) {
-      user = { id: 'fac_hod', email: 'hod.commerce@christuniversity.in', name: 'Dr. Joy Kishor (HOD)', primary_role: 'faculty', role_tags_str: 'HOD', status: 'active' };
+      user = { id: 'fac_hod', email: 'hod.commerce@christuniversity.in', name: 'Dr. Joy Kishor (HOD)', primary_role: 'faculty', role_tags_str: 'HOD', status: 'active', permissions: [] };
     } else if (username.includes('teacher') || username.includes('class')) {
-      user = { id: 'fac_class_teacher', email: 'teacher.class@christuniversity.in', name: 'Prof. Sarah Abraham', primary_role: 'faculty', role_tags_str: 'Class Teacher,Course Coordinator', status: 'active' };
+      user = { id: 'fac_class_teacher', email: 'teacher.class@christuniversity.in', name: 'Prof. Sarah Abraham', primary_role: 'faculty', role_tags_str: 'Class Teacher,Course Coordinator', status: 'active', permissions: [] };
     } else if (username.includes('vp')) {
-      user = { id: 'std_vp', email: 'student.vp@christuniversity.in', name: 'Ananya Rao', primary_role: 'student', role_tags_str: 'Vice President', status: 'active' };
+      user = { id: 'std_vp', email: 'student.vp@christuniversity.in', name: 'Ananya Rao', primary_role: 'student', role_tags_str: 'Vice President', status: 'active', permissions: [] };
     } else if (username.includes('president')) {
-      user = { id: 'std_president', email: 'student.president@christuniversity.in', name: 'Rahul Sharma', primary_role: 'student', role_tags_str: 'Club President', status: 'active' };
+      user = { id: 'std_president', email: 'student.president@christuniversity.in', name: 'Rahul Sharma', primary_role: 'student', role_tags_str: 'Club President', status: 'active', permissions: [] };
     } else {
-      user = { id: 'std_regular_1', email: 'student.regular@christuniversity.in', name: 'Vikram Aditya', primary_role: 'student', role_tags_str: '', status: 'active' };
+      user = { id: 'std_regular_1', email: 'student.regular@christuniversity.in', name: 'Vikram Aditya', primary_role: 'student', role_tags_str: '', status: 'active', permissions: [] };
     }
+    user.permissions = mockPermissions(user.primary_role, user.role_tags_str);
 
-    return { access_token: 'mock_jwt_token_payload', token_type: 'bearer', user_profile: user } as any;
+    return { access_token: 'mock_jwt_token_payload', token_type: 'bearer', user_profile: user, capabilities: {} } as any;
   }
   
   if (endpoint.startsWith('/auth/me')) {

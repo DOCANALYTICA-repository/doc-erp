@@ -47,6 +47,7 @@ class ClaimOut(ClaimBase):
     id: str
     reference_number: str
     submitted_by: str
+    submitter_name: str = "Unknown"  # populated by the endpoint via Claim.submitter, never client-supplied
     submission_date: str
     status: str
     late_submission_flag: bool
