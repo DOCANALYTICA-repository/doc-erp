@@ -6,6 +6,7 @@ from app.core.rbac import PermissionChecker, get_current_user
 from app.repositories.club import club_repo, member_repo, event_repo, budget_repo, reimbursement_repo, sponsorship_repo
 from app.schemas.club import ClubOut, ClubMemberOut, EventOut, EventCreate, BudgetOut, ReimbursementOut, ReimbursementCreate, SponsorshipOut, SponsorshipCreate
 from app.models.user import User
+from app.services.engines.reporting import reporting_engine
 import uuid
 
 router = APIRouter()
@@ -102,3 +103,11 @@ def create_sponsorship(
     spons_dict["id"] = f"spons_{uuid.uuid4().hex[:12]}"
     spons_dict["club_id"] = club_id
     return sponsorship_repo.create(db, obj_in=spons_dict)
+
+# 7. Reports Engine — club performance report (one of the 7 v1 report types
+# named in the Clubs PRD; the other 6 are new Phase 4 build-out, not just
+# wiring, since the engine only implements this one today).
+@router.get("/{club_id}/reports/performance")
+def get_club_performance_report(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_active_club_member(db, current_user, club_id)
+    return reporting_engine.generate_club_performance_report(db, club_id=club_id)

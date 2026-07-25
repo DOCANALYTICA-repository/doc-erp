@@ -12,6 +12,7 @@ from app.models.user import User
 from app.models.claim import Claim, ClaimParticipant, AttendanceEntry, SupportingDocument, TimetableSession
 from app.services.engines.storage import storage_engine
 from app.services.engines.ai import ai_engine
+from app.services.engines.reporting import reporting_engine
 import uuid
 from datetime import datetime, timezone
 
@@ -406,3 +407,15 @@ def get_claim_ai_summary(
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
     return {"summary": ai_engine.summarize_claim_reason(claim.reason or "")}
+
+
+# 7. Reports Engine — attendance claims summary (one of the two v1 report
+# types named in the Claims PRD; gated to faculty/admin, matching the PRD's
+# framing that these are operational reports, not student-facing).
+@router.get("/reports/attendance-summary")
+def get_attendance_summary_report(
+    academic_year: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(PermissionChecker(["reports:view"])),
+):
+    return reporting_engine.generate_attendance_report(db, academic_year=academic_year)

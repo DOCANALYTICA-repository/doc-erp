@@ -1,6 +1,6 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from app.models.faculty import Note, Document, Meeting, Task, Reminder
+from app.models.faculty import Note, Document, Meeting, Task, Reminder, DashboardWidgetPreference
 from app.repositories.base import BaseRepository
 
 class NoteRepository(BaseRepository[Note]):
@@ -47,8 +47,21 @@ class ReminderRepository(BaseRepository[Reminder]):
     def get_by_owner(self, db: Session, *, owner_id: str) -> List[Reminder]:
         return db.query(Reminder).filter(Reminder.owner_id == owner_id).all()
 
+class DashboardWidgetPreferenceRepository(BaseRepository[DashboardWidgetPreference]):
+    def get_by_owner(self, db: Session, *, owner_id: str) -> List[DashboardWidgetPreference]:
+        return db.query(DashboardWidgetPreference).filter(
+            DashboardWidgetPreference.owner_id == owner_id
+        ).order_by(DashboardWidgetPreference.order).all()
+
+    def get_one(self, db: Session, *, owner_id: str, widget_key: str) -> Optional[DashboardWidgetPreference]:
+        return db.query(DashboardWidgetPreference).filter(
+            DashboardWidgetPreference.owner_id == owner_id,
+            DashboardWidgetPreference.widget_key == widget_key,
+        ).first()
+
 note_repo = NoteRepository(Note)
 document_repo = DocumentRepository(Document)
 meeting_repo = MeetingRepository(Meeting)
 task_repo = TaskRepository(Task)
 reminder_repo = ReminderRepository(Reminder)
+widget_preference_repo = DashboardWidgetPreferenceRepository(DashboardWidgetPreference)

@@ -3,10 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.rbac import get_current_user
-from app.repositories.faculty import note_repo, document_repo, meeting_repo, reminder_repo
+from app.repositories.faculty import note_repo, document_repo, meeting_repo, reminder_repo, widget_preference_repo
 from app.schemas.faculty import (
     NoteOut, NoteCreate, NoteUpdate, DocumentOut, MeetingOut, MeetingCreate, MeetingMinutesUpdate,
     ReminderOut, ReminderCreate, ReminderUpdate,
+    DashboardWidgetPreferenceItem, DashboardWidgetPreferenceOut,
 )
 from app.models.user import User
 from app.models.faculty import Note, Document, Meeting
@@ -178,3 +179,49 @@ def delete_reminder(reminder_id: str, db: Session = Depends(get_db), current_use
         raise HTTPException(status_code=404, detail="Reminder not found")
     reminder_repo.remove(db, id=reminder_id)
     return {"status": "success"}
+
+# 5. Dashboard widget preferences — minimum-viable Workspace Engine (Phase 2).
+# v1 scope is deliberately just order + show/hide; drag-and-drop/collapse is
+# faculty.dashboard_customization_advanced (coming_soon).
+DEFAULT_WIDGET_ORDER = [
+    "todays_schedule", "tasks", "notification_summary", "calendar_preview",
+    "meetings", "reminders", "notes", "quick_actions",
+]
+
+@router.get("/dashboard-preferences", response_model=List[DashboardWidgetPreferenceOut])
+def get_dashboard_preferences(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    existing = widget_preference_repo.get_by_owner(db, owner_id=current_user.id)
+    if existing:
+        return existing
+    # First visit: materialize the documented default order so the frontend
+    # always has something real to render/reorder, not an empty list.
+    created = []
+    for i, key in enumerate(DEFAULT_WIDGET_ORDER):
+        pref = widget_preference_repo.create(db, obj_in={
+            "id": f"widgetpref_{uuid.uuid4().hex[:12]}",
+            "owner_id": current_user.id,
+            "widget_key": key,
+            "order": str(i),
+            "visible": True,
+        })
+        created.append(pref)
+    return created
+
+@router.put("/dashboard-preferences", response_model=List[DashboardWidgetPreferenceOut])
+def update_dashboard_preferences(
+    prefs_in: List[DashboardWidgetPreferenceItem],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = []
+    for item in prefs_in:
+        existing = widget_preference_repo.get_one(db, owner_id=current_user.id, widget_key=item.widget_key)
+        if existing:
+            result.append(widget_preference_repo.update(db, db_obj=existing, obj_in=item.model_dump()))
+        else:
+            result.append(widget_preference_repo.create(db, obj_in={
+                "id": f"widgetpref_{uuid.uuid4().hex[:12]}",
+                "owner_id": current_user.id,
+                **item.model_dump(),
+            }))
+    return result

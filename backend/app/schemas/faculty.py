@@ -95,3 +95,15 @@ class ReminderOut(ReminderBase):
 
     class Config:
         from_attributes = True
+
+class DashboardWidgetPreferenceItem(BaseModel):
+    widget_key: str
+    order: str
+    visible: bool = True
+
+class DashboardWidgetPreferenceOut(DashboardWidgetPreferenceItem):
+    id: str
+    owner_id: str
+
+    class Config:
+        from_attributes = True
