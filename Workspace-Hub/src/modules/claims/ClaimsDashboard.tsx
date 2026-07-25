@@ -10,27 +10,53 @@ export const ClaimsDashboard: React.FC = () => {
   
   const [claims, setClaims] = useState<any[]>([]);
   const [timetable, setTimetable] = useState<any[]>([]);
-  
+
   // Submit claim form state
   const [category, setCategory] = useState<'medical' | 'co_curricular'>('medical');
   const [dateRange, setDateRange] = useState('');
   const [reason, setReason] = useState('');
   const [selectedHours, setSelectedHours] = useState<string[]>([]);
-  
+  const [certificateFile, setCertificateFile] = useState<File | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+
+  // A claim's academic context now comes from the logged-in student's own
+  // profile (Phase 1D fields), never a hardcoded literal — this was the
+  // reason the whole feature could only ever work for one seeded demo
+  // persona before.
+  const programme = user?.programme || '';
+  const semester = user?.semester || '';
+  const section = user?.section || '';
+
   useEffect(() => {
     async function loadData() {
       try {
         const list = await api.get<any[]>('/claims');
         setClaims(list);
-        
-        const tt = await api.get<any[]>('/claims/timetable?programme=B.Com%20(Hons)&semester=5&section=A');
-        setTimetable(tt);
+
+        if (programme && semester && section) {
+          const tt = await api.get<any[]>(
+            `/claims/timetable?programme=${encodeURIComponent(programme)}&semester=${encodeURIComponent(semester)}&section=${encodeURIComponent(section)}`
+          );
+          setTimetable(tt);
+        }
       } catch (e) {
         console.error(e);
       }
     }
     loadData();
-  }, [activeSubTab]);
+  }, [activeSubTab, programme, semester, section]);
+
+  // Soft duplicate-claim check as the student types a date range — never
+  // blocks submission, only warns (per the PRD).
+  useEffect(() => {
+    if (!dateRange.trim()) { setDuplicateWarning(null); return; }
+    const t = setTimeout(() => {
+      api.get<any>(`/claims/duplicate-check?date_range=${encodeURIComponent(dateRange)}`)
+        .then(res => setDuplicateWarning(res.has_potential_duplicate ? res.message : null))
+        .catch(() => setDuplicateWarning(null));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [dateRange]);
 
   const handleSubmitClaim = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,12 +64,19 @@ export const ClaimsDashboard: React.FC = () => {
       alert("Please select at least one missed class hour from the timetable.");
       return;
     }
+    if (category === 'medical' && !certificateFile) {
+      alert("A medical certificate is required for this claim category.");
+      return;
+    }
 
+    // Every selected entry uses the FIRST date in the range the student
+    // actually typed — not a hardcoded literal unrelated to their input.
+    const entryDate = dateRange.split('to')[0].trim();
     const missedClasses = selectedHours.map(hourId => {
       const slot = timetable.find(t => t.id === hourId);
       return {
         subject: slot.subject,
-        date: "2026-07-06", // Default date for mock submission
+        date: entryDate,
         hour: slot.hour,
         subject_faculty_id: slot.faculty_id
       };
@@ -51,21 +84,31 @@ export const ClaimsDashboard: React.FC = () => {
 
     const payload = {
       category,
-      academic_year: "2025-2026",
-      semester: "5",
-      programme: "B.Com (Hons)",
-      section: "A",
+      academic_year: '2025-2026',
+      semester,
+      programme,
+      section,
       date_range: dateRange,
       reason,
       missed_classes: missedClasses
     };
 
     try {
-      await api.post('/claims', payload);
-      alert("Claim submitted successfully!");
+      const claim = await api.post<any>('/claims', payload);
+      if (certificateFile) {
+        const formData = new FormData();
+        formData.append('file', certificateFile);
+        formData.append('document_type', category === 'medical' ? 'medical_certificate' : 'pre_approval_form');
+        await api.upload(`/claims/${claim.id}/documents`, formData);
+      }
+      setCertificateFile(null);
+      setDateRange('');
+      setReason('');
+      setSelectedHours([]);
       setActiveSubTab('my_claims');
     } catch (err) {
       console.error(err);
+      alert('Could not submit the claim. Please check the form and try again.');
     }
   };
 
@@ -207,6 +250,11 @@ export const ClaimsDashboard: React.FC = () => {
                     required
                     className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-lg text-slate-950 dark:text-white"
                   />
+                  {duplicateWarning && (
+                    <span className="text-[10px] text-amber-600 flex items-center gap-1 mt-1">
+                      <AlertTriangle className="w-3 h-3" /> {duplicateWarning}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -250,8 +298,16 @@ export const ClaimsDashboard: React.FC = () => {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-500">Upload Certificate PDF</label>
-                <input type="file" className="text-xs text-slate-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white" />
+                <label className="text-xs font-semibold text-slate-500">
+                  Upload Certificate PDF {category === 'medical' && <span className="text-rose-500">*</span>}
+                </label>
+                <input
+                  type="file"
+                  accept="application/pdf,image/*"
+                  onChange={(e) => setCertificateFile(e.target.files?.[0] ?? null)}
+                  required={category === 'medical'}
+                  className="text-xs text-slate-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white"
+                />
               </div>
             </div>
 
@@ -285,7 +341,7 @@ export const ClaimsDashboard: React.FC = () => {
                   {claims.map(claim => (
                     <tr key={claim.id}>
                       <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{claim.reference_number}</td>
-                      <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{claim.submitted_name || 'Vikram Aditya'}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{claim.submitter_name}</td>
                       <td className="px-6 py-4 max-w-xs truncate">{claim.reason}</td>
                       <td className="px-6 py-4 flex gap-2">
                         <button

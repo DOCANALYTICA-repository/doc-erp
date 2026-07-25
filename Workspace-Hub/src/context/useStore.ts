@@ -7,6 +7,12 @@ export interface UserState {
   primary_role: 'public' | 'student' | 'faculty' | 'super_admin';
   role_tags_str: string;
   status: string;
+  // Academic profile (students) / Faculty Directory fields — added Phase 1D.
+  programme?: string | null;
+  semester?: string | null;
+  section?: string | null;
+  enrollment_no?: string | null;
+  designation?: string | null;
   // Resolved server-side by GET /auth/me (backend/app/core/rbac.py::get_resolved_permissions).
   // This is the ONLY permission source on the frontend now — do not
   // reintroduce a local ROLE_PERMISSIONS map here; that duplication (once a
