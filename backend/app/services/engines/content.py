@@ -1,4 +1,6 @@
 from typing import Dict, Any, List
+from sqlalchemy.orm import Session
+from app.models.club import Club
 
 class ContentEngine:
     def get_public_statistics(self) -> Dict[str, Any]:
@@ -8,6 +10,26 @@ class ContentEngine:
             "number_of_clubs": 12,
             "years_established": 55
         }
+
+    def get_club_showcase(self, db: Session) -> List[Dict[str, Any]]:
+        """
+        Public-safe club cards for the Landing Portal — per the Landing PRD,
+        this must expose ONLY Logo/Short Description/contact, never member
+        lists, budgets, or any operational data (that's what the real,
+        authenticated /clubs endpoints are for, per Phase 1A).
+        """
+        clubs = db.query(Club).filter(Club.status == "active").all()
+        return [
+            {
+                "id": c.id,
+                "name": c.name,
+                "category": c.category,
+                "logo": c.logo,
+                "description": c.description,
+                "contact_email": c.contact_email,
+            }
+            for c in clubs
+        ]
 
     def get_courses(self) -> List[Dict[str, Any]]:
         return [

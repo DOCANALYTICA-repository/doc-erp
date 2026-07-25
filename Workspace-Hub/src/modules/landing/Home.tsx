@@ -3,21 +3,59 @@ import { useNavigate } from 'react-router-dom';
 import { Sparkles, ArrowRight, Download, BookOpen, Users, Compass, Eye, Mail, MapPin } from 'lucide-react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { api } from '../../services/api';
 
 // Register GSAP plugins
 gsap.registerPlugin(ScrollTrigger);
 
-// Import generated local illustrations
+// Local illustration used for the static "About" section only — everything
+// else on this page (stats/courses/clubs/gallery) is Content-Engine-driven
+// (Phase 3), not hardcoded, per the Landing PRD's "presentation layer only,
+// owns no content" architecture rule.
 import docDeptImg from '../../../assets/images/doc_department.jpg';
-import conclaveImg from '../../../assets/images/gallery_conclave.jpg';
-import recruitmentImg from '../../../assets/images/gallery_recruitment.jpg';
-import inaugurationImg from '../../../assets/images/gallery_inauguration.jpg';
-import festImg from '../../../assets/images/gallery_fest.jpg';
+
+interface Course {
+  id: string;
+  name: string;
+  description: string;
+  outcomes: string[];
+  careers: string[];
+}
+interface ClubCard {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  contact_email: string;
+}
+interface GalleryImage {
+  id: string;
+  title: string;
+  url: string;
+}
+interface Stats {
+  total_students: number;
+  faculty_count: number;
+  number_of_clubs: number;
+  years_established: number;
+}
 
 export const LandingHome: React.FC = () => {
   const navigate = useNavigate();
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
   const [activeLightboxImg, setActiveLightboxImg] = useState<string | null>(null);
+
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [clubs, setClubs] = useState<ClubCard[]>([]);
+  const [gallery, setGallery] = useState<GalleryImage[]>([]);
+
+  useEffect(() => {
+    api.get<Stats>('/content/statistics').then(setStats).catch(console.error);
+    api.get<Course[]>('/content/courses').then(setCourses).catch(console.error);
+    api.get<ClubCard[]>('/content/clubs-showcase').then(setClubs).catch(console.error);
+    api.get<GalleryImage[]>('/content/gallery').then(setGallery).catch(console.error);
+  }, []);
 
   const heroContainerRef = useRef<HTMLDivElement>(null);
   const svgPathRef = useRef<SVGPathElement>(null);
@@ -87,51 +125,6 @@ export const LandingHome: React.FC = () => {
 
     return () => ctx.revert();
   }, []);
-
-  // Department public data
-  const stats = {
-    students: "2,500+",
-    faculty: "85+",
-    clubs: "12",
-    history: "55 Years"
-  };
-
-  const courses = [
-    {
-      id: "bcom_regular",
-      name: "B.Com (Regular)",
-      description: "A comprehensive undergraduate program focusing on commerce, accounting, and business finance.",
-      outcomes: ["Strong foundation in Accounting principles", "Understanding of Financial markets", "Business Law literacy"],
-      careers: ["Financial Analyst", "Audit Associate", "Accountant"]
-    },
-    {
-      id: "bcom_hons",
-      name: "B.Com (Honours)",
-      description: "Advanced commerce curriculum with specialization tracks in Finance, Investment, and Business Analytics.",
-      outcomes: ["Mastery of Corporate Valuation", "Proficiency in Data Analytics tools", "Advanced Taxation concepts"],
-      careers: ["Investment Banker", "Risk Analyst", "Data Consultant"]
-    },
-    {
-      id: "bcom_fna",
-      name: "B.Com (Finance and Accountancy)",
-      description: "Professional program integrated with globally recognized accounting curriculums (ACCA / CPA).",
-      outcomes: ["Exemption in global certification exams", "Strategic business leadership insights", "Taxation compliance expertise"],
-      careers: ["Chartered Accountant", "Management Consultant", "Corporate Secretary"]
-    }
-  ];
-
-  const clubs = [
-    { name: "Commerce Club", desc: "Fostering academic excellence, analytical reasoning, and industrial finance insights.", cat: "Academic", email: "commerce.club@christuniversity.in" },
-    { name: "Cultural Committee", desc: "The heartbeat of artistic, theatrical, and musical expression for the department.", cat: "Cultural", email: "cultural.club@christuniversity.in" },
-    { name: "Sponsorship & PR Cell", desc: "Facilitating corporate partnerships and external relations for major conclaves.", cat: "Logistics", email: "pr.commerce@christuniversity.in" }
-  ];
-
-  const gallery = [
-    { title: "National Conclave 2026", url: conclaveImg },
-    { title: "Club Recruitment Day", url: recruitmentImg },
-    { title: "Inauguration Ceremony", url: inaugurationImg },
-    { title: "Inter-collegiate Fest", url: festImg }
-  ];
 
   return (
     <div ref={heroContainerRef} className="w-full min-h-screen bg-slate-50 dark:bg-[#0a0a0a] transition-colors duration-300 overflow-x-hidden relative">
@@ -204,19 +197,19 @@ export const LandingHome: React.FC = () => {
       <section className="stats-section py-12 bg-white dark:bg-slate-950/40 border-y border-slate-200/40 dark:border-slate-900/60">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           <div className="stat-card">
-            <div className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">{stats.students}</div>
+            <div className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">{stats ? `${stats.total_students}+` : '—'}</div>
             <div className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Enrolled Students</div>
           </div>
           <div className="stat-card">
-            <div className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">{stats.faculty}</div>
+            <div className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">{stats ? `${stats.faculty_count}+` : '—'}</div>
             <div className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Faculty Advisors</div>
           </div>
           <div className="stat-card">
-            <div className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">{stats.clubs}</div>
+            <div className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">{stats?.number_of_clubs ?? '—'}</div>
             <div className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Operational Clubs</div>
           </div>
           <div className="stat-card">
-            <div className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">{stats.history}</div>
+            <div className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">{stats ? `${stats.years_established} Years` : '—'}</div>
             <div className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Academic Legacy</div>
           </div>
         </div>
@@ -307,18 +300,18 @@ export const LandingHome: React.FC = () => {
           <p className="text-sm text-slate-500 mt-2">Get involved in our diverse specialized clubs to develop hands-on logistics and planning capabilities.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
-          {clubs.map((club, idx) => (
-            <div key={idx} className="club-card p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between">
+          {clubs.map((club) => (
+            <div key={club.id} className="club-card p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between">
               <div>
                 <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  {club.cat}
+                  {club.category}
                 </span>
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-4">{club.name}</h3>
-                <p className="text-xs text-slate-500 mt-2 leading-relaxed">{club.desc}</p>
+                <p className="text-xs text-slate-500 mt-2 leading-relaxed">{club.description}</p>
               </div>
               <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
                 <span>Inquiries:</span>
-                <a href={`mailto:${club.email}`} className="text-indigo-500 hover:underline">{club.email}</a>
+                <a href={`mailto:${club.contact_email}`} className="text-indigo-500 hover:underline">{club.contact_email}</a>
               </div>
             </div>
           ))}
@@ -333,9 +326,9 @@ export const LandingHome: React.FC = () => {
             <p className="text-sm text-slate-500 mt-3">Glimpses of recent academic summits, recruitment days, and cultural fests.</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {gallery.map((img, idx) => (
+            {gallery.map((img) => (
               <div
-                key={idx}
+                key={img.id}
                 onClick={() => setActiveLightboxImg(img.url)}
                 className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer border border-slate-200 dark:border-slate-800 shadow-sm bg-slate-200"
               >

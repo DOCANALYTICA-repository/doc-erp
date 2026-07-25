@@ -10,6 +10,15 @@ def test_content_engine_is_public(client):
     assert r.status_code == 200
 
 
+def test_content_clubs_showcase_exposes_only_public_safe_fields(client):
+    r = client.get("/api/v1/content/clubs-showcase")
+    assert r.status_code == 200
+    clubs = r.json()
+    assert any(c["name"] == "Commerce Club" for c in clubs)
+    for c in clubs:
+        assert set(c.keys()) == {"id", "name", "category", "logo", "description", "contact_email"}
+
+
 def test_search_requires_auth(client):
     r = client.get("/api/v1/search/?q=commerce")
     assert r.status_code == 401

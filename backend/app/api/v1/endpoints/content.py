@@ -1,4 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.core.database import get_db
 from app.services.engines.content import content_engine
 
 router = APIRouter()
@@ -20,3 +22,7 @@ def get_courses():
 @router.get("/gallery")
 def get_gallery_images():
     return content_engine.get_gallery_images()
+
+@router.get("/clubs-showcase")
+def get_clubs_showcase(db: Session = Depends(get_db)):
+    return content_engine.get_club_showcase(db)
