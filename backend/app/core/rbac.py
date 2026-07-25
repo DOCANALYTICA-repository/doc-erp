@@ -60,7 +60,8 @@ ROLE_PERMISSIONS = {
         "reimbursement:request"
     },
     "Class Teacher": {
-        "claims:review_class_teacher"
+        "claims:review_class_teacher",
+        "claims:manage_timetable"
     },
     "Club Faculty Coordinator": {
         "clubs:approve_plan",
@@ -76,7 +77,8 @@ ROLE_PERMISSIONS = {
         "claims:approve_coordinator",
         "clubs:approve_plan",
         "events:approve",
-        "rbac:assign_roles"
+        "rbac:assign_roles",
+        "claims:manage_timetable"
     }
 }
 

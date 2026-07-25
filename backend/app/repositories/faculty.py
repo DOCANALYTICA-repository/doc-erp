@@ -1,6 +1,6 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from app.models.faculty import Note, Document, Meeting, Task
+from app.models.faculty import Note, Document, Meeting, Task, Reminder
 from app.repositories.base import BaseRepository
 
 class NoteRepository(BaseRepository[Note]):
@@ -43,7 +43,12 @@ class TaskRepository(BaseRepository[Task]):
     def get_by_source(self, db: Session, *, source: str) -> List[Task]:
         return db.query(Task).filter(Task.source_module == source).all()
 
+class ReminderRepository(BaseRepository[Reminder]):
+    def get_by_owner(self, db: Session, *, owner_id: str) -> List[Reminder]:
+        return db.query(Reminder).filter(Reminder.owner_id == owner_id).all()
+
 note_repo = NoteRepository(Note)
 document_repo = DocumentRepository(Document)
 meeting_repo = MeetingRepository(Meeting)
 task_repo = TaskRepository(Task)
+reminder_repo = ReminderRepository(Reminder)

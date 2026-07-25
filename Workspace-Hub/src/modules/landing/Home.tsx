@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useStore } from '../../context/useStore';
+import { useNavigate } from 'react-router-dom';
 import { Sparkles, ArrowRight, Download, BookOpen, Users, Compass, Eye, Mail, MapPin } from 'lucide-react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -15,7 +15,7 @@ import inaugurationImg from '../../../assets/images/gallery_inauguration.jpg';
 import festImg from '../../../assets/images/gallery_fest.jpg';
 
 export const LandingHome: React.FC = () => {
-  const navigate = useStore((state) => state.navigate);
+  const navigate = useNavigate();
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
   const [activeLightboxImg, setActiveLightboxImg] = useState<string | null>(null);
 
@@ -163,7 +163,7 @@ export const LandingHome: React.FC = () => {
             <a href="#contact" className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">Contact</a>
           </nav>
           <button
-            onClick={() => navigate('landing', 'login')}
+            onClick={() => navigate('/login')}
             className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-medium rounded-lg text-sm transition-all shadow-sm"
           >
             DOC Portal Login
@@ -185,7 +185,7 @@ export const LandingHome: React.FC = () => {
         </p>
         <div className="hero-cta mt-10 flex flex-col sm:flex-row gap-4 items-center justify-center w-full sm:w-auto">
           <button
-            onClick={() => navigate('landing', 'login')}
+            onClick={() => navigate('/login')}
             className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-medium rounded-lg flex items-center justify-center gap-2 transition-all shadow"
           >
             Access ERP Portal

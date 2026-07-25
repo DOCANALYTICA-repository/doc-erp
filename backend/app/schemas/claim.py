@@ -66,8 +66,13 @@ class SupportingDocumentOut(BaseModel):
     class Config:
         from_attributes = True
 
-class TimetableSessionOut(BaseModel):
-    id: str
+class DuplicateClaimWarning(BaseModel):
+    """Soft warning only — per the Claims PRD, duplicate detection must
+    never block submission, only surface a warning."""
+    has_potential_duplicate: bool
+    message: Optional[str] = None
+
+class TimetableSessionBase(BaseModel):
     day_of_week: str
     subject: str
     hour: str
@@ -75,6 +80,12 @@ class TimetableSessionOut(BaseModel):
     programme: str
     semester: str
     section: str
+
+class TimetableSessionCreate(TimetableSessionBase):
+    pass
+
+class TimetableSessionOut(TimetableSessionBase):
+    id: str
 
     class Config:
         from_attributes = True

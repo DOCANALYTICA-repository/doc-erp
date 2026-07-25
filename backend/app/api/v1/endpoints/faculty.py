@@ -1,10 +1,13 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.rbac import get_current_user
-from app.repositories.faculty import note_repo, document_repo, meeting_repo
-from app.schemas.faculty import NoteOut, NoteCreate, DocumentOut, DocumentCreate, MeetingOut, MeetingCreate, MeetingMinutesUpdate
+from app.repositories.faculty import note_repo, document_repo, meeting_repo, reminder_repo
+from app.schemas.faculty import (
+    NoteOut, NoteCreate, NoteUpdate, DocumentOut, MeetingOut, MeetingCreate, MeetingMinutesUpdate,
+    ReminderOut, ReminderCreate, ReminderUpdate,
+)
 from app.models.user import User
 from app.models.faculty import Note, Document, Meeting
 from app.services.engines.storage import storage_engine
@@ -25,6 +28,23 @@ def create_note(note_in: NoteCreate, db: Session = Depends(get_db), current_user
     note_dict["owner_id"] = current_user.id
     return note_repo.create(db, obj_in=note_dict)
 
+@router.put("/notes/{note_id}", response_model=NoteOut)
+def update_note(
+    note_id: str,
+    note_in: NoteUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Previously missing entirely — notes could be created and listed but
+    never edited, so pinning/favoriting after creation (which the
+    dashboard's "Pinned Notes" widget depends on) had no way to happen.
+    """
+    note = note_repo.get(db, note_id)
+    if not note or note.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return note_repo.update(db, db_obj=note, obj_in=note_in.model_dump(exclude_unset=True))
+
 @router.delete("/notes/{note_id}")
 def delete_note(note_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     note = note_repo.get(db, note_id)
@@ -33,19 +53,45 @@ def delete_note(note_id: str, db: Session = Depends(get_db), current_user: User 
     note_repo.remove(db, id=note_id)
     return {"status": "success"}
 
-# 2. Documents Space
+# 2. Documents Space — real upload via the Storage Engine (Phase 1C). This
+# used to accept a client-supplied fake file_url string; it now accepts an
+# actual file and stores it in Supabase Storage.
 @router.get("/documents", response_model=List[DocumentOut])
 def list_documents(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return document_repo.get_by_owner(db, owner_id=current_user.id)
 
 @router.post("/documents", response_model=DocumentOut)
-def create_document(doc_in: DocumentCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    doc_dict = doc_in.dict()
-    doc_dict["id"] = f"doc_{uuid.uuid4().hex[:12]}"
-    doc_dict["owner_id"] = current_user.id
-    doc_dict["shared_link"] = f"share_{uuid.uuid4().hex[:12]}"
-    doc_dict["is_link_revoked"] = False
+def create_document(
+    file: UploadFile = File(...),
+    name: Optional[str] = Form(None),
+    folder_path: str = Form("/"),
+    tags: str = Form(""),
+    is_favorite: bool = Form(False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    stored_path = storage_engine.upload_file(file, folder=f"faculty_documents/{current_user.id}")
+    doc_dict = {
+        "id": f"doc_{uuid.uuid4().hex[:12]}",
+        "owner_id": current_user.id,
+        "name": name or file.filename or "Untitled",
+        "file_url": stored_path,
+        "folder_path": folder_path,
+        "tags": tags,
+        "is_favorite": is_favorite,
+        "shared_link": f"share_{uuid.uuid4().hex[:12]}",
+        "is_link_revoked": False,
+    }
     return document_repo.create(db, obj_in=doc_dict)
+
+@router.get("/documents/{document_id}/download-url")
+def get_document_download_url(
+    document_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    doc = document_repo.get(db, document_id)
+    if not doc or doc.owner_id != current_user.id or doc.is_link_revoked:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"url": storage_engine.get_signed_url(doc.file_url)}
 
 # 3. Meetings
 @router.get("/meetings", response_model=List[MeetingOut])
@@ -70,11 +116,21 @@ def record_meeting_minutes(
     meeting = meeting_repo.get(db, meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
-        
+    if meeting.organizer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the meeting organizer can record minutes")
+
+    # Explicit, validated gate (Phase 6): a meeting cannot be marked complete
+    # without real minutes, decisions, and action items — this used to be
+    # an implicit side effect of merely calling this endpoint at all.
+    if not minutes_in.minutes.strip():
+        raise HTTPException(status_code=400, detail="Minutes are required to complete a meeting")
+    if not minutes_in.decisions:
+        raise HTTPException(status_code=400, detail="At least one decision is required to complete a meeting")
+
     meeting.minutes = minutes_in.minutes
     meeting.decisions = ",".join(minutes_in.decisions)
     meeting.status = "completed"
-    
+
     # Sync meeting action items as formal tasks inside the Platform Task Engine
     task_engine.sync_meeting_action_items(
         db,
@@ -82,8 +138,43 @@ def record_meeting_minutes(
         organizer_id=current_user.id,
         action_items=minutes_in.action_items
     )
-    
+
     db.add(meeting)
     db.commit()
     db.refresh(meeting)
     return meeting
+
+# 4. Reminders (Faculty PRD v1 workspace — previously had no model or endpoints at all)
+@router.get("/reminders", response_model=List[ReminderOut])
+def list_reminders(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return reminder_repo.get_by_owner(db, owner_id=current_user.id)
+
+@router.post("/reminders", response_model=ReminderOut)
+def create_reminder(
+    reminder_in: ReminderCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    reminder_dict = reminder_in.dict()
+    reminder_dict["id"] = f"rem_{uuid.uuid4().hex[:12]}"
+    reminder_dict["owner_id"] = current_user.id
+    reminder_dict["status"] = "scheduled"
+    return reminder_repo.create(db, obj_in=reminder_dict)
+
+@router.put("/reminders/{reminder_id}", response_model=ReminderOut)
+def update_reminder(
+    reminder_id: str,
+    reminder_in: ReminderUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    reminder = reminder_repo.get(db, reminder_id)
+    if not reminder or reminder.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    return reminder_repo.update(db, db_obj=reminder, obj_in=reminder_in.model_dump(exclude_unset=True))
+
+@router.delete("/reminders/{reminder_id}")
+def delete_reminder(reminder_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    reminder = reminder_repo.get(db, reminder_id)
+    if not reminder or reminder.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    reminder_repo.remove(db, id=reminder_id)
+    return {"status": "success"}

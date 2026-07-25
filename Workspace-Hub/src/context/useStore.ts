@@ -21,15 +21,13 @@ interface PlatformStore {
   // Resolved server-side by GET /auth/me (backend/app/core/capabilities.py).
   // slug -> "live" | "coming_soon". A slug absent from this map is "live".
   capabilities: Record<string, string>;
-  activeModule: 'landing' | 'launcher' | 'clubs' | 'claims' | 'faculty';
-  activeTab: string;
   isSearchOpen: boolean;
   isNotificationsOpen: boolean;
 
-  // Actions
+  // Actions. Navigation itself now lives in React Router (Phase 1C) — this
+  // store only holds session/identity state, never "which screen am I on."
   login: (user: UserState, token: string, capabilities?: Record<string, string>) => void;
   logout: () => void;
-  navigate: (module: 'landing' | 'launcher' | 'clubs' | 'claims' | 'faculty', tab?: string) => void;
   setSearchOpen: (open: boolean) => void;
   setNotificationsOpen: (open: boolean) => void;
 
@@ -42,23 +40,17 @@ export const useStore = create<PlatformStore>((set, get) => ({
   user: null,
   token: null,
   capabilities: {},
-  activeModule: 'landing',
-  activeTab: 'home',
   isSearchOpen: false,
   isNotificationsOpen: false,
 
   login: (user, token, capabilities = {}) => {
     localStorage.setItem('doc_user_session', JSON.stringify({ user, token, capabilities }));
-    set({ user, token, capabilities, activeModule: 'launcher', activeTab: 'main' });
+    set({ user, token, capabilities });
   },
 
   logout: () => {
     localStorage.removeItem('doc_user_session');
-    set({ user: null, token: null, capabilities: {}, activeModule: 'landing', activeTab: 'home' });
-  },
-
-  navigate: (module, tab = 'dashboard') => {
-    set({ activeModule: module, activeTab: tab });
+    set({ user: null, token: null, capabilities: {} });
   },
 
   setSearchOpen: (open) => set({ isSearchOpen: open }),

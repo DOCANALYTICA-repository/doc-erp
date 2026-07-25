@@ -1,12 +1,17 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.rbac import PermissionChecker, get_current_user, get_resolved_permissions
-from app.repositories.claim import claim_repo, claim_participant_repo, attendance_entry_repo, timetable_repo
-from app.schemas.claim import ClaimOut, ClaimCreate, TimetableSessionOut
+from app.repositories.claim import claim_repo, claim_participant_repo, attendance_entry_repo, timetable_repo, doc_repo
+from app.schemas.claim import (
+    ClaimOut, ClaimCreate, TimetableSessionOut, TimetableSessionCreate,
+    SupportingDocumentOut, DuplicateClaimWarning,
+)
 from app.models.user import User
-from app.models.claim import Claim, ClaimParticipant, AttendanceEntry
+from app.models.claim import Claim, ClaimParticipant, AttendanceEntry, SupportingDocument, TimetableSession
+from app.services.engines.storage import storage_engine
+from app.services.engines.ai import ai_engine
 import uuid
 from datetime import datetime, timezone
 
@@ -23,6 +28,65 @@ def get_student_timetable(
 ):
     return timetable_repo.get_by_academic_context(db, prog=programme, sem=semester, sec=section)
 
+
+# 1a. Timetable administration (Class Teacher / HOD / super_admin) — this
+# didn't exist at all before Phase 5; there was no way to populate or
+# maintain the timetable data the entire claims workflow depends on beyond
+# the one-time seed script.
+@router.post("/timetable", response_model=TimetableSessionOut)
+def create_timetable_session(
+    session_in: TimetableSessionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(PermissionChecker(["claims:manage_timetable"])),
+):
+    session_dict = session_in.dict()
+    session_dict["id"] = f"tt_{uuid.uuid4().hex[:12]}"
+    return timetable_repo.create(db, obj_in=session_dict)
+
+@router.put("/timetable/{session_id}", response_model=TimetableSessionOut)
+def update_timetable_session(
+    session_id: str,
+    session_in: TimetableSessionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(PermissionChecker(["claims:manage_timetable"])),
+):
+    session = timetable_repo.get(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Timetable session not found")
+    return timetable_repo.update(db, db_obj=session, obj_in=session_in.dict())
+
+@router.delete("/timetable/{session_id}")
+def delete_timetable_session(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(PermissionChecker(["claims:manage_timetable"])),
+):
+    session = timetable_repo.get(db, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Timetable session not found")
+    timetable_repo.remove(db, id=session_id)
+    return {"status": "success"}
+
+# 1b. Duplicate-claim check — SOFT WARNING ONLY, never blocks submission
+# (per the Claims PRD: "recommend withdrawal of the previous claim but
+# shall not block submission").
+@router.get("/duplicate-check", response_model=DuplicateClaimWarning)
+def check_duplicate_claim(
+    date_range: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    existing = claim_repo.get_by_submitter(db, user_id=current_user.id)
+    match = next((c for c in existing if c.date_range == date_range and c.status != "rejected"), None)
+    if match:
+        return DuplicateClaimWarning(
+            has_potential_duplicate=True,
+            message=f"You already have a claim ({match.reference_number}) covering {date_range}. "
+                    f"Consider withdrawing it before submitting a new one for the same dates.",
+        )
+    return DuplicateClaimWarning(has_potential_duplicate=False)
+
+
 # 2. Submit Claim
 @router.post("/", response_model=ClaimOut)
 def submit_attendance_claim(
@@ -32,6 +96,17 @@ def submit_attendance_claim(
 ):
     claim_id = f"cl_{uuid.uuid4().hex[:12]}"
     ref_num = f"ACP-{datetime.now().year}-{uuid.uuid4().hex[:6].upper()}"
+
+    # Late-submission flag: >7 calendar days after the LAST date covered by
+    # the claim. Per the PRD this is informational only — late claims remain
+    # fully eligible for review, never auto-rejected.
+    late_flag = False
+    try:
+        last_date_str = claim_in.date_range.split("to")[-1].strip()
+        last_date = datetime.strptime(last_date_str, "%Y-%m-%d")
+        late_flag = (datetime.now(timezone.utc).replace(tzinfo=None) - last_date).days > 7
+    except (ValueError, IndexError):
+        pass  # Unparseable date_range format — leave flag False rather than guess
 
     # Create main Claim record
     claim_dict = {
@@ -48,7 +123,7 @@ def submit_attendance_claim(
         "date_range": claim_in.date_range,
         "reason": claim_in.reason,
         "status": "submitted",
-        "late_submission_flag": False,
+        "late_submission_flag": late_flag,
         "current_workflow_stage": "initial_review" # Class Teacher or Club Faculty Coordinator
     }
     db_claim = Claim(**claim_dict)
@@ -274,3 +349,60 @@ def approve_claim_stage(
     db.add(claim)
     db.commit()
     return {"status": "success", "new_stage": claim.current_workflow_stage, "claim_status": claim.status}
+
+
+# 5. Supporting Documents — real upload via the Storage Engine (Phase 1C/5).
+# Previously the medical-certificate file input on the frontend wasn't wired
+# to any handler at all; selecting a file silently did nothing.
+@router.post("/{claim_id}/documents", response_model=SupportingDocumentOut)
+def upload_supporting_document(
+    claim_id: str,
+    document_type: str = Form(...),  # medical_certificate, pre_approval_form
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    claim = claim_repo.get(db, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail="Claim not found")
+    if claim.submitted_by != current_user.id and current_user.primary_role != "super_admin":
+        raise HTTPException(status_code=403, detail="Only the claim's submitter may attach supporting documents")
+
+    stored_path = storage_engine.upload_file(file, folder=f"claims/{claim_id}")
+    doc = SupportingDocument(
+        id=f"doc_{uuid.uuid4().hex[:12]}",
+        claim_id=claim_id,
+        document_type=document_type,
+        file_url=stored_path,
+    )
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
+@router.get("/{claim_id}/documents/{document_id}/download-url")
+def get_supporting_document_url(
+    claim_id: str, document_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
+    doc = doc_repo.get(db, document_id)
+    if not doc or doc.claim_id != claim_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    # Reuse the same access rule as viewing the claim itself.
+    get_claim(claim_id, db, current_user)
+    return {"url": storage_engine.get_signed_url(doc.file_url)}
+
+
+# 6. AI Engine — faculty-facing reason summarization (bounded, advisory-only,
+# in v1; the open-ended Student AI Assistant stays claims.student_ai_assistant
+# / coming_soon, see backend/app/core/capabilities.py).
+@router.get("/{claim_id}/ai-summary")
+def get_claim_ai_summary(
+    claim_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(PermissionChecker(["claims:review_faculty"])),
+):
+    claim = claim_repo.get(db, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail="Claim not found")
+    return {"summary": ai_engine.summarize_claim_reason(claim.reason or "")}

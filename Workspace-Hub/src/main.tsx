@@ -1,12 +1,21 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
+import {BrowserRouter} from 'react-router-dom';
 import "@astryxdesign/core/reset.css";
 import "@astryxdesign/core/astryx.css";
+// Design token cleanup (Phase 1C): these two were installed dependencies
+// that were never actually imported, leaving `bg-surface`/`text-primary`
+// style Tailwind utilities unavailable and the neutral theme inactive —
+// the app rendered on astryx.css's raw defaults only.
+import "@astryxdesign/core/tailwind-theme.css";
+import "@astryxdesign/theme-neutral/theme.css";
 import App from './App.tsx';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </StrictMode>,
 );
