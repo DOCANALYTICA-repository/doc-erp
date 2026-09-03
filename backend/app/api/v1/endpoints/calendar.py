@@ -1,7 +1,7 @@
 from typing import Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.core.database import get_db
+from app.core.database import get_db_readonly as get_db  # read-only: no BEGIN/ROLLBACK round trips
 from app.core.rbac import get_current_user
 from app.models.user import User
 from app.services.engines.calendar import calendar_engine

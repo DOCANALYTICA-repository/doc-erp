@@ -35,7 +35,10 @@ class MeetingRepository(BaseRepository[Meeting]):
 
 class TaskRepository(BaseRepository[Task]):
     def get_by_assignee(self, db: Session, *, assignee_id: str) -> List[Task]:
-        return db.query(Task).filter(Task.assignee_id == assignee_id).all()
+        # Soonest due first; NULL due dates sort last rather than randomly.
+        return db.query(Task).filter(
+            Task.assignee_id == assignee_id
+        ).order_by(Task.due_date.is_(None), Task.due_date, Task.id).all()
 
     def get_by_creator(self, db: Session, *, creator_id: str) -> List[Task]:
         return db.query(Task).filter(Task.creator_id == creator_id).all()

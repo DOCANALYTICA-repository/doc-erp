@@ -7,11 +7,18 @@ class ClaimRepository(BaseRepository[Claim]):
     def get_by_reference(self, db: Session, *, ref_num: str) -> Optional[Claim]:
         return db.query(Claim).filter(Claim.reference_number == ref_num).first()
 
+    # Newest first. Without an ORDER BY, Postgres returns rows in whatever
+    # order it likes, so a student's claim list visibly reshuffled between
+    # loads — a present-tense bug, not a future one.
     def get_by_submitter(self, db: Session, *, user_id: str) -> List[Claim]:
-        return db.query(Claim).filter(Claim.submitted_by == user_id).all()
+        return db.query(Claim).filter(
+            Claim.submitted_by == user_id
+        ).order_by(Claim.submission_date.desc(), Claim.id.desc()).all()
 
     def get_by_stage(self, db: Session, *, stage: str) -> List[Claim]:
-        return db.query(Claim).filter(Claim.current_workflow_stage == stage).all()
+        return db.query(Claim).filter(
+            Claim.current_workflow_stage == stage
+        ).order_by(Claim.submission_date.desc(), Claim.id.desc()).all()
 
 class ClaimParticipantRepository(BaseRepository[ClaimParticipant]):
     def get_by_claim(self, db: Session, *, claim_id: str) -> List[ClaimParticipant]:

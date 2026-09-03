@@ -10,6 +10,11 @@ from app.models.notification import Notification
 from app.models.faculty_assignment import FacultyAssignment
 from app.models.club import ClubHierarchyLevel
 
+# Must come last: it attaches indexes to tables that the imports above define.
+from app.models.indexes import register_indexes
+
+register_indexes()
+
 __all__ = [
     "Base",
     "User",

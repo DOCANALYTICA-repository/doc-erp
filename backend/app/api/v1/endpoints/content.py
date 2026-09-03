@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.core.database import get_db
+from app.core.database import get_db_readonly as get_db  # read-only: no BEGIN/ROLLBACK round trips
 from app.services.engines.content import content_engine
 
 router = APIRouter()

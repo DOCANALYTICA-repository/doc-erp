@@ -20,7 +20,15 @@ class BaseRepository(Generic[ModelType]):
         whose only membership was club #101 got an empty selector and no error
         of any kind.
         """
-        query = db.query(self.model).offset(skip)
+        query = db.query(self.model)
+        # A stable order, always. Paging without ORDER BY can return the same
+        # row on two pages and skip another entirely; and even unpaged, an
+        # unordered list visibly reshuffles between loads on Postgres.
+        if hasattr(self.model, "name"):
+            query = query.order_by(self.model.name, self.model.id)
+        else:
+            query = query.order_by(self.model.id)
+        query = query.offset(skip)
         if limit is not None:
             query = query.limit(limit)
         return query.all()
