@@ -49,6 +49,52 @@ def _require_active_club_member(db: Session, current_user: User, club_id: str) -
         raise HTTPException(status_code=403, detail="You are not an active member of this club")
 
 
+# Department-wide plan reviewers. These roles sit ABOVE any single club in the
+# annual-plan approval chain, so they must be able to read every club — they
+# are deliberately not scoped in faculty_scope.py either.
+DEPARTMENT_WIDE_REVIEW_PERMISSIONS = (
+    "clubs:approve_plan_cultural_coordinator",
+    "clubs:approve_plan_hod",
+)
+
+
+def _is_department_wide_reviewer(current_user: User) -> bool:
+    perms = get_resolved_permissions(current_user)
+    return "*" in perms or any(p in perms for p in DEPARTMENT_WIDE_REVIEW_PERMISSIONS)
+
+
+def _require_club_reader(db: Session, current_user: User, club_id: str) -> None:
+    """Read access to a club's workspace.
+
+    Granted to: an active member, the club's assigned Faculty Coordinator, a
+    department-wide plan reviewer (Cultural Coordinator / HOD), or super_admin.
+
+    This exists because _require_active_club_member is a pure ClubMember
+    lookup, and a Faculty Coordinator is by definition NOT a member of the club
+    they oversee. Gating reads on membership produced a precise inversion: the
+    only user permitted to EDIT a club's hierarchy was the only faculty user
+    forbidden from READING it — and, worse, the coordinator got 403 on
+    /annual-plans, the list containing the very plan he had to approve. He
+    could therefore never learn the plan_id that the review endpoint requires.
+
+    Writes keep _require_active_club_member: a coordinator oversees the club,
+    they do not draft its events, plans or budgets.
+    """
+    if current_user.primary_role == "super_admin":
+        return
+    membership = member_repo.get_by_student_and_club(db, student_id=current_user.id, club_id=club_id)
+    if membership and membership.status == "active":
+        return
+    if faculty_scope.is_club_faculty_coordinator_for(db, current_user.id, club_id):
+        return
+    if _is_department_wide_reviewer(current_user):
+        return
+    raise HTTPException(
+        status_code=403,
+        detail="You do not have access to this club's workspace",
+    )
+
+
 def _require_club_head_or_admin(db: Session, current_user: User, club_id: str) -> None:
     """
     Permission Template assignment (Clubs PRD §17: "Club Head... including
@@ -143,18 +189,20 @@ def get_club(club_id: str, db: Session = Depends(get_db), current_user: User = D
     club = club_repo.get(db, club_id)
     if not club:
         raise HTTPException(status_code=404, detail="Club not found")
-    club_hierarchy_engine.ensure_default_hierarchy(db, club_id)
+    _require_club_reader(db, current_user, club_id)
     caps = _viewer_capabilities(db, current_user, club_id)
     return ClubDetailOut(**ClubOut.model_validate(club).model_dump(), **caps)
 
 # 2. Members
 @router.get("/{club_id}/members", response_model=List[ClubMemberOut])
 def get_club_members(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_club_reader(db, current_user, club_id)
     return member_repo.get_club_members(db, club_id=club_id)
 
 # 3. Events
 @router.get("/{club_id}/events", response_model=List[EventOut])
 def get_club_events(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_club_reader(db, current_user, club_id)
     return db.query(event_repo.model).filter(event_repo.model.club_id == club_id).all()
 
 @router.post("/{club_id}/events", response_model=EventOut)
@@ -188,11 +236,13 @@ def create_club_event(
 # 4. Budget
 @router.get("/{club_id}/budgets", response_model=List[BudgetOut])
 def get_club_budgets(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_club_reader(db, current_user, club_id)
     return db.query(budget_repo.model).filter(budget_repo.model.club_id == club_id).all()
 
 # 5. Reimbursement
 @router.get("/{club_id}/reimbursements", response_model=List[ReimbursementOut])
 def get_club_reimbursements(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_club_reader(db, current_user, club_id)
     return reimbursement_repo.get_by_club(db, club_id=club_id)
 
 @router.post("/{club_id}/reimbursements", response_model=ReimbursementOut)
@@ -213,6 +263,7 @@ def request_reimbursement(
 # 6. Sponsorship
 @router.get("/{club_id}/sponsorships", response_model=List[SponsorshipOut])
 def get_club_sponsorships(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_club_reader(db, current_user, club_id)
     return sponsorship_repo.get_by_club(db, club_id=club_id)
 
 @router.post("/{club_id}/sponsorships", response_model=SponsorshipOut)
@@ -233,13 +284,25 @@ def create_sponsorship(
 # wiring, since the engine only implements this one today).
 @router.get("/{club_id}/reports/performance")
 def get_club_performance_report(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return reporting_engine.generate_club_performance_report(db, club_id=club_id)
 
 # 8. Recruitment (Phase 4 — new; PRD: "replaces Google Forms" for recruitment)
 @router.get("/{club_id}/recruitment-drives", response_model=List[RecruitmentDriveOut])
 def get_recruitment_drives(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return recruitment_drive_repo.get_by_club(db, club_id=club_id)
+    """Recruitment drives for a club.
+
+    Deliberately the one club read that is not fully gated: recruitment only
+    works if people outside the club can see that it is happening. Non-readers
+    get the OPEN drives only — a draft or closed drive, and the internal
+    fields the club uses to run it, stay inside the club.
+    """
+    drives = recruitment_drive_repo.get_by_club(db, club_id=club_id)
+    try:
+        _require_club_reader(db, current_user, club_id)
+    except HTTPException:
+        return [d for d in drives if d.status == "open"]
+    return drives
 
 @router.post("/{club_id}/recruitment-drives", response_model=RecruitmentDriveOut)
 def create_recruitment_drive(
@@ -274,7 +337,7 @@ def list_recruitment_applications(
     drive = recruitment_drive_repo.get(db, drive_id)
     if not drive:
         raise HTTPException(status_code=404, detail="Recruitment drive not found")
-    _require_active_club_member(db, current_user, drive.club_id)
+    _require_club_reader(db, current_user, drive.club_id)
     return recruitment_application_repo.get_by_drive(db, drive_id=drive_id)
 
 @router.put("/recruitment-applications/{application_id}", response_model=RecruitmentApplicationOut)
@@ -287,11 +350,12 @@ def update_recruitment_application_status(
         raise HTTPException(status_code=404, detail="Application not found")
     drive = recruitment_drive_repo.get(db, application.drive_id)
     _require_active_club_member(db, current_user, drive.club_id)
-    return recruitment_application_repo.update(db, db_obj=application, obj_in=update_in.dict())
+    return recruitment_application_repo.update(db, db_obj=application, obj_in=update_in.model_dump(exclude_unset=True))
 
 # 9. Announcements (Phase 4 — new)
 @router.get("/{club_id}/announcements", response_model=List[AnnouncementOut])
 def get_club_announcements(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_club_reader(db, current_user, club_id)
     return announcement_repo.get_by_club(db, club_id=club_id)
 
 @router.post("/{club_id}/announcements", response_model=AnnouncementOut)
@@ -309,7 +373,7 @@ def create_club_announcement(
 # 10. Annual Planning Workspace (Clubs PRD §24) — new in Phase 4 remainder
 @router.get("/{club_id}/annual-plans", response_model=List[AnnualPlanOut])
 def list_annual_plans(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return annual_plan_repo.get_by_club(db, club_id=club_id)
 
 
@@ -451,7 +515,7 @@ def list_club_documents(
     club_id: str, category: Optional[str] = None,
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return club_document_repo.get_by_club(db, club_id=club_id, category=category)
 
 
@@ -464,12 +528,12 @@ def get_club_knowledge_base(
     same Documents Workspace records — any document tagged
     "knowledge-base" surfaces here, rather than a separate content store.
     """
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return club_document_repo.get_knowledge_base(db, club_id=club_id)
 
 
 @router.post("/{club_id}/documents", response_model=ClubDocumentOut)
-def upload_club_document(
+async def upload_club_document(
     club_id: str,
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
@@ -479,7 +543,7 @@ def upload_club_document(
     current_user: User = Depends(PermissionChecker(["documents:manage_club"])),
 ):
     _require_active_club_member(db, current_user, club_id)
-    stored_path = storage_engine.upload_file(file, folder=f"club_documents/{club_id}")
+    stored_path = await storage_engine.upload_file(file, folder=f"club_documents/{club_id}")
     doc_dict = {
         "id": f"cdoc_{uuid.uuid4().hex[:12]}",
         "club_id": club_id,
@@ -495,7 +559,7 @@ def upload_club_document(
 
 
 @router.post("/documents/{document_id}/new-version", response_model=ClubDocumentOut)
-def upload_new_document_version(
+async def upload_new_document_version(
     document_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -505,7 +569,7 @@ def upload_new_document_version(
     if not previous:
         raise HTTPException(status_code=404, detail="Document not found")
     _require_active_club_member(db, current_user, previous.club_id)
-    stored_path = storage_engine.upload_file(file, folder=f"club_documents/{previous.club_id}")
+    stored_path = await storage_engine.upload_file(file, folder=f"club_documents/{previous.club_id}")
     doc_dict = {
         "id": f"cdoc_{uuid.uuid4().hex[:12]}",
         "club_id": previous.club_id,
@@ -527,7 +591,7 @@ def get_document_versions(
     doc = club_document_repo.get(db, document_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    _require_active_club_member(db, current_user, doc.club_id)
+    _require_club_reader(db, current_user, doc.club_id)
     return club_document_repo.get_versions(db, document_id=document_id)
 
 
@@ -538,7 +602,7 @@ def get_club_document_download_url(
     doc = club_document_repo.get(db, document_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    _require_active_club_member(db, current_user, doc.club_id)
+    _require_club_reader(db, current_user, doc.club_id)
     return {"url": storage_engine.get_signed_url(doc.file_url)}
 
 
@@ -571,7 +635,13 @@ def mark_event_attendance(
 def get_event_attendance(
     club_id: str, event_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
+    # The club_id in the path was never checked against the event's own club,
+    # so a member of club A could read club B's attendance simply by putting
+    # their own club_id in front of B's event_id and sailing past the gate.
+    event = event_repo.get(db, event_id)
+    if not event or event.club_id != club_id:
+        raise HTTPException(status_code=404, detail="Event not found")
     return [
         {"student_id": r.student_id, "attended": r.attended}
         for r in event_attendance_repo.get_by_event(db, event_id=event_id)
@@ -583,7 +653,7 @@ def get_event_attendance(
 def get_monthly_club_report(
     club_id: str, month: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return reporting_engine.generate_monthly_club_report(db, club_id=club_id, month=month)
 
 
@@ -591,7 +661,7 @@ def get_monthly_club_report(
 def get_annual_club_report(
     club_id: str, academic_year: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return reporting_engine.generate_annual_club_report(db, club_id=club_id, academic_year=academic_year)
 
 
@@ -599,7 +669,7 @@ def get_annual_club_report(
 def get_budget_summary_report(
     club_id: str, academic_year: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return reporting_engine.generate_budget_summary_report(db, club_id=club_id, academic_year=academic_year)
 
 
@@ -607,7 +677,7 @@ def get_budget_summary_report(
 def get_sponsorship_summary_report(
     club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return reporting_engine.generate_sponsorship_summary_report(db, club_id=club_id)
 
 
@@ -615,7 +685,7 @@ def get_sponsorship_summary_report(
 def get_club_attendance_report(
     club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return reporting_engine.generate_attendance_report(db, club_id=club_id)
 
 
@@ -623,7 +693,7 @@ def get_club_attendance_report(
 def get_contribution_report(
     club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return reporting_engine.generate_contribution_report(db, club_id=club_id)
 
 
@@ -632,7 +702,7 @@ def get_contribution_report(
 def get_club_analytics(
     club_id: str, academic_year: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return reporting_engine.generate_club_analytics(db, club_id=club_id, academic_year=academic_year)
 
 
@@ -683,7 +753,7 @@ def update_club_settings(
 # 17. Configurable Club Hierarchy (org-chart / structure)
 @router.get("/{club_id}/hierarchy", response_model=List[ClubHierarchyLevelOut])
 def get_club_hierarchy(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return club_hierarchy_engine.ensure_default_hierarchy(db, club_id)
 
 
@@ -787,7 +857,7 @@ def assign_member_hierarchy_level(
 # populating instead of being silently empty.
 @router.get("/{club_id}/tasks", response_model=List[TaskOut])
 def get_club_tasks(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    _require_active_club_member(db, current_user, club_id)
+    _require_club_reader(db, current_user, club_id)
     return task_repo.get_by_related_entity(db, related_entity_type="club", related_entity_id=club_id)
 
 

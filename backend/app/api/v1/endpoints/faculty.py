@@ -122,7 +122,7 @@ def list_documents(db: Session = Depends(get_db), current_user: User = Depends(g
     return document_repo.get_by_owner(db, owner_id=current_user.id)
 
 @router.post("/documents", response_model=DocumentOut)
-def create_document(
+async def create_document(
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
     folder_path: str = Form("/"),
@@ -131,7 +131,7 @@ def create_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    stored_path = storage_engine.upload_file(file, folder=f"faculty_documents/{current_user.id}")
+    stored_path = await storage_engine.upload_file(file, folder=f"faculty_documents/{current_user.id}")
     doc_dict = {
         "id": f"doc_{uuid.uuid4().hex[:12]}",
         "owner_id": current_user.id,
@@ -263,19 +263,24 @@ def get_dashboard_preferences(db: Session = Depends(get_db), current_user: User 
     existing = widget_preference_repo.get_by_owner(db, owner_id=current_user.id)
     if existing:
         return existing
-    # First visit: materialize the documented default order so the frontend
-    # always has something real to render/reorder, not an empty list.
-    created = []
-    for i, key in enumerate(DEFAULT_WIDGET_ORDER):
-        pref = widget_preference_repo.create(db, obj_in={
-            "id": f"widgetpref_{uuid.uuid4().hex[:12]}",
-            "owner_id": current_user.id,
-            "widget_key": key,
-            "order": str(i),
-            "visible": True,
-        })
-        created.append(pref)
-    return created
+
+    # First visit: return the documented default order WITHOUT persisting it.
+    #
+    # This used to perform 8 inserts and 8 separate commits inside a GET. Two
+    # tabs opened at once raced into duplicate rows, and at 127 ms per round
+    # trip it also made a read take about a second. Nothing needs these rows
+    # to exist until the user actually reorders something — which is a PUT,
+    # and the PUT already upserts.
+    return [
+        DashboardWidgetPreferenceOut(
+            id=f"default_{key}",
+            owner_id=current_user.id,
+            widget_key=key,
+            order=str(i),
+            visible=True,
+        )
+        for i, key in enumerate(DEFAULT_WIDGET_ORDER)
+    ]
 
 @router.put("/dashboard-preferences", response_model=List[DashboardWidgetPreferenceOut])
 def update_dashboard_preferences(

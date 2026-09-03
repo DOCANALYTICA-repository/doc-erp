@@ -1,4 +1,5 @@
 from typing import List
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.models.club import ClubMember, ClubHierarchyLevel
 from app.repositories.club import hierarchy_repo, member_repo
@@ -14,18 +15,31 @@ class ClubHierarchyEngine:
     is treated as bottom-rank everywhere (most restrictive default)."""
 
     def ensure_default_hierarchy(self, db: Session, club_id: str) -> List[ClubHierarchyLevel]:
+        """Materialize a club's default hierarchy the first time it is read.
+
+        The primary keys are deterministic (chl_<club_id>_<order>), so two
+        concurrent readers used to race straight into an IntegrityError — and
+        this ran from GET /clubs/{id} as well as GET /clubs/{id}/hierarchy, so
+        simply opening a club workspace was enough to trigger it. It is now
+        called from one place, and it loses the race gracefully rather than
+        500ing the reader that arrived second.
+        """
         existing = hierarchy_repo.get_by_club(db, club_id=club_id)
         if existing:
             return existing
-        created = []
+
         for level_order, title in DEFAULT_LEVELS:
-            level = ClubHierarchyLevel(
+            db.add(ClubHierarchyLevel(
                 id=f"chl_{club_id}_{level_order}", club_id=club_id, level_order=level_order, title=title,
-            )
-            db.add(level)
-            created.append(level)
-        db.commit()
-        return created
+            ))
+        try:
+            db.commit()
+        except IntegrityError:
+            # Another request created them between our read and our write.
+            # Its rows are just as good as ours would have been.
+            db.rollback()
+
+        return hierarchy_repo.get_by_club(db, club_id=club_id)
 
     def get_level_order_for_member(self, db: Session, member: ClubMember) -> int:
         if member.hierarchy_level and member.hierarchy_level.level_order is not None:

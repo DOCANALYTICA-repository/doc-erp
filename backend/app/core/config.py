@@ -24,9 +24,27 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_STORAGE_BUCKET: str = "doc-portal-files"
 
-    # Google Workspace OAuth ( CHRIST University ) — production auth fast-follow
-    GOOGLE_CLIENT_ID: str = ""
-    GOOGLE_CLIENT_SECRET: str = ""
+    # --- Uploads -----------------------------------------------------------
+    # Four upload paths existed with no size cap, no MIME allow-list and no
+    # check that the store actually accepted the bytes.
+    MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024  # 10 MB
+
+    # Deliberately NO image/svg+xml and NO text/html: both are script-bearing
+    # documents, and either one served from a signed URL on our own origin is
+    # stored XSS. Extensions are derived from this map, never from the
+    # client-supplied filename.
+    ALLOWED_UPLOAD_MIME: dict = {
+        "application/pdf": "pdf",
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/webp": "webp",
+        "application/msword": "doc",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+        "application/vnd.ms-excel": "xls",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+        "text/plain": "txt",
+        "text/csv": "csv",
+    }
 
     model_config = SettingsConfigDict(
         env_file=".env",

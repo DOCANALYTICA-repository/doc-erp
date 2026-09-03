@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -36,12 +36,33 @@ def get_student_timetable(
 # didn't exist at all before Phase 5; there was no way to populate or
 # maintain the timetable data the entire claims workflow depends on beyond
 # the one-time seed script.
+def _require_timetable_scope(db: Session, current_user: User, programme, semester, section) -> None:
+    """A Class Teacher may only maintain THEIR OWN class's timetable.
+
+    claims:manage_timetable was permission-gated but not scope-gated, so any
+    Class Teacher could rewrite or delete any other class's timetable — and the
+    whole claims workflow is built on that data. HOD and super_admin stay
+    department-wide by design.
+    """
+    if current_user.primary_role == "super_admin":
+        return
+    if "claims:manage_timetable_all" in get_resolved_permissions(current_user):
+        return
+    if faculty_scope.is_class_teacher_for(db, current_user.id, programme, semester, section):
+        return
+    raise HTTPException(
+        status_code=403,
+        detail="You are not the Class Teacher for this programme/semester/section",
+    )
+
+
 @router.post("/timetable", response_model=TimetableSessionOut)
 def create_timetable_session(
     session_in: TimetableSessionCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(PermissionChecker(["claims:manage_timetable"])),
 ):
+    _require_timetable_scope(db, current_user, session_in.programme, session_in.semester, session_in.section)
     session_dict = session_in.dict()
     session_dict["id"] = f"tt_{uuid.uuid4().hex[:12]}"
     return timetable_repo.create(db, obj_in=session_dict)
@@ -56,7 +77,12 @@ def update_timetable_session(
     session = timetable_repo.get(db, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Timetable session not found")
-    return timetable_repo.update(db, db_obj=session, obj_in=session_in.dict())
+    # Scope BOTH the row being edited and the values being written, or a Class
+    # Teacher could move another class's slot into their own scope, or their
+    # own out of it.
+    _require_timetable_scope(db, current_user, session.programme, session.semester, session.section)
+    _require_timetable_scope(db, current_user, session_in.programme, session_in.semester, session_in.section)
+    return timetable_repo.update(db, db_obj=session, obj_in=session_in.model_dump(exclude_unset=True))
 
 @router.delete("/timetable/{session_id}")
 def delete_timetable_session(
@@ -67,6 +93,7 @@ def delete_timetable_session(
     session = timetable_repo.get(db, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Timetable session not found")
+    _require_timetable_scope(db, current_user, session.programme, session.semester, session.section)
     timetable_repo.remove(db, id=session_id)
     return {"status": "success"}
 
@@ -546,9 +573,11 @@ def list_claim_documents(claim_id: str, db: Session = Depends(get_db), current_u
 # Previously the medical-certificate file input on the frontend wasn't wired
 # to any handler at all; selecting a file silently did nothing.
 @router.post("/{claim_id}/documents", response_model=SupportingDocumentOut)
-def upload_supporting_document(
+async def upload_supporting_document(
     claim_id: str,
-    document_type: str = Form(...),  # medical_certificate, pre_approval_form
+    # Constrained, not free text. The comment here used to claim these were
+    # the two accepted values while the signature accepted any string at all.
+    document_type: Literal["medical_certificate", "pre_approval_form", "supporting_evidence"] = Form(...),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -559,7 +588,7 @@ def upload_supporting_document(
     if claim.submitted_by != current_user.id and current_user.primary_role != "super_admin":
         raise HTTPException(status_code=403, detail="Only the claim's submitter may attach supporting documents")
 
-    stored_path = storage_engine.upload_file(file, folder=f"claims/{claim_id}")
+    stored_path = await storage_engine.upload_file(file, folder=f"claims/{claim_id}")
     doc = SupportingDocument(
         id=f"doc_{uuid.uuid4().hex[:12]}",
         claim_id=claim_id,

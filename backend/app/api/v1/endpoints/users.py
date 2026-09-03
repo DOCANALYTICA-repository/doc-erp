@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.rbac import get_current_user
 from app.models.user import User
+from app.core import visibility
 from app.schemas.user import UserDirectoryOut
 
 router = APIRouter()
@@ -25,4 +26,22 @@ def get_faculty_directory(
         query = query.filter(
             (User.name.ilike(term)) | (User.designation.ilike(term)) | (User.role_tags_str.ilike(term))
         )
-    return query.all()
+    faculty = query.order_by(User.name).all()
+
+    # A student looking up who teaches what does not need every faculty
+    # member's personal phone number and office hours. Colleagues do.
+    if visibility.is_faculty_side(current_user):
+        return faculty
+
+    return [
+        UserDirectoryOut(
+            id=u.id,
+            name=u.name,
+            email=u.email,
+            designation=u.designation,
+            role_tags_str=u.role_tags_str or "",
+            bio=u.bio,
+            availability_status=u.availability_status or "available",
+        )
+        for u in faculty
+    ]

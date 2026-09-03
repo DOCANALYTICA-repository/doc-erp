@@ -2,11 +2,18 @@ from typing import List, Set
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import ALGORITHM
+from app.core.security import ACCESS_TOKEN_TYPE, ALGORITHM
 from app.models.user import User
+
+# The only columns authentication and authorization actually need. This query
+# runs on every authenticated request; it used to select the whole row.
+_AUTH_USER_COLUMNS = (
+    User.id, User.email, User.name, User.primary_role, User.status,
+    User.role_tags_str, User.programme, User.semester, User.section,
+)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
@@ -88,7 +95,11 @@ ROLE_PERMISSIONS = {
         "clubs:approve_plan_hod",  # Annual Plan workflow, stage 3 — final approval (Clubs PRD §24.3)
         "events:approve",
         "rbac:assign_roles",
-        "claims:manage_timetable"
+        "claims:manage_timetable",
+        # HOD maintains the timetable department-wide. A Class Teacher holds
+        # claims:manage_timetable too, but is scope-checked down to their own
+        # programme/semester/section — see _require_timetable_scope.
+        "claims:manage_timetable_all",
     }
 }
 
@@ -103,10 +114,19 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
+        # Only an access token authenticates a request. Tokens minted for any
+        # other purpose (refresh, and anything added later) must not be
+        # accepted here just because they are validly signed. Tokens issued
+        # before `typ` existed carry no claim and are still honoured.
+        token_type = payload.get("typ", ACCESS_TOKEN_TYPE)
+        if token_type != ACCESS_TOKEN_TYPE:
+            raise credentials_exception
     except JWTError:
         raise credentials_exception
-        
-    user = db.query(User).filter(User.id == user_id).first()
+
+    # load_only: this runs on EVERY authenticated request and used to select
+    # the full row, bio and hashed_password included.
+    user = db.query(User).options(load_only(*_AUTH_USER_COLUMNS)).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
     if not user.is_active:

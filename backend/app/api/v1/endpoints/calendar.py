@@ -32,4 +32,5 @@ def get_unified_calendar(
         user_id=current_user.id,
         user_role=current_user.primary_role,
         academic_context=academic_context,
+        current_user=current_user,
     )

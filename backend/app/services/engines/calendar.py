@@ -1,8 +1,10 @@
-from typing import List, Dict, Any
-from sqlalchemy.orm import Session
+from typing import List, Dict, Any, Optional
+from sqlalchemy.orm import Session, selectinload
+from app.core import visibility
 from app.models.club import Event, ClubMember
 from app.models.faculty import Meeting, Task
 from app.models.claim import TimetableSession
+from app.models.user import User
 
 class CalendarEngine:
     def get_unified_events(
@@ -11,7 +13,8 @@ class CalendarEngine:
         *,
         user_id: str,
         user_role: str,
-        academic_context: Dict[str, str] = None
+        academic_context: Dict[str, str] = None,
+        current_user: Optional[User] = None,
     ) -> List[Dict[str, Any]]:
         """
         Gathers calendar events from multiple domains:
@@ -23,7 +26,7 @@ class CalendarEngine:
         events: List[Dict[str, Any]] = []
 
         # 1. Gather Club Events
-        club_events = db.query(Event).all() # Simplification for Version 1
+        club_events = db.query(Event).options(selectinload(Event.club)).all()
         for ce in club_events:
             events.append({
                 "id": ce.id,
@@ -36,12 +39,22 @@ class CalendarEngine:
             })
 
         # 2. Gather Meetings
-        meetings = db.query(Meeting).all() # Fetch meetings organized by user or in department
+        #
+        # This used to be a bare `db.query(Meeting).all()` and it put EVERY
+        # meeting on the platform — including the full minutes text — on every
+        # user's calendar, students included. Scope the rows first, then decide
+        # separately whether this caller may read the minutes: being able to
+        # see that a meeting happened is not the same as being entitled to
+        # read what was decided in it.
+        meetings = db.query(Meeting).options(selectinload(Meeting.organizer)).all()
+        if current_user is not None:
+            meetings = visibility.visible_meetings(db, current_user, meetings)
         for m in meetings:
+            may_read = current_user is not None and visibility.may_read_minutes(current_user, m)
             events.append({
                 "id": m.id,
                 "title": f"[Meeting] {m.title}",
-                "description": m.minutes or "Scheduled Meeting",
+                "description": (m.minutes if may_read else None) or "Scheduled Meeting",
                 "start": f"{m.date}T{m.time[:5] if ':' in m.time else '09:00'}",
                 "end": m.date,
                 "type": "meeting",

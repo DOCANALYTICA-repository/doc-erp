@@ -87,11 +87,39 @@ def test_timetable_admin_requires_permission(client):
     student_h = auth_headers(client, "student.regular@christuniversity.in", "student123")
     body = {
         "day_of_week": "Thursday", "subject": "X", "hour": "X", "faculty_id": "fac_subject_1",
-        "programme": "X", "semester": "X", "section": "X",
+        "programme": "B.Com (Hons)", "semester": "5", "section": "A",
     }
     r = client.post("/api/v1/claims/timetable", json=body, headers=student_h)
     assert r.status_code == 403
 
+    # fac_class_teacher is the Class Teacher for exactly B.Com (Hons) / 5 / A.
     teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "faculty123")
     r = client.post("/api/v1/claims/timetable", json=body, headers=teacher_h)
-    assert r.status_code == 200
+    assert r.status_code == 200, r.text
+
+
+def test_class_teacher_cannot_touch_another_classs_timetable(client):
+    """claims:manage_timetable was permission-gated but not scope-gated.
+
+    Any Class Teacher could rewrite or delete any class's timetable — and the
+    entire claims workflow is built on that data.
+    """
+    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "faculty123")
+    foreign = {
+        "day_of_week": "Friday", "subject": "Not Mine", "hour": "1", "faculty_id": "fac_subject_1",
+        "programme": "BBA", "semester": "3", "section": "C",
+    }
+    r = client.post("/api/v1/claims/timetable", json=foreign, headers=teacher_h)
+    assert r.status_code == 403, r.text
+
+    # HOD holds claims:manage_timetable_all and stays department-wide.
+    hod_h = auth_headers(client, "hod.commerce@christuniversity.in", "faculty123")
+    r = client.post("/api/v1/claims/timetable", json=foreign, headers=hod_h)
+    assert r.status_code == 200, r.text
+    foreign_id = r.json()["id"]
+
+    # ...and the Class Teacher still cannot edit or delete the row afterwards.
+    r = client.put(f"/api/v1/claims/timetable/{foreign_id}", json=foreign, headers=teacher_h)
+    assert r.status_code == 403
+    r = client.delete(f"/api/v1/claims/timetable/{foreign_id}", headers=teacher_h)
+    assert r.status_code == 403

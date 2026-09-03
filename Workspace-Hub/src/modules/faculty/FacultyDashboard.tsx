@@ -59,7 +59,7 @@ export const FacultyDashboard: React.FC = () => {
         setReminders(rList);
 
         if (activeSubTab === 'calendar' || activeSubTab === 'dashboard') {
-          const cal = await api.get<any[]>('/calendar/');
+          const cal = await api.get<any[]>('/calendar');
           setCalendarEvents(cal);
         }
       } catch (e) {

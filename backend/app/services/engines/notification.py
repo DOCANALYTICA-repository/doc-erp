@@ -33,8 +33,20 @@ class NotificationEngine:
         db.refresh(db_notif)
         return db_notif
 
-    def mark_as_read(self, db: Session, *, notification_id: str) -> bool:
-        db_notif = db.query(Notification).filter(Notification.id == notification_id).first()
+    def mark_as_read(self, db: Session, *, notification_id: str, user_id: str) -> bool:
+        """Mark one notification read. user_id is REQUIRED and is part of the
+        lookup, not a check performed afterwards.
+
+        Without it this was an IDOR: the endpoint injected current_user and
+        never used it, so any authenticated user could mark any other user's
+        notification read by id — silently suppressing someone else's approval
+        prompts. The caller returns 404 rather than 403 on a miss, so the
+        response cannot be used to probe which ids exist.
+        """
+        db_notif = db.query(Notification).filter(
+            Notification.id == notification_id,
+            Notification.user_id == user_id,
+        ).first()
         if db_notif:
             db_notif.is_read = True
             db.add(db_notif)
@@ -42,10 +54,24 @@ class NotificationEngine:
             return True
         return False
 
-    def get_unread_for_user(self, db: Session, *, user_id: str) -> list[Notification]:
+    def get_unread_for_user(self, db: Session, *, user_id: str, limit: int = 50) -> list[Notification]:
         return db.query(Notification).filter(
             Notification.user_id == user_id,
             Notification.is_read == False
-        ).all()
+        ).order_by(Notification.created_at.desc()).limit(limit).all()
+
+    def mark_all_read_for_user(self, db: Session, *, user_id: str) -> int:
+        updated = db.query(Notification).filter(
+            Notification.user_id == user_id,
+            Notification.is_read == False,
+        ).update({Notification.is_read: True}, synchronize_session=False)
+        db.commit()
+        return updated
+
+    def unread_count_for_user(self, db: Session, *, user_id: str) -> int:
+        return db.query(Notification).filter(
+            Notification.user_id == user_id,
+            Notification.is_read == False,
+        ).count()
 
 notification_engine = NotificationEngine()

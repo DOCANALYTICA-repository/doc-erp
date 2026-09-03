@@ -77,7 +77,14 @@ def test_club_detail_exposes_viewer_capability_flags(client):
     body = r.json()
     assert body["viewer_can_edit_hierarchy"] is True
 
-    unrelated_h = auth_headers(client, "faculty.finance@christuniversity.in", "faculty123")
-    r = client.get("/api/v1/clubs/club_commerce", headers=unrelated_h)
+    # A member can read the workspace, and sees the flag as False.
+    member_h = auth_headers(client, "student.president@christuniversity.in", "student123")
+    r = client.get("/api/v1/clubs/club_commerce", headers=member_h)
     assert r.status_code == 200
     assert r.json()["viewer_can_edit_hierarchy"] is False
+
+    # An unrelated faculty member is not a reader of this club at all. This
+    # used to return 200 to anyone holding a session.
+    unrelated_h = auth_headers(client, "faculty.finance@christuniversity.in", "faculty123")
+    r = client.get("/api/v1/clubs/club_commerce", headers=unrelated_h)
+    assert r.status_code == 403

@@ -12,10 +12,10 @@ def _fake_storage(monkeypatch):
     """
     from app.services.engines import storage as storage_module
 
-    monkeypatch.setattr(
-        storage_module.storage_engine, "upload_file",
-        lambda file, folder="general": f"{folder}/fake_{file.filename}",
-    )
+    async def _fake_upload(file, folder="general"):
+        return f"{folder}/fake_{file.filename}"
+
+    monkeypatch.setattr(storage_module.storage_engine, "upload_file", _fake_upload)
     monkeypatch.setattr(
         storage_module.storage_engine, "get_signed_url",
         lambda file_path, expires_in_seconds=3600: f"https://fake-signed-url/{file_path}",
