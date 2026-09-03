@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "generate:api": "cd ../backend && ./.venv/bin/python -c \"import json;from app.main import app;open('../Workspace-Hub/openapi.json','w').write(json.dumps(app.openapi(), indent=2))\" && cd ../Workspace-Hub && openapi-typescript openapi.json -o src/api/schema.d.ts"
   },
   "dependencies": {
     "@astryxdesign/cli": "^0.1.4",
@@ -41,6 +42,7 @@
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
     "jsdom": "^25.0.1",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

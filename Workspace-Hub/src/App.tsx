@@ -27,9 +27,16 @@ const ClaimsDashboard = lazy(() =>
 const FacultyDashboard = lazy(() =>
   import('./modules/faculty/FacultyDashboard').then(m => ({ default: m.FacultyDashboard }))
 );
+const Inbox = lazy(() =>
+  import('./modules/inbox/Inbox').then(m => ({ default: m.Inbox }))
+);
 import { ModuleLauncher } from './routes/ModuleLauncher';
 import { AuthenticatedLayout } from './routes/AuthenticatedLayout';
+import { NotFound } from './routes/NotFound';
 import { RequireAuth } from './routes/RequireAuth';
+import { CLUBS_DEFAULT_TAB } from './modules/clubs/tabs';
+import { CLAIMS_DEFAULT_TAB } from './modules/claims/tabs';
+import { FACULTY_DEFAULT_TAB } from './modules/faculty/tabs';
 
 export default function App() {
   const login = useStore((state) => state.login);
@@ -76,12 +83,43 @@ export default function App() {
             </RequireAuth>
           }
         >
-          <Route index element={<ModuleLauncher />} />
-          <Route path="clubs/*" element={<ClubsDashboard />} />
-          <Route path="claims/*" element={<ClaimsDashboard />} />
-          <Route path="faculty/*" element={<FacultyDashboard />} />
+          {/*
+            * Every screen has a URL.
+            *
+            * These three used to be splat routes (`clubs/*`) with nothing
+            * inside them and nothing reading the splat, so 27 screens shared
+            * 3 URLs: the tab lived in useState, Back left the module
+            * entirely, and a deep link to "the Budget tab of the Commerce
+            * Club" could not be written down at all.
+            *
+            * The tab is a path segment; the club is a SEARCH param, because
+            * they are orthogonal — you can change club without changing tab.
+            */}
+          <Route index element={<Inbox />} />
+          <Route path="modules" element={<ModuleLauncher />} />
+
+          <Route path="clubs">
+            <Route index element={<Navigate to={CLUBS_DEFAULT_TAB} replace />} />
+            <Route path=":tab" element={<ClubsDashboard />} />
+          </Route>
+
+          <Route path="claims">
+            <Route index element={<Navigate to={CLAIMS_DEFAULT_TAB} replace />} />
+            <Route path=":tab" element={<ClaimsDashboard />} />
+          </Route>
+
+          <Route path="faculty">
+            <Route index element={<Navigate to={FACULTY_DEFAULT_TAB} replace />} />
+            <Route path=":tab" element={<FacultyDashboard />} />
+          </Route>
+
+          {/* A stale /app/... bookmark used to be thrown out to the public
+              landing page by the catch-all below. It now lands inside the
+              shell, where the user can still see where they are. */}
+          <Route path="*" element={<NotFound />} />
         </Route>
 
+        {/* Unauthenticated paths only. */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

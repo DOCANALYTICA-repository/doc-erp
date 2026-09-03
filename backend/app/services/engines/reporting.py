@@ -295,8 +295,17 @@ class ReportingEngine:
                     "data": {
                         "total_drives": len(drives),
                         "total_applications": len(applications),
-                        "selected": sum(1 for a in applications if a.status == "selected"),
-                        "by_status": dict(Counter(a.status for a in applications)),
+                        # Case-insensitive on purpose. The documented
+                        # vocabulary is title-case ("Selected" — see
+                        # RecruitmentApplicationUpdate) while the column
+                        # defaults to lowercase "applied", so this comparison
+                        # never matched and the counter was ALWAYS zero.
+                        "selected": sum(
+                            1 for a in applications if (a.status or "").lower() == "selected"
+                        ),
+                        "by_status": dict(
+                            Counter((a.status or "unknown").lower() for a in applications)
+                        ),
                     },
                 },
                 {
