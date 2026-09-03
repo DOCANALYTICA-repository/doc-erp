@@ -1,5 +1,5 @@
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import List, Literal, Optional
+from pydantic import BaseModel, Field
 
 class ClubBase(BaseModel):
     name: str
@@ -110,6 +110,23 @@ class ClubBootstrap(BaseModel):
     counters: ClubCounters
     hierarchy: List["ClubHierarchyLevelOut"] = []
     members: List["ClubMemberOut"] = []
+
+
+class EventAttendanceRecord(BaseModel):
+    """One student's attendance at one event.
+
+    A real model, not List[dict]: the endpoint indexed r["student_id"]
+    directly, so a malformed record was a 500 rather than a 422 naming the
+    field.
+    """
+    student_id: str = Field(min_length=1)
+    attended: Literal["present", "absent"] = "present"
+
+
+class EventAttendanceOut(BaseModel):
+    student_id: str
+    student_name: Optional[str] = None
+    attended: str
 
 
 class ClubSettingsUpdate(BaseModel):

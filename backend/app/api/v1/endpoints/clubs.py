@@ -21,6 +21,7 @@ from app.schemas.club import (
     ClubSettingsUpdate, ClubHierarchyLevelOut, ClubHierarchyLevelCreate, ClubHierarchyLevelUpdate,
     MyClubOut, AwaitingReviewPlanOut, ClubBootstrap, ClubCapabilities, ClubCounters,
     ClubHierarchyMemberAssign, ClubTaskCreate, ClubTaskReviewAction,
+    EventAttendanceRecord, EventAttendanceOut,
 )
 from app.schemas.task import TaskOut
 from app.models.user import User
@@ -844,27 +845,65 @@ def get_club_document_download_url(
 def mark_event_attendance(
     club_id: str,
     event_id: str,
-    records: List[dict],  # [{"student_id": str, "attended": "present"|"absent"}]
+    records: List[EventAttendanceRecord],
     db: Session = Depends(get_db),
     current_user: User = Depends(PermissionChecker(["events:create"])),
 ):
+    """Record who attended an event.
+
+    UPSERT, not insert. This used to create a new row unconditionally, so
+    correcting one student's attendance — or simply saving the register twice —
+    left two contradictory rows for the same person. Both fed the attendance
+    analytics and the attendance report, which are the two shipped features
+    that depend on this data, so the numbers drifted the first time anyone
+    edited a register.
+    """
     _require_active_club_member(db, current_user, club_id)
+
     event = event_repo.get(db, event_id)
     if not event or event.club_id != club_id:
         raise HTTPException(status_code=404, detail="Event not found")
-    created = []
-    for r in records:
-        att_dict = {
-            "id": f"att_{uuid.uuid4().hex[:12]}",
-            "event_id": event_id,
-            "student_id": r["student_id"],
-            "attended": r.get("attended", "present"),
-        }
-        created.append(event_attendance_repo.create(db, obj_in=att_dict))
-    return {"marked": len(created)}
+
+    # Only actual members of the club can be marked as attending its event.
+    member_ids = {
+        m.student_id for m in member_repo.get_club_members(db, club_id=club_id)
+        if m.status == "active"
+    }
+    unknown = {r.student_id for r in records} - member_ids
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Not active members of this club: {', '.join(sorted(unknown))}",
+        )
+
+    existing = {
+        row.student_id: row
+        for row in db.query(EventAttendance).filter(EventAttendance.event_id == event_id).all()
+    }
+
+    updated = 0
+    created = 0
+    for record in records:
+        row = existing.get(record.student_id)
+        if row is not None:
+            if row.attended != record.attended:
+                row.attended = record.attended
+                db.add(row)
+                updated += 1
+            continue
+        db.add(EventAttendance(
+            id=f"att_{uuid.uuid4().hex[:12]}",
+            event_id=event_id,
+            student_id=record.student_id,
+            attended=record.attended,
+        ))
+        created += 1
+
+    db.commit()
+    return {"created": created, "updated": updated, "total": len(records)}
 
 
-@router.get("/{club_id}/events/{event_id}/attendance")
+@router.get("/{club_id}/events/{event_id}/attendance", response_model=List[EventAttendanceOut])
 def get_event_attendance(
     club_id: str, event_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
 ):
@@ -875,8 +914,19 @@ def get_event_attendance(
     event = event_repo.get(db, event_id)
     if not event or event.club_id != club_id:
         raise HTTPException(status_code=404, detail="Event not found")
+
+    # Names, not just ids — a register of opaque student ids is unusable, and
+    # the client should not have to fetch the roster to caption it.
+    names = {
+        m.student_id: m.student_name
+        for m in member_repo.get_club_members(db, club_id=club_id)
+    }
     return [
-        {"student_id": r.student_id, "attended": r.attended}
+        EventAttendanceOut(
+            student_id=r.student_id,
+            student_name=names.get(r.student_id),
+            attended=r.attended,
+        )
         for r in event_attendance_repo.get_by_event(db, event_id=event_id)
     ]
 

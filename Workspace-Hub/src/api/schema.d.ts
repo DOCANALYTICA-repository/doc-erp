@@ -571,7 +571,17 @@ export interface paths {
         /** Get Event Attendance */
         get: operations["get_event_attendance_api_v1_clubs__club_id__events__event_id__attendance_get"];
         put?: never;
-        /** Mark Event Attendance */
+        /**
+         * Mark Event Attendance
+         * @description Record who attended an event.
+         *
+         *     UPSERT, not insert. This used to create a new row unconditionally, so
+         *     correcting one student's attendance — or simply saving the register twice —
+         *     left two contradictory rows for the same person. Both fed the attendance
+         *     analytics and the attendance report, which are the two shipped features
+         *     that depend on this data, so the numbers drifted the first time anyone
+         *     edited a register.
+         */
         post: operations["mark_event_attendance_api_v1_clubs__club_id__events__event_id__attendance_post"];
         delete?: never;
         options?: never;
@@ -2495,6 +2505,33 @@ export interface components {
             has_potential_duplicate: boolean;
             /** Message */
             message?: string | null;
+        };
+        /** EventAttendanceOut */
+        EventAttendanceOut: {
+            /** Student Id */
+            student_id: string;
+            /** Student Name */
+            student_name?: string | null;
+            /** Attended */
+            attended: string;
+        };
+        /**
+         * EventAttendanceRecord
+         * @description One student's attendance at one event.
+         *
+         *     A real model, not List[dict]: the endpoint indexed r["student_id"]
+         *     directly, so a malformed record was a 500 rather than a 422 naming the
+         *     field.
+         */
+        EventAttendanceRecord: {
+            /** Student Id */
+            student_id: string;
+            /**
+             * Attended
+             * @default present
+             * @enum {string}
+             */
+            attended: "present" | "absent";
         };
         /** EventCreate */
         EventCreate: {
@@ -4458,7 +4495,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["EventAttendanceOut"][];
                 };
             };
             /** @description Validation Error */
@@ -4484,9 +4521,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                }[];
+                "application/json": components["schemas"]["EventAttendanceRecord"][];
             };
         };
         responses: {

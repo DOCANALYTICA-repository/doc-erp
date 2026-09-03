@@ -35,6 +35,7 @@ export type RecruitmentDrive = Schemas['RecruitmentDriveOut'];
 export type AnnualPlan = Schemas['AnnualPlanOut'];
 export type AwaitingReviewPlan = Schemas['AwaitingReviewPlanOut'];
 export type ClubDocument = Schemas['ClubDocumentOut'];
+export type EventAttendance = Schemas['EventAttendanceOut'];
 
 // --- Claims ----------------------------------------------------------------
 export type Claim = Schemas['ClaimOut'];

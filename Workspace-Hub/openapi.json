@@ -1752,6 +1752,7 @@
           "clubs"
         ],
         "summary": "Mark Event Attendance",
+        "description": "Record who attended an event.\n\nUPSERT, not insert. This used to create a new row unconditionally, so\ncorrecting one student's attendance \u2014 or simply saving the register twice \u2014\nleft two contradictory rows for the same person. Both fed the attendance\nanalytics and the attendance report, which are the two shipped features\nthat depend on this data, so the numbers drifted the first time anyone\nedited a register.",
         "operationId": "mark_event_attendance_api_v1_clubs__club_id__events__event_id__attendance_post",
         "security": [
           {
@@ -1785,8 +1786,7 @@
               "schema": {
                 "type": "array",
                 "items": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/EventAttendanceRecord"
                 },
                 "title": "Records"
               }
@@ -1850,7 +1850,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventAttendanceOut"
+                  },
+                  "title": "Response Get Event Attendance Api V1 Clubs  Club Id  Events  Event Id  Attendance Get"
+                }
               }
             }
           },
@@ -7300,6 +7306,59 @@
         ],
         "title": "DuplicateClaimWarning",
         "description": "Soft warning only \u2014 per the Claims PRD, duplicate detection must\nnever block submission, only surface a warning."
+      },
+      "EventAttendanceOut": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "title": "Student Id"
+          },
+          "student_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Name"
+          },
+          "attended": {
+            "type": "string",
+            "title": "Attended"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id",
+          "attended"
+        ],
+        "title": "EventAttendanceOut"
+      },
+      "EventAttendanceRecord": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Student Id"
+          },
+          "attended": {
+            "type": "string",
+            "enum": [
+              "present",
+              "absent"
+            ],
+            "title": "Attended",
+            "default": "present"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id"
+        ],
+        "title": "EventAttendanceRecord",
+        "description": "One student's attendance at one event.\n\nA real model, not List[dict]: the endpoint indexed r[\"student_id\"]\ndirectly, so a malformed record was a 500 rather than a 422 naming the\nfield."
       },
       "EventCreate": {
         "properties": {

@@ -16,6 +16,7 @@ import { SectionHeader } from '../../../components/ui/SectionHeader';
 import { StatusChip } from '../../../components/ui/StatusChip';
 import { PageLoader } from '../../../components/ui/PageLoader';
 import { useClubWorkspace } from '../ClubWorkspaceContext';
+import { EventAttendanceSheet } from '../EventAttendanceSheet';
 
 export const EventsTab: React.FC = () => {
   const { clubId, bootstrap, refreshShell } = useClubWorkspace();
@@ -30,6 +31,7 @@ export const EventsTab: React.FC = () => {
   const [venue, setVenue] = React.useState('');
   const [budget, setBudget] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
+  const [attendanceFor, setAttendanceFor] = React.useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,9 +124,22 @@ export const EventsTab: React.FC = () => {
                   <p className="mt-2 text-sm leading-relaxed text-slate-500">{evt.description}</p>
                 ) : null}
               </div>
-              <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-sm text-slate-500">
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-sm text-slate-500">
                 <span>{evt.venue}</span>
+                {/* Event attendance capture had NO UI, and two shipped
+                    analytics features read the table it writes to. */}
+                {bootstrap.capabilities.can_write ? (
+                  <Button
+                    label={attendanceFor === evt.id ? 'Close register' : 'Attendance'}
+                    variant="ghost"
+                    size="sm"
+                    clickAction={() => setAttendanceFor(attendanceFor === evt.id ? null : evt.id)}
+                  />
+                ) : null}
               </div>
+              {attendanceFor === evt.id ? (
+                <EventAttendanceSheet event={evt} onClose={() => setAttendanceFor(null)} />
+              ) : null}
             </article>
           ))}
         </div>

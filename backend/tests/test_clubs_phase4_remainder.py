@@ -164,12 +164,54 @@ def test_event_attendance_marking(client):
     r = client.post("/api/v1/clubs/club_commerce/events/evt_conclave/attendance", json=[
         {"student_id": "std_regular_1", "attended": "present"},
     ], headers=h)
-    assert r.status_code == 200
-    assert r.json()["marked"] == 1
+    assert r.status_code == 200, r.text
+    # The seed may already carry a row for this student, so assert the total
+    # accounted for rather than which half of the upsert ran.
+    assert r.json()["total"] == 1
 
     r = client.get("/api/v1/clubs/club_commerce/events/evt_conclave/attendance", headers=h)
     assert r.status_code == 200
-    assert any(a["student_id"] == "std_regular_1" for a in r.json())
+    rows = r.json()
+    assert any(a["student_id"] == "std_regular_1" for a in rows)
+    # Names, not opaque ids — the register has to be readable.
+    assert next(a for a in rows if a["student_id"] == "std_regular_1")["student_name"]
+
+
+def test_re_marking_attendance_updates_rather_than_duplicating(client):
+    """This used to INSERT unconditionally, so correcting a register left two
+    contradictory rows for one student — and both fed the attendance analytics
+    and the attendance report."""
+    h = auth_headers(client, *PRESIDENT)
+    url = "/api/v1/clubs/club_commerce/events/evt_conclave/attendance"
+
+    client.post(url, json=[{"student_id": "std_vp", "attended": "present"}], headers=h)
+    before = client.get(url, headers=h).json()
+
+    r = client.post(url, json=[{"student_id": "std_vp", "attended": "absent"}], headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json() == {"created": 0, "updated": 1, "total": 1}, "a correction was not an update"
+
+    after = client.get(url, headers=h).json()
+    assert len(after) == len(before), "a correction created a duplicate row"
+    assert next(a for a in after if a["student_id"] == "std_vp")["attended"] == "absent"
+
+
+def test_attendance_rejects_non_members_and_malformed_records(client):
+    h = auth_headers(client, *PRESIDENT)
+    url = "/api/v1/clubs/club_commerce/events/evt_conclave/attendance"
+
+    # Not a member of this club.
+    r = client.post(url, json=[{"student_id": "std_regular_2", "attended": "present"}], headers=h)
+    assert r.status_code == 422, r.text
+    assert "std_regular_2" in r.json()["detail"]
+
+    # r["student_id"] used to be indexed unguarded — a 500, not a 422.
+    r = client.post(url, json=[{"attended": "present"}], headers=h)
+    assert r.status_code == 422
+
+    # An invented attendance value is refused rather than stored.
+    r = client.post(url, json=[{"student_id": "std_vp", "attended": "maybe"}], headers=h)
+    assert r.status_code == 422
 
 
 def test_club_members_expose_real_student_names(client):
