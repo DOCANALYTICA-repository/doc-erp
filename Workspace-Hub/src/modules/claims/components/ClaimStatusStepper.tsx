@@ -2,6 +2,8 @@ import React from 'react';
 import { Token } from '@astryxdesign/core/Token';
 import { Popover } from '@astryxdesign/core/Popover';
 import { StatusDot } from '@astryxdesign/core/StatusDot';
+import { useClaimWorkflow } from '../../../api/hooks';
+import type { ClaimWorkflowStage } from '../../../api/types';
 
 type ClaimStatus = 'draft' | 'submitted' | 'under_review' | 'approved' | 'closed' | 'rejected' | 'returned';
 type WorkflowStage = 'initial_review' | 'subject_faculty' | 'course_coordinator' | 'attendance_office' | 'closed';
@@ -12,17 +14,26 @@ interface ClaimStatusStepperProps {
   submissionType?: 'individual' | 'club';
   referenceNumber?: string;
   revisionReason?: string | null;
+  /** Which stage sent it back. Recorded by the server; previously unused. */
+  lastRevisedStage?: string | null;
 }
 
-const STAGES: { id: WorkflowStage; individualLabel: string; clubLabel: string }[] = [
-  { id: 'initial_review', individualLabel: 'Class Teacher Review', clubLabel: 'Club Faculty Coordinator Review' },
-  { id: 'subject_faculty', individualLabel: 'Subject Faculty Review', clubLabel: 'Subject Faculty Review' },
-  { id: 'course_coordinator', individualLabel: 'Course Coordinator / HOD Review', clubLabel: 'Course Coordinator / HOD Review' },
-  { id: 'attendance_office', individualLabel: 'Attendance Office Update', clubLabel: 'Attendance Office Update' },
-  { id: 'closed', individualLabel: 'Closed', clubLabel: 'Closed' },
+/**
+ * Fallback stage list, used only until GET /claims/workflow resolves.
+ *
+ * The live list comes from the server — the same table
+ * backend/app/core/claim_workflow.py enforces. This component used to own the
+ * ONLY copy, which is how it came to hardcode 'approved' onto stage 3 and grey
+ * out the rest: a workaround for an approved claim being invisible to every
+ * review queue. The stepper was hiding a dead end rather than showing one.
+ */
+const FALLBACK_STAGES: ClaimWorkflowStage[] = [
+  { id: 'initial_review', label: 'Class Teacher review', club_label: 'Club Faculty Coordinator review', is_terminal: false, is_parallel: false, next_on_approve: 'subject_faculty' },
+  { id: 'subject_faculty', label: 'Subject faculty review', club_label: 'Subject faculty review', is_terminal: false, is_parallel: true, next_on_approve: 'course_coordinator' },
+  { id: 'course_coordinator', label: 'Course Coordinator / HOD review', club_label: 'Course Coordinator / HOD review', is_terminal: false, is_parallel: false, next_on_approve: 'attendance_office' },
+  { id: 'attendance_office', label: 'Attendance office update', club_label: 'Attendance office update', is_terminal: false, is_parallel: false, next_on_approve: 'closed' },
+  { id: 'closed', label: 'Closed', club_label: 'Closed', is_terminal: true, is_parallel: false, next_on_approve: null },
 ];
-
-const STAGE_ORDER = STAGES.map(s => s.id);
 
 const TOKEN_COLOR: Record<ClaimStatus, 'blue' | 'yellow' | 'green' | 'red' | 'orange' | 'gray'> = {
   draft: 'gray',
@@ -44,9 +55,12 @@ const StatusLabel: Record<ClaimStatus, string> = {
   returned: 'Returned',
 };
 
-function StepperBody({ status, currentStage, submissionType = 'individual', referenceNumber, revisionReason }: ClaimStatusStepperProps) {
+function StepperBody({ status, currentStage, submissionType = 'individual', referenceNumber, revisionReason, lastRevisedStage }: ClaimStatusStepperProps) {
+  const { data: workflow } = useClaimWorkflow();
+  const stages = workflow?.stages ?? FALLBACK_STAGES;
+
   const isTerminalNegative = status === 'rejected' || status === 'returned';
-  const currentIndex = STAGE_ORDER.indexOf(currentStage);
+  const currentIndex = stages.findIndex(s => s.id === currentStage);
 
   return (
     <div className="p-1 min-w-[260px]">
@@ -64,14 +78,19 @@ function StepperBody({ status, currentStage, submissionType = 'individual', refe
               {revisionReason || 'No reason was provided.'}
             </p>
           </div>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            The exact review stage that made this decision isn't tracked yet — only that the claim was returned/rejected after submission.
-          </p>
+          {/* last_revised_stage IS recorded now (claims.py record_revision),
+              so name the stage rather than apologising for not knowing it. */}
+          {lastRevisedStage ? (
+            <p className="text-xs leading-relaxed text-slate-500">
+              Decided at the{' '}
+              {stages.find(s => s.id === lastRevisedStage)?.label ?? lastRevisedStage} stage.
+            </p>
+          ) : null}
         </div>
       ) : (
         <ul className="space-y-3">
-          {STAGES.map((stage, idx) => {
-            const label = submissionType === 'club' ? stage.clubLabel : stage.individualLabel;
+          {stages.map((stage, idx) => {
+            const label = submissionType === 'club' ? stage.club_label : stage.label;
             // Drive the marker from currentStage in every case.
             //
             // status === 'approved' used to hardcode the marker onto index 3

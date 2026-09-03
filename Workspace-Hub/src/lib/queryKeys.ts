@@ -29,6 +29,7 @@ export const claimKeys = {
   list: () => [...claimKeys.all, 'list'] as const,
   detail: (claimId: string) => [...claimKeys.all, claimId] as const,
   documents: (claimId: string) => [...claimKeys.detail(claimId), 'documents'] as const,
+  workflow: () => [...claimKeys.all, 'workflow'] as const,
   timetable: (programme?: string, semester?: string, section?: string) =>
     [...claimKeys.all, 'timetable', programme ?? '', semester ?? '', section ?? ''] as const,
 };

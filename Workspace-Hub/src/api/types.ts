@@ -74,6 +74,25 @@ export type ShowcaseClub = Schemas['ShowcaseClubOut'];
  * kept deliberately small — if it grows, give it a response_model on the
  * server instead of widening it here.
  */
+/**
+ * GET /claims/workflow — the claim state machine, served from the same table
+ * the backend enforces (backend/app/core/claim_workflow.py).
+ */
+export interface ClaimWorkflowStage {
+  id: string;
+  label: string;
+  club_label: string;
+  is_terminal: boolean;
+  is_parallel: boolean;
+  next_on_approve: string | null;
+}
+
+export interface ClaimWorkflow {
+  stage_order: string[];
+  actions: string[];
+  stages: ClaimWorkflowStage[];
+}
+
 export interface CalendarEvent {
   id: string;
   title: string;

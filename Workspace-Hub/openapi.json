@@ -3140,6 +3140,26 @@
         ]
       }
     },
+    "/api/v1/claims/workflow": {
+      "get": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "Get Claim Workflow",
+        "description": "The claim state machine, as data.\n\nClaimStatusStepper.tsx kept its own hardcoded copy of the stage list and\nlabels \u2014 which is how it came to hardcode 'approved' onto stage 3 as a\nworkaround for a backend bug, permanently greying out the stage that\nactually needed attention. Serving the same table both sides read from\nremoves the temptation.\n\nMUST stay above the /{claim_id} route below, or \"workflow\" is matched as\na claim id and this endpoint never runs \u2014 the same trap that hid the\nreviewer inbox in clubs.py.",
+        "operationId": "get_claim_workflow_api_v1_claims_workflow_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/claims/{claim_id}": {
       "get": {
         "tags": [
@@ -3193,6 +3213,7 @@
           "claims"
         ],
         "summary": "Approve Claim Stage",
+        "description": "Advance, return or reject a claim at whichever stage it is sitting in.\n\nThis was a 130-line if/elif chain, and three separate defects in it were\nreally one defect: a branch that forgot to honour `action` (a rejection\nrecorded as a success), a branch that forgot super_admin (an admin unable\nto rescue a stuck claim), and a branch that forgot to record the revision.\nEach was patched individually.\n\nThe stages now live in app/core/claim_workflow.STAGES, and this endpoint is\nthe three steps that are true of every stage: look up the spec, authorize,\napply. A new stage cannot forget any of them.",
         "operationId": "approve_claim_stage_api_v1_claims__claim_id__approve_stage_post",
         "security": [
           {

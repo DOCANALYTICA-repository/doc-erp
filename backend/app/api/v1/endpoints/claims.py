@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.rbac import PermissionChecker, get_current_user, get_resolved_permissions
-from app.core import faculty_scope
+from app.core import claim_workflow, faculty_scope
 from app.repositories.claim import claim_repo, claim_participant_repo, attendance_entry_repo, timetable_repo, doc_repo
 from app.schemas.claim import (
     ClaimOut, ClaimCreate, ClaimResubmit, TimetableSessionOut, TimetableSessionCreate,
@@ -281,6 +281,23 @@ def list_claims(db: Session = Depends(get_db), current_user: User = Depends(get_
     return [_to_claim_out(c) for c in claim_repo.get_by_submitter(db, user_id=current_user.id)]
 
 
+@router.get("/workflow")
+def get_claim_workflow():
+    """The claim state machine, as data.
+
+    ClaimStatusStepper.tsx kept its own hardcoded copy of the stage list and
+    labels — which is how it came to hardcode 'approved' onto stage 3 as a
+    workaround for a backend bug, permanently greying out the stage that
+    actually needed attention. Serving the same table both sides read from
+    removes the temptation.
+
+    MUST stay above the /{claim_id} route below, or "workflow" is matched as
+    a claim id and this endpoint never runs — the same trap that hid the
+    reviewer inbox in clubs.py.
+    """
+    return claim_workflow.as_json()
+
+
 @router.get("/{claim_id}", response_model=ClaimOut)
 def get_claim(claim_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     claim = claim_repo.get(db, claim_id)
@@ -339,123 +356,90 @@ def approve_claim_stage(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Advance, return or reject a claim at whichever stage it is sitting in.
+
+    This was a 130-line if/elif chain, and three separate defects in it were
+    really one defect: a branch that forgot to honour `action` (a rejection
+    recorded as a success), a branch that forgot super_admin (an admin unable
+    to rescue a stuck claim), and a branch that forgot to record the revision.
+    Each was patched individually.
+
+    The stages now live in app/core/claim_workflow.STAGES, and this endpoint is
+    the three steps that are true of every stage: look up the spec, authorize,
+    apply. A new stage cannot forget any of them.
+    """
     claim = claim_repo.get(db, claim_id)
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
-    if action not in ("approve", "reject", "revise"):
+    if action not in claim_workflow.ACTIONS:
         raise HTTPException(status_code=400, detail="Invalid action")
-    if action == "revise" and not (feedback and feedback.strip()):
+    if action == claim_workflow.REVISE and not (feedback and feedback.strip()):
         raise HTTPException(status_code=400, detail="A reason is required to revise a claim")
 
     stage = claim.current_workflow_stage
-    tags = set(current_user.role_tags_list)
-    permissions = get_resolved_permissions(current_user)
+    spec = claim_workflow.STAGES.get(stage)
+    if spec is None or spec.is_terminal:
+        raise HTTPException(
+            status_code=403,
+            detail=spec.denial if spec else f"Unknown workflow stage '{stage}'",
+        )
+
+    # ---- 1. authorize -----------------------------------------------------
+    if not claim_workflow.may_act(db, current_user, claim, spec):
+        raise HTTPException(status_code=403, detail=spec.denial)
+
     is_super_admin = current_user.primary_role == "super_admin"
 
-    def deny(detail: str):
-        raise HTTPException(status_code=403, detail=detail)
-
     def record_revision():
-        if action in ("revise", "reject"):
-            claim.revision_reason = feedback
-            claim.last_revised_by = current_user.id
-            claim.last_revised_stage = stage
+        """Always called on a non-approval, for every stage."""
+        claim.revision_reason = feedback
+        claim.last_revised_by = current_user.id
+        claim.last_revised_stage = stage
 
-    if stage == "initial_review":
-        allowed = is_super_admin or (
-            claim.submission_type == "individual" and "claims:review_class_teacher" in permissions
-            and faculty_scope.is_class_teacher_for(db, current_user.id, claim.programme, claim.semester, claim.section)
-        ) or (
-            claim.submission_type == "club" and "claims:review_faculty_coordinator" in permissions
-            and faculty_scope.is_club_faculty_coordinator_for(db, current_user.id, claim.club_id)
-        )
-        if not allowed:
-            deny("Only the assigned Class Teacher or Club Faculty Coordinator may act at this stage")
+    def send_back():
+        claim.status = "returned" if action == claim_workflow.REVISE else "rejected"
+        claim.current_workflow_stage = "closed"
+        record_revision()
 
-        if action == "approve":
-            claim.current_workflow_stage = "subject_faculty"
-            claim.status = "under_review"
-        else:
-            claim.status = "returned" if action == "revise" else "rejected"
-            claim.current_workflow_stage = "closed"
-            record_revision()
-
-    elif stage == "subject_faculty":
-        if not (is_super_admin or "claims:review_faculty" in permissions):
-            deny("Only Subject Faculty may act at this stage")
-
-        my_pending_entries = [
+    # ---- 2. apply ---------------------------------------------------------
+    if spec.is_parallel:
+        # Many independent reviewers: each acts only on their OWN entries, and
+        # the claim advances only once none are left pending.
+        my_pending = [
             entry
             for participant in claim.participants
             for entry in participant.entries
-            if entry.subject_faculty_id == current_user.id and entry.status == "pending"
+            if entry.status == "pending"
+            and (is_super_admin or entry.subject_faculty_id == current_user.id)
         ]
-        # super_admin acts on behalf of EVERY subject faculty member here.
-        # Previously it fell through with an empty entry list, so approving
-        # changed nothing and the stage never advanced — an admin could not
-        # rescue a claim stuck behind an unavailable faculty member.
-        if is_super_admin:
-            my_pending_entries = [
-                entry
-                for participant in claim.participants
-                for entry in participant.entries
-                if entry.status == "pending"
-            ]
-        elif not my_pending_entries:
-            deny("You have no pending attendance entries on this claim")
+        if not my_pending:
+            raise HTTPException(
+                status_code=403,
+                detail="You have no pending attendance entries on this claim",
+            )
 
-        if action == "approve":
-            for entry in my_pending_entries:
+        if action == claim_workflow.APPROVE:
+            for entry in my_pending:
                 entry.status = "approved"
                 db.add(entry)
             db.flush()
             all_entries = [e for p in claim.participants for e in p.entries]
             if all(e.status != "pending" for e in all_entries):
-                claim.current_workflow_stage = "course_coordinator"
+                claim.current_workflow_stage = spec.on_approve
         else:
-            for entry in my_pending_entries:
+            for entry in my_pending:
                 entry.status = "rejected"
                 entry.feedback = feedback
                 db.add(entry)
-            claim.status = "returned" if action == "revise" else "rejected"
-            claim.current_workflow_stage = "closed"
-            record_revision()
+            send_back()
 
-    elif stage == "course_coordinator":
-        if not (is_super_admin or "claims:approve_coordinator" in permissions):
-            deny("Only the Course Coordinator / HOD may act at this stage")
-        if not is_super_admin and "HOD" not in tags and "Course Coordinator" in tags:
-            if not faculty_scope.is_course_coordinator_for(db, current_user.id, claim.programme):
-                deny("You are not the assigned Course Coordinator for this programme")
-
-        if action == "approve":
-            claim.current_workflow_stage = "attendance_office"
-            claim.status = "approved"
-        else:
-            claim.status = "returned" if action == "revise" else "rejected"
-            claim.current_workflow_stage = "closed"
-            record_revision()
-
-    elif stage == "attendance_office":
-        if not (is_super_admin or "claims:approve_coordinator" in permissions):
-            deny("Only the Course Coordinator / HOD may close this claim")
-        if not is_super_admin and "HOD" not in tags and "Course Coordinator" in tags:
-            if not faculty_scope.is_course_coordinator_for(db, current_user.id, claim.programme):
-                deny("You are not the assigned Course Coordinator for this programme")
-
-        # This branch used to ignore `action` entirely and mark the claim
-        # closed-as-successful even when called with revise or reject — a
-        # rejection recorded as a success, on the final stage of the workflow.
-        if action == "approve":
-            claim.current_workflow_stage = "closed"
-            claim.status = "closed"
-        else:
-            claim.status = "returned" if action == "revise" else "rejected"
-            claim.current_workflow_stage = "closed"
-            record_revision()
+    elif action == claim_workflow.APPROVE:
+        claim.current_workflow_stage = spec.on_approve
+        if spec.approve_status:
+            claim.status = spec.approve_status
 
     else:
-        deny("This claim is already closed")
+        send_back()
 
     db.add(claim)
     db.commit()

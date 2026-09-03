@@ -69,6 +69,7 @@ export const OverviewTab: React.FC = () => {
                   submissionType={claim.submission_type as never}
                   referenceNumber={claim.reference_number}
                   revisionReason={claim.revision_reason}
+                  lastRevisedStage={claim.last_revised_stage}
                 />
               </div>
             ))

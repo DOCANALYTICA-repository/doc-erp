@@ -914,6 +914,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/claims/workflow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Claim Workflow
+         * @description The claim state machine, as data.
+         *
+         *     ClaimStatusStepper.tsx kept its own hardcoded copy of the stage list and
+         *     labels — which is how it came to hardcode 'approved' onto stage 3 as a
+         *     workaround for a backend bug, permanently greying out the stage that
+         *     actually needed attention. Serving the same table both sides read from
+         *     removes the temptation.
+         *
+         *     MUST stay above the /{claim_id} route below, or "workflow" is matched as
+         *     a claim id and this endpoint never runs — the same trap that hid the
+         *     reviewer inbox in clubs.py.
+         */
+        get: operations["get_claim_workflow_api_v1_claims_workflow_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/claims/{claim_id}": {
         parameters: {
             query?: never;
@@ -940,7 +970,20 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Approve Claim Stage */
+        /**
+         * Approve Claim Stage
+         * @description Advance, return or reject a claim at whichever stage it is sitting in.
+         *
+         *     This was a 130-line if/elif chain, and three separate defects in it were
+         *     really one defect: a branch that forgot to honour `action` (a rejection
+         *     recorded as a success), a branch that forgot super_admin (an admin unable
+         *     to rescue a stuck claim), and a branch that forgot to record the revision.
+         *     Each was patched individually.
+         *
+         *     The stages now live in app/core/claim_workflow.STAGES, and this endpoint is
+         *     the three steps that are true of every stage: look up the spec, authorize,
+         *     apply. A new stage cannot forget any of them.
+         */
         post: operations["approve_claim_stage_api_v1_claims__claim_id__approve_stage_post"];
         delete?: never;
         options?: never;
@@ -5247,6 +5290,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_claim_workflow_api_v1_claims_workflow_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

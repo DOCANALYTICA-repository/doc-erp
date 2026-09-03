@@ -115,6 +115,7 @@ export const ReviewQueueTab: React.FC = () => {
                       submissionType={claim.submission_type as never}
                       referenceNumber={claim.reference_number}
                       revisionReason={claim.revision_reason}
+                      lastRevisedStage={claim.last_revised_stage}
                     />
                   </td>
                   <td className="hidden px-6 py-4 sm:table-cell">

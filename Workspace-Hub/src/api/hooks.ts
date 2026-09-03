@@ -15,7 +15,7 @@ import type {
   ClubBootstrap, ClubDocument, ClubEvent, ClubMember, DirectoryEntry, FacultyDocument,
   GalleryImage, HierarchyLevel, Meeting, MyClub, Note, Notification, Programme,
   PublicStatistics, RecruitmentDrive, Reimbursement, Reminder, ShowcaseClub, Sponsorship,
-  SupportingDocument, Task, TimetableSession,
+  SupportingDocument, Task, TimetableSession, ClaimWorkflow,
 } from './types';
 
 type Options<T> = Omit<UseQueryOptions<T, Error, T>, 'queryKey' | 'queryFn'>;
@@ -125,6 +125,22 @@ export function useTimetable(programme?: string | null, semester?: string | null
     // The timetable changes once a semester. There is no reason to re-fetch it
     // while someone fills in a form.
     staleTime: 10 * 60_000,
+  });
+}
+
+/**
+ * The claim state machine, from the server.
+ *
+ * ClaimStatusStepper used to carry its own hardcoded copy of the stage list
+ * and labels, which is how it came to hardcode 'approved' onto stage 3 as a
+ * workaround for a backend bug. It changes about once a year, so it caches
+ * for the whole session.
+ */
+export function useClaimWorkflow() {
+  return useQuery({
+    queryKey: claimKeys.workflow(),
+    queryFn: () => api.get<ClaimWorkflow>('/claims/workflow'),
+    staleTime: Infinity,
   });
 }
 
