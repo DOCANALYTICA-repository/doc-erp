@@ -1,3 +1,4 @@
+import json
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
@@ -37,7 +38,10 @@ def list_faculty_assignments(
 ):
     if faculty_id:
         return faculty_assignment_repo.get_by_faculty(db, faculty_id=faculty_id)
-    return faculty_assignment_repo.get_multi(db, limit=1000)
+    # Unbounded on purpose: this is the RBAC admin screen, and silently
+    # truncating the assignment list is how a scoped coordinator goes missing.
+    # The table is bounded by the size of the faculty, not by user activity.
+    return faculty_assignment_repo.get_multi(db)
 
 
 @router.post("/assignments", response_model=FacultyAssignmentOut)
@@ -198,8 +202,27 @@ def record_meeting_minutes(
     if not minutes_in.decisions:
         raise HTTPException(status_code=400, detail="At least one decision is required to complete a meeting")
 
+    # Every assignee must be a real user. Without this the task engine happily
+    # created a task assigned to an id that does not exist, and it silently
+    # never appeared in anyone's list.
+    assignee_ids = {item.assignee_id for item in minutes_in.action_items}
+    if assignee_ids:
+        known = {
+            row[0] for row in db.query(User.id).filter(User.id.in_(assignee_ids)).all()
+        }
+        unknown = assignee_ids - known
+        if unknown:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unknown assignee(s): {', '.join(sorted(unknown))}",
+            )
+
     meeting.minutes = minutes_in.minutes
     meeting.decisions = ",".join(minutes_in.decisions)
+    # The column existed and was never written to, so the action items agreed
+    # in a meeting survived only as spawned tasks — the minutes themselves had
+    # no record of what was assigned.
+    meeting.action_items = json.dumps([item.model_dump() for item in minutes_in.action_items])
     meeting.status = "completed"
 
     # Sync meeting action items as formal tasks inside the Platform Task Engine
@@ -207,7 +230,7 @@ def record_meeting_minutes(
         db,
         meeting_id=meeting_id,
         organizer_id=current_user.id,
-        action_items=minutes_in.action_items
+        action_items=[item.model_dump() for item in minutes_in.action_items],
     )
 
     db.add(meeting)

@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_STORAGE_BUCKET: str = "doc-portal-files"
 
+    # --- Department facts --------------------------------------------------
+    # The one number on the public site that cannot be counted from the
+    # database. Everything else (students, faculty, clubs) is now a real
+    # count() rather than a literal that drifts the moment anyone enrols.
+    DEPARTMENT_FOUNDED_YEAR: int = 1971
+
     # --- Claims policy -----------------------------------------------------
     # ONE definition of the submission SLA. The engines module documented a
     # 5-day limit in two places while the endpoint enforced 7 — two business

@@ -9,6 +9,7 @@ from app.models.faculty import Note, Document, Meeting, Task, Reminder, Dashboar
 from app.models.notification import Notification
 from app.models.faculty_assignment import FacultyAssignment
 from app.models.club import ClubHierarchyLevel
+from app.models.content import Programme, GalleryImage
 
 # Must come last: it attaches indexes to tables that the imports above define.
 from app.models.indexes import register_indexes
@@ -44,4 +45,6 @@ __all__ = [
     "Notification",
     "FacultyAssignment",
     "ClubHierarchyLevel",
+    "Programme",
+    "GalleryImage",
 ]

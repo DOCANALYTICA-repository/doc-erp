@@ -19,12 +19,13 @@ from app.schemas.club import (
     AnnualPlanOut, AnnualPlanCreate, AnnualPlanUpdate, AnnualPlanReviewAction,
     ClubDocumentOut, PermissionTemplateAssign,
     ClubSettingsUpdate, ClubHierarchyLevelOut, ClubHierarchyLevelCreate, ClubHierarchyLevelUpdate,
-    MyClubOut, AwaitingReviewPlanOut,
+    MyClubOut, AwaitingReviewPlanOut, ClubBootstrap, ClubCapabilities, ClubCounters,
     ClubHierarchyMemberAssign, ClubTaskCreate, ClubTaskReviewAction,
 )
 from app.schemas.task import TaskOut
 from app.models.user import User
-from app.models.club import AnnualPlan, Club, EventAttendance, ClubHierarchyLevel
+from sqlalchemy import func
+from app.models.club import AnnualPlan, Budget, Club, Event, EventAttendance, ClubHierarchyLevel, Reimbursement
 from app.models.faculty import Task
 from app.services.engines.reporting import reporting_engine
 from app.services.engines.storage import storage_engine
@@ -274,6 +275,148 @@ def _viewer_capabilities(db: Session, current_user: User, club_id: str) -> dict:
     }
 
 
+# Which tabs each relationship may see.
+#
+# The server owns this, not the client. A Faculty Coordinator is not a member:
+# they oversee the club, they do not draft its events or request its
+# reimbursements. Rendering those tabs for them means rendering six buttons
+# that the backend will 403 — the UI promising something the API refuses.
+MEMBER_ONLY_TABS = frozenset({"recruitment", "reimbursements", "sponsorships"})
+
+ALL_CLUB_TABS = [
+    "dashboard", "members", "structure", "tasks", "recruitment", "events",
+    "announcements", "budget", "reimbursements", "sponsorships", "annual-plan",
+    "documents", "reports", "analytics", "settings",
+]
+
+
+def _club_capabilities(db: Session, current_user: User, club_id: str) -> ClubCapabilities:
+    def allowed(fn) -> bool:
+        try:
+            fn(db, current_user, club_id)
+            return True
+        except HTTPException:
+            return False
+
+    can_write = allowed(_require_active_club_member)
+    return ClubCapabilities(
+        can_read=allowed(_require_club_reader),
+        can_write=can_write,
+        can_edit_hierarchy=allowed(_require_club_faculty_coordinator_or_admin),
+        can_manage_settings=allowed(_require_club_head_or_admin),
+        can_assign_tasks=allowed(_require_task_assigner),
+        can_approve_plan=_can_approve_any_plan_stage(db, current_user, club_id),
+        can_manage_members=allowed(_require_club_head_or_admin),
+    )
+
+
+def _can_approve_any_plan_stage(db: Session, current_user: User, club_id: str) -> bool:
+    """Is this user the reviewer for THIS club's plan at its CURRENT stage?
+
+    Not "do they hold an approver permission somewhere" — a coordinator of a
+    different club holds the same permission string and must not see an
+    approve button here.
+    """
+    perms = get_resolved_permissions(current_user)
+    if "*" in perms:
+        return True
+
+    plans = annual_plan_repo.get_by_club(db, club_id=club_id)
+    for plan in plans:
+        required = ANNUAL_PLAN_STAGE_PERMISSIONS.get(plan.status)
+        if not required or required not in perms:
+            continue
+        if plan.status == "faculty_coordinator_review":
+            if not faculty_scope.is_club_faculty_coordinator_for(db, current_user.id, club_id):
+                continue
+        return True
+    return False
+
+
+def _visible_tabs(relationship: str, caps: ClubCapabilities) -> List[str]:
+    if relationship in ("member", "super_admin"):
+        return list(ALL_CLUB_TABS)
+    # Coordinators and department reviewers get everything they can actually
+    # act on or audit, minus the member-only operational tabs.
+    return [t for t in ALL_CLUB_TABS if t not in MEMBER_ONLY_TABS]
+
+
+def _club_relationship(db: Session, current_user: User, club_id: str) -> str:
+    if current_user.primary_role == "super_admin":
+        return "super_admin"
+    membership = member_repo.get_by_student_and_club(db, student_id=current_user.id, club_id=club_id)
+    if membership and membership.status == "active":
+        return "member"
+    if faculty_scope.is_club_faculty_coordinator_for(db, current_user.id, club_id):
+        return "faculty_coordinator"
+    return "reviewer"
+
+
+@router.get("/{club_id}/bootstrap", response_model=ClubBootstrap)
+def get_club_bootstrap(
+    club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    """Everything the Clubs workspace needs to render its shell, in one request.
+
+    Mounting the workspace previously issued thirteen requests. Of those
+    payloads exactly three are used by more than one tab — the club itself,
+    the member roster and the hierarchy — so this returns those plus the
+    resolved capabilities, the tab list and the counters that feed the
+    dashboard tiles. Everything else stays a lazy per-tab fetch.
+
+    counters exists so the dashboard can show "3 members, 2 events, Rs 15,000
+    spent" without pulling five full lists to count their lengths.
+    """
+    _require_club_reader(db, current_user, club_id)
+
+    club = club_repo.get(db, club_id)
+    if not club:
+        raise HTTPException(status_code=404, detail="Club not found")
+
+    relationship = _club_relationship(db, current_user, club_id)
+    caps = _club_capabilities(db, current_user, club_id)
+
+    members = member_repo.get_club_members(db, club_id=club_id)
+    hierarchy = club_hierarchy_engine.ensure_default_hierarchy(db, club_id)
+    budgets = db.query(Budget).filter(Budget.club_id == club_id).all()
+
+    counters = ClubCounters(
+        members=sum(1 for m in members if m.status == "active"),
+        events=db.query(func.count(Event.id)).filter(Event.club_id == club_id).scalar() or 0,
+        open_tasks=db.query(func.count(Task.id)).filter(
+            Task.related_entity_type == "club",
+            Task.related_entity_id == club_id,
+            Task.status != "completed",
+        ).scalar() or 0,
+        pending_reimbursements=db.query(func.count(Reimbursement.id)).filter(
+            Reimbursement.club_id == club_id, Reimbursement.status == "pending",
+        ).scalar() or 0,
+        budget_allocated=sum(b.allocated_amount or 0 for b in budgets),
+        budget_spent=sum(b.spent_amount or 0 for b in budgets),
+        plans_awaiting_me=sum(
+            1 for p in annual_plan_repo.get_by_club(db, club_id=club_id)
+            if p.status in ANNUAL_PLAN_STAGE_PERMISSIONS
+        ) if caps.can_approve_plan else 0,
+    )
+
+    detail = ClubDetailOut(
+        **ClubOut.model_validate(club).model_dump(),
+        viewer_can_edit_hierarchy=caps.can_edit_hierarchy,
+        viewer_can_manage_settings=caps.can_manage_settings,
+        viewer_can_assign_tasks=caps.can_assign_tasks,
+    )
+
+    return ClubBootstrap(
+        club=detail,
+        relationship=relationship,
+        capabilities=caps,
+        visible_tabs=_visible_tabs(relationship, caps),
+        counters=counters,
+        hierarchy=hierarchy,
+        members=members,
+    )
+
+
 @router.get("/{club_id}", response_model=ClubDetailOut)
 def get_club(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     club = club_repo.get(db, club_id)
@@ -319,7 +462,7 @@ def create_club_event(
         notification_engine.send_notification(
             db, user_id=assignment.faculty_id, title="New event proposal",
             content=f"{club.name if club else club_id} proposed a new event: {created.title}.",
-            source_module="clubs",
+            source_module="clubs", entity_type="club", entity_id=club_id,
         )
     return created
 
@@ -818,7 +961,7 @@ def assign_permission_template(
     notification_engine.send_notification(
         db, user_id=member.student_id, title="Club permission template updated",
         content=f"You have been assigned the '{assignment.permission_template or 'Member'}' permission template.",
-        source_module="clubs",
+        source_module="clubs", entity_type="club", entity_id=club_id,
     )
     return updated
 
@@ -1005,6 +1148,6 @@ def review_club_task(
         db, user_id=task.assignee_id,
         title=f"Task {'approved' if review_in.action == 'approve' else 'sent back'}",
         content=review_in.comments or f"Your task '{task.title}' was {task.status}.",
-        source_module="clubs", task_id=task.id,
+        source_module="clubs", task_id=task.id, entity_type="task", entity_id=task.id,
     )
     return task

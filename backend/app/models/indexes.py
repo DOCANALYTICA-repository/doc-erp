@@ -97,6 +97,8 @@ COMPOSITE_INDEXES = [
     ('ix_users_primary_role', 'users', ['primary_role']),
     # the reviewer inbox
     ('ix_annual_plans_status', 'annual_plans', ['status']),
+    # notification -> entity lookups (migration c8d2e3f4a5b6)
+    ('ix_notifications_entity_type_entity_id', 'notifications', ['entity_type', 'entity_id']),
 ]
 
 ALL_INDEXES = FK_INDEXES + COMPOSITE_INDEXES

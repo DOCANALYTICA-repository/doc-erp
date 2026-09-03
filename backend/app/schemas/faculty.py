@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class FacultyAssignmentBase(BaseModel):
     faculty_id: str
@@ -85,10 +85,22 @@ class MeetingOut(MeetingBase):
     class Config:
         from_attributes = True
 
+class MeetingActionItem(BaseModel):
+    """A real model, not List[dict].
+
+    task.py indexed item["title"] and item["assignee_id"] directly, so an
+    action item missing either was a 500 rather than a 422 telling the user
+    which field they left out.
+    """
+    title: str = Field(min_length=1)
+    assignee_id: str = Field(min_length=1)
+    due_date: Optional[str] = None
+
+
 class MeetingMinutesUpdate(BaseModel):
     minutes: str
     decisions: List[str]
-    action_items: List[dict] # list of {"title": str, "assignee_id": str, "due_date": str}
+    action_items: List[MeetingActionItem] = []
 
 class ReminderBase(BaseModel):
     title: str

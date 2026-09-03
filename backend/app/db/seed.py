@@ -15,6 +15,7 @@ from app.models.claim import Claim, ClaimParticipant, AttendanceEntry, Supportin
 from app.models.faculty import Note, Document, Meeting, Task
 from app.models.notification import Notification
 from app.models.faculty_assignment import FacultyAssignment
+from app.models.content import Programme, GalleryImage
 from app.core.security import get_password_hash
 
 DESTRUCTIVE_ENV_FLAG = "ALLOW_DESTRUCTIVE_SEED"
@@ -491,6 +492,43 @@ def seed_database():
             source_module="clubs"
         )
         db.add_all([n1, n2])
+        db.commit()
+
+        print("Generating department content (programmes + gallery)...")
+        # These used to be hardcoded Python lists in content.py. brochure_url
+        # is deliberately left NULL — the previous list advertised three PDFs
+        # that were never in the repository, so every link 404'd. A missing
+        # link is better than a broken one.
+        programmes = [
+            Programme(
+                id="bcom_regular", display_order=10,
+                name="B.Com (Regular)",
+                description="A comprehensive undergraduate programme covering commerce, accounting and business finance.",
+                outcomes="Strong foundation in accounting principles,Understanding of financial markets,Business law literacy",
+                careers="Financial Analyst,Audit Associate,Accountant",
+            ),
+            Programme(
+                id="bcom_hons", display_order=20,
+                name="B.Com (Honours)",
+                description="Advanced commerce curriculum with specialisation tracks in finance, investment and business analytics.",
+                outcomes="Mastery of corporate valuation,Proficiency in data analytics tools,Advanced taxation concepts",
+                careers="Investment Banker,Risk Analyst,Data Consultant",
+            ),
+            Programme(
+                id="bcom_fna", display_order=30,
+                name="B.Com (Finance and Accountancy)",
+                description="Professional programme integrated with globally recognised accounting curricula (ACCA / CPA).",
+                outcomes="Exemptions in global certification exams,Strategic business leadership insight,Taxation compliance expertise",
+                careers="Chartered Accountant,Management Consultant,Corporate Secretary",
+            ),
+        ]
+        db.add_all(programmes)
+
+        # No gallery images are seeded. The four that were here were
+        # picsum.photos placeholders standing in for photographs of a real
+        # department; an empty, honestly-empty gallery is better than four
+        # stock images presented as departmental events. The HOD adds real
+        # ones through /content/admin/gallery.
         db.commit()
 
         print("Seeding completed successfully!")

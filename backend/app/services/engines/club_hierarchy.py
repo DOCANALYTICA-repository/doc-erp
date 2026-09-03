@@ -67,7 +67,8 @@ class ClubHierarchyEngine:
                 continue
             if self.get_level_order_for_member(db, m) in top_ranks:
                 notification_engine.send_notification(
-                    db, user_id=m.student_id, title=title, content=content, source_module="clubs"
+                    db, user_id=m.student_id, title=title, content=content,
+                    source_module="clubs", entity_type="club", entity_id=club_id,
                 )
 
 

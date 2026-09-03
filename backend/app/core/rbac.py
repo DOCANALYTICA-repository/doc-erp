@@ -100,6 +100,8 @@ ROLE_PERMISSIONS = {
         # claims:manage_timetable too, but is scope-checked down to their own
         # programme/semester/section — see _require_timetable_scope.
         "claims:manage_timetable_all",
+        # The public site is the department's front door; the HOD owns it.
+        "content:manage",
     }
 }
 

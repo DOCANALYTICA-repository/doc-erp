@@ -11,7 +11,9 @@ class NotificationEngine:
         title: str,
         content: str,
         source_module: str,
-        task_id: str = None
+        task_id: str = None,
+        entity_type: str = None,
+        entity_id: str = None,
     ) -> Notification:
         """
         Dispatches a system or workspace-level notification to a user.
@@ -24,6 +26,8 @@ class NotificationEngine:
             "content": content,
             "source_module": source_module,
             "task_id": task_id,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
             "is_read": False
         }
         

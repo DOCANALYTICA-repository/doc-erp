@@ -64,6 +64,54 @@ class ClubDetailOut(ClubOut):
     viewer_can_manage_settings: bool = False
     viewer_can_assign_tasks: bool = False
 
+class ClubCapabilities(BaseModel):
+    """Everything the viewer is allowed to DO in this club, resolved server-side.
+
+    Generalizes the three viewer_can_* flags on ClubDetailOut into the full
+    set. The frontend must never re-derive scope logic — that is how the UI
+    ends up rendering six buttons the backend will refuse.
+    """
+    can_read: bool = False
+    can_write: bool = False              # active member: create events, plans, requests
+    can_edit_hierarchy: bool = False     # the club's assigned Faculty Coordinator
+    can_manage_settings: bool = False    # club head
+    can_assign_tasks: bool = False
+    can_approve_plan: bool = False       # a reviewer at the plan's current stage
+    can_manage_members: bool = False
+
+
+class ClubCounters(BaseModel):
+    """Dashboard tile numbers, so the shell does not fetch five lists to count them."""
+    members: int = 0
+    events: int = 0
+    open_tasks: int = 0
+    pending_reimbursements: int = 0
+    budget_allocated: float = 0.0
+    budget_spent: float = 0.0
+    plans_awaiting_me: int = 0
+
+
+class ClubBootstrap(BaseModel):
+    """One request per workspace mount.
+
+    Mounting the Clubs workspace used to issue THIRTEEN requests. Of those
+    payloads exactly three are needed by more than one tab, so the right shape
+    is a small composed shell plus a lazy fetch per tab — not one mega-endpoint
+    that re-sends everything.
+
+    visible_tabs is the important field: the server decides what a coordinator
+    versus a member may see, which is what stops the UI offering actions the
+    backend will 403.
+    """
+    club: ClubDetailOut
+    relationship: str
+    capabilities: ClubCapabilities
+    visible_tabs: List[str]
+    counters: ClubCounters
+    hierarchy: List["ClubHierarchyLevelOut"] = []
+    members: List["ClubMemberOut"] = []
+
+
 class ClubSettingsUpdate(BaseModel):
     contact_email: Optional[str] = None
 
@@ -274,3 +322,8 @@ class ClubDocumentOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ClubBootstrap forward-references ClubHierarchyLevelOut and ClubMemberOut,
+# both defined below it in this module.
+ClubBootstrap.model_rebuild()

@@ -48,7 +48,7 @@ class TaskEngine:
             notification_engine.send_notification(
                 db, user_id=assignee_id, title="New task assigned",
                 content=f"You've been assigned: {title}", source_module=source_module,
-                task_id=db_task.id,
+                task_id=db_task.id, entity_type="task", entity_id=db_task.id,
             )
         return db_task
 
@@ -65,13 +65,20 @@ class TaskEngine:
         """
         spawned_tasks = []
         for item in action_items:
+            # .get() throughout: these dicts come from a validated
+            # MeetingActionItem now, but this engine is also called from
+            # elsewhere and a KeyError here is a 500 with no explanation.
+            title = (item.get("title") or "").strip()
+            assignee_id = item.get("assignee_id")
+            if not title or not assignee_id:
+                continue
             task = self.create_task(
                 db,
-                title=item["title"],
+                title=title,
                 description=f"Action item generated from meeting: {meeting_id}",
-                due_date=item.get("due_date", "2026-12-31"),
+                due_date=item.get("due_date") or "2026-12-31",
                 priority="medium",
-                assignee_id=item["assignee_id"],
+                assignee_id=assignee_id,
                 creator_id=organizer_id,
                 source_module="faculty",
                 related_entity_type="meeting",
