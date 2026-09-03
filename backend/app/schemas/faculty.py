@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 class FacultyAssignmentBase(BaseModel):
     faculty_id: str
@@ -74,17 +74,6 @@ class MeetingBase(BaseModel):
 class MeetingCreate(MeetingBase):
     club_id: Optional[str] = None
 
-class MeetingOut(MeetingBase):
-    id: str
-    organizer_id: str
-    minutes: Optional[str] = None
-    decisions: Optional[str] = None
-    action_items: Optional[str] = None
-    club_id: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
 class MeetingActionItem(BaseModel):
     """A real model, not List[dict].
 
@@ -96,6 +85,24 @@ class MeetingActionItem(BaseModel):
     assignee_id: str = Field(min_length=1)
     due_date: Optional[str] = None
 
+
+class MeetingOut(MeetingBase):
+    id: str
+    organizer_id: str
+    minutes: Optional[str] = None
+    club_id: Optional[str] = None
+
+    # Real lists rather than the raw storage strings. The columns hold JSON;
+    # these come from Meeting.decisions_list / action_items_list, which also
+    # read the legacy comma-joined format correctly.
+    decisions: List[str] = Field(default_factory=list, validation_alias="decisions_list")
+    action_items: List[MeetingActionItem] = Field(
+        default_factory=list, validation_alias="action_items_list"
+    )
+
+    # populate_by_name so the field can still be set by its own name in tests
+    # and by any caller constructing this directly.
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class MeetingMinutesUpdate(BaseModel):
     minutes: str

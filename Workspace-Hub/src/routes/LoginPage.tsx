@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useStore, UserState } from '../context/useStore';
 import { api, ApiError } from '../services/api';
 import { Sparkles } from 'lucide-react';
+import type { LoginResponse, UserProfile } from '../api/types';
+import { parseUserProfile } from '../api/contracts';
 
 export const LoginPage: React.FC = () => {
   const login = useStore((state) => state.login);
@@ -21,7 +23,7 @@ export const LoginPage: React.FC = () => {
       params.append('username', emailInput);
       params.append('password', passwordInput);
 
-      const res = await api.post<any>('/auth/login', params);
+      const res = await api.post<LoginResponse>('/auth/login', params);
 
       let userProfile = res.user_profile;
       let capabilities = res.capabilities || {};
@@ -30,13 +32,14 @@ export const LoginPage: React.FC = () => {
       if (!userProfile) {
         // Real backend: save token temporarily so client headers include it
         localStorage.setItem('doc_user_session', JSON.stringify({ user: null, token: accessToken, capabilities: {} }));
-        const profile = await api.get<any>('/auth/me');
+        const profile = parseUserProfile(await api.get<UserProfile>('/auth/me')) as UserProfile;
         capabilities = profile.capabilities || {};
         userProfile = profile;
       }
 
       login(userProfile as UserState, accessToken, capabilities);
-      const from = (location.state as any)?.from?.pathname || '/app';
+      const from =
+        (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/app';
       navigate(from, { replace: true });
     } catch (err) {
       localStorage.removeItem('doc_user_session');

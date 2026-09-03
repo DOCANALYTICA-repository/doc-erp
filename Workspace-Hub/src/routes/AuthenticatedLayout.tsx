@@ -6,9 +6,10 @@ import { AppShell } from '@astryxdesign/core/AppShell';
 import { TopNav, TopNavHeading } from '@astryxdesign/core/TopNav';
 import { Button } from '@astryxdesign/core/Button';
 import { Skeleton } from '@astryxdesign/core/Skeleton';
-import { Sparkles, LogOut, Search, Bell, X, ChevronDown } from 'lucide-react';
+import { Sparkles, Search, Bell, X, ChevronDown } from 'lucide-react';
 import { PageLoader } from '../components/ui/PageLoader';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
+import { EMPTY_SEARCH_RESULTS, type Notification, type SearchResults } from '../api/types';
 
 /**
  * Shared authenticated shell — replaces the big conditionally-rendered
@@ -27,8 +28,8 @@ export const AuthenticatedLayout: React.FC = () => {
 
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any>({ users: [], clubs: [], meetings: [], tasks: [] });
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<SearchResults>(EMPTY_SEARCH_RESULTS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
 
   const activeModule = location.pathname.split('/')[2] || '';
@@ -36,7 +37,7 @@ export const AuthenticatedLayout: React.FC = () => {
   useEffect(() => {
     if (user) {
       setIsLoadingNotifications(true);
-      api.get<any[]>('/notifications')
+      api.get<Notification[]>('/notifications')
         .then(setNotifications)
         .catch(console.error)
         .finally(() => setIsLoadingNotifications(false));
@@ -45,11 +46,11 @@ export const AuthenticatedLayout: React.FC = () => {
 
   useEffect(() => {
     if (searchQuery.trim().length > 1) {
-      api.get<any>(`/search?q=${encodeURIComponent(searchQuery)}`)
+      api.get<SearchResults>(`/search?q=${encodeURIComponent(searchQuery)}`)
         .then(setSearchResults)
-        .catch(() => setSearchResults({ users: [], clubs: [], meetings: [], tasks: [] }));
+        .catch(() => setSearchResults(EMPTY_SEARCH_RESULTS));
     } else {
-      setSearchResults({ users: [], clubs: [], meetings: [], tasks: [] });
+      setSearchResults(EMPTY_SEARCH_RESULTS);
     }
   }, [searchQuery]);
 
@@ -153,7 +154,7 @@ export const AuthenticatedLayout: React.FC = () => {
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Faculty & Students</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {searchResults.users.map((u: any) => (
+                    {searchResults.users.map(u => (
                       <div key={u.id} className="p-3 rounded-lg border border-slate-100 bg-slate-50 text-xs">
                         <div className="font-bold text-slate-900">{u.name}</div>
                         <div className="text-xs text-slate-400 mt-0.5">{u.role}</div>
@@ -166,7 +167,7 @@ export const AuthenticatedLayout: React.FC = () => {
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Clubs</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {searchResults.clubs.map((c: any) => (
+                    {searchResults.clubs.map(c => (
                       <div key={c.id} className="p-3 rounded-lg border border-slate-100 bg-slate-50 text-xs cursor-pointer" onClick={() => { navigate('/app/clubs'); setSearchOpen(false); }}>
                         <div className="font-bold text-slate-900">{c.name}</div>
                         <div className="text-xs text-slate-400 mt-0.5">{c.category} Club</div>

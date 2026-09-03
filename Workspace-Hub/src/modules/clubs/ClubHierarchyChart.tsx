@@ -3,6 +3,7 @@ import { api } from '../../services/api';
 import { Button } from '@astryxdesign/core/Button';
 import { Skeleton } from '@astryxdesign/core/Skeleton';
 import { Plus, Trash2 } from 'lucide-react';
+import type { ClubMember } from '../../api/types';
 
 interface HierarchyLevel {
   id: string;
@@ -13,7 +14,7 @@ interface HierarchyLevel {
 
 interface ClubHierarchyChartProps {
   clubId: string;
-  members: any[];
+  members: ClubMember[];
   canEdit: boolean;
   onMembersChanged: () => void;
   /**
@@ -40,7 +41,9 @@ export const ClubHierarchyChart: React.FC<ClubHierarchyChartProps> = ({
   clubId, members, canEdit, onMembersChanged, levels: levelsFromParent, onLevelsChanged,
 }) => {
   const [levels, setLevels] = useState<HierarchyLevel[]>(levelsFromParent);
-  const [isLoading, setIsLoading] = useState(false);
+  // The hierarchy now arrives as a prop from the shell, so this component
+  // never fetches and is never in a loading state of its own.
+  const isLoading = false;
   const [newTitleByRank, setNewTitleByRank] = useState<Record<number, string>>({});
   const [newLevelTitle, setNewLevelTitle] = useState('');
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ApiError } from './api';
 
 // Re-import request indirectly via the public api object; api.ts doesn't

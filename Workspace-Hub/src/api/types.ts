@@ -103,3 +103,25 @@ export interface CalendarEvent {
   priority?: string;
   hour?: string;
 }
+
+/** GET /search — FastAPI types this as a bare dict, so it is declared here. */
+export interface SearchResults {
+  users: { id: string; name: string; email: string; role: string }[];
+  clubs: { id: string; name: string; category: string }[];
+  meetings: { id: string; title: string; date: string; venue: string }[];
+  tasks: { id: string; title: string; priority: string; status: string }[];
+}
+
+export const EMPTY_SEARCH_RESULTS: SearchResults = {
+  users: [], clubs: [], meetings: [], tasks: [],
+};
+
+/** POST /auth/login */
+export type LoginResponse = Schemas['Token'] & {
+  /** Present only from the dev-only offline mocks; the real API omits it. */
+  user_profile?: unknown;
+  capabilities?: Record<string, string>;
+};
+
+/** GET /auth/me */
+export type UserProfile = Schemas['UserProfileOut'];

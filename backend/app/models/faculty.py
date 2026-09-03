@@ -1,3 +1,4 @@
+import json
 from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime, Float
 from sqlalchemy.orm import relationship
 from app.models.base import Base, TimestampMixin
@@ -54,6 +55,39 @@ class Meeting(Base, TimestampMixin):
     # Relationships
     organizer = relationship("User", back_populates="created_meetings")
     club = relationship("Club")
+
+    @property
+    def decisions_list(self) -> list[str]:
+        """Decisions as a real list.
+
+        Stored as JSON. Older rows used a comma-joined string, which could not
+        distinguish ONE decision containing a comma ("Approved a budget of
+        Rs 40,000") from TWO decisions — it silently split the text in half on
+        display. Those rows are still read correctly by the fallback below.
+        """
+        raw = (self.decisions or "").strip()
+        if not raw:
+            return []
+        if raw.startswith("["):
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    return [str(d) for d in parsed]
+            except (ValueError, TypeError):
+                pass
+        # Legacy comma-joined format.
+        return [d.strip() for d in raw.split(",") if d.strip()]
+
+    @property
+    def action_items_list(self) -> list[dict]:
+        raw = (self.action_items or "").strip()
+        if not raw:
+            return []
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, list) else []
+        except (ValueError, TypeError):
+            return []
 
 
 class Reminder(Base, TimestampMixin):

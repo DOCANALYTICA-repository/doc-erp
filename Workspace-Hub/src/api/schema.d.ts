@@ -2655,12 +2655,12 @@ export interface components {
             organizer_id: string;
             /** Minutes */
             minutes?: string | null;
-            /** Decisions */
-            decisions?: string | null;
-            /** Action Items */
-            action_items?: string | null;
             /** Club Id */
             club_id?: string | null;
+            /** Decisions */
+            decisions?: string[];
+            /** Action Items */
+            action_items?: components["schemas"]["MeetingActionItem"][];
         };
         /**
          * MyClubOut

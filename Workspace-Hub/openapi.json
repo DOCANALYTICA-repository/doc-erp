@@ -7823,28 +7823,6 @@
             ],
             "title": "Minutes"
           },
-          "decisions": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Decisions"
-          },
-          "action_items": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Action Items"
-          },
           "club_id": {
             "anyOf": [
               {
@@ -7855,6 +7833,20 @@
               }
             ],
             "title": "Club Id"
+          },
+          "decisions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Decisions"
+          },
+          "action_items": {
+            "items": {
+              "$ref": "#/components/schemas/MeetingActionItem"
+            },
+            "type": "array",
+            "title": "Action Items"
           }
         },
         "type": "object",

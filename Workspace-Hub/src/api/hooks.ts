@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 
 import { api } from '../services/api';
+import { parseActionQueue, parseClubBootstrap, parseTimetable } from './contracts';
 import {
   claimKeys, clubKeys, contentKeys, facultyKeys, platformKeys,
 } from '../lib/queryKeys';
@@ -32,7 +33,7 @@ type Options<T> = Omit<UseQueryOptions<T, Error, T>, 'queryKey' | 'queryFn'>;
 export function useClubBootstrap(clubId: string | null) {
   return useQuery({
     queryKey: clubKeys.bootstrap(clubId ?? ''),
-    queryFn: () => api.get<ClubBootstrap>(`/clubs/${clubId}/bootstrap`),
+    queryFn: async () => parseClubBootstrap(await api.get<ClubBootstrap>(`/clubs/${clubId}/bootstrap`)) as ClubBootstrap,
     enabled: Boolean(clubId),
   });
 }
@@ -112,12 +113,14 @@ export function useClaims() {
 export function useTimetable(programme?: string | null, semester?: string | null, section?: string | null) {
   return useQuery({
     queryKey: claimKeys.timetable(programme ?? '', semester ?? '', section ?? ''),
-    queryFn: () =>
-      api.get<TimetableSession[]>(
-        `/claims/timetable?programme=${encodeURIComponent(programme ?? '')}` +
-        `&semester=${encodeURIComponent(semester ?? '')}` +
-        `&section=${encodeURIComponent(section ?? '')}`,
-      ),
+    queryFn: async () =>
+      parseTimetable(
+        await api.get<TimetableSession[]>(
+          `/claims/timetable?programme=${encodeURIComponent(programme ?? '')}` +
+          `&semester=${encodeURIComponent(semester ?? '')}` +
+          `&section=${encodeURIComponent(section ?? '')}`,
+        ),
+      ) as TimetableSession[],
     enabled: Boolean(programme && semester && section),
     // The timetable changes once a semester. There is no reason to re-fetch it
     // while someone fills in a form.
@@ -179,7 +182,10 @@ export const useNotifications = () =>
   });
 
 export const useActionQueue = () =>
-  useQuery({ queryKey: platformKeys.actionQueue, queryFn: () => api.get<ActionQueue>('/me/action-queue') });
+  useQuery({
+    queryKey: platformKeys.actionQueue,
+    queryFn: async () => parseActionQueue(await api.get<ActionQueue>('/me/action-queue')) as ActionQueue,
+  });
 
 export function useGlobalSearch(query: string) {
   return useQuery({

@@ -218,7 +218,9 @@ def record_meeting_minutes(
             )
 
     meeting.minutes = minutes_in.minutes
-    meeting.decisions = ",".join(minutes_in.decisions)
+    # JSON, not ",".join(): a decision containing a comma ("Approved a budget
+    # of Rs 40,000") was silently split into two decisions on display.
+    meeting.decisions = json.dumps([d.strip() for d in minutes_in.decisions if d.strip()])
     # The column existed and was never written to, so the action items agreed
     # in a meeting survived only as spawned tasks — the minutes themselves had
     # no record of what was assigned.

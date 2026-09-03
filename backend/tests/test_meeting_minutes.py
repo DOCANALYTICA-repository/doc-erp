@@ -9,8 +9,6 @@ Two server-side defects went with it: Meeting.action_items was never persisted
 despite the column existing, and task.py indexed item["title"] and
 item["assignee_id"] unguarded, so a malformed action item was a 500.
 """
-import json
-
 from .conftest import auth_headers
 
 HOD = ("hod.commerce@christuniversity.in", "faculty123")
@@ -32,7 +30,9 @@ def test_minutes_persist_action_items_and_spawn_tasks(client):
 
     r = client.post(f"/api/v1/faculty/meetings/{meeting_id}/minutes", headers=h, json={
         "minutes": "Reviewed the conclave budget and the recruitment timeline.",
-        "decisions": ["Approved the revised conclave budget."],
+        # Deliberately contains a comma: the previous ",".join() storage split
+        # this into TWO decisions on display.
+        "decisions": ["Approved the revised conclave budget of Rs 40,000."],
         "action_items": [
             {"title": "Book the auditorium", "assignee_id": "fac_hod", "due_date": "2026-08-25"},
         ],
@@ -43,8 +43,11 @@ def test_minutes_persist_action_items_and_spawn_tasks(client):
     assert body["status"] == "completed"
     # The column existed and was never written to.
     assert body["action_items"], "action items were not persisted on the meeting"
-    stored = json.loads(body["action_items"])
-    assert stored[0]["title"] == "Book the auditorium"
+    assert body["action_items"][0]["title"] == "Book the auditorium"
+    assert body["action_items"][0]["assignee_id"] == "fac_hod"
+
+    # A decision containing a comma stays ONE decision.
+    assert body["decisions"] == ["Approved the revised conclave budget of Rs 40,000."]
 
     tasks = client.get("/api/v1/tasks", headers=h).json()
     assert any(t["title"] == "Book the auditorium" for t in tasks), tasks
