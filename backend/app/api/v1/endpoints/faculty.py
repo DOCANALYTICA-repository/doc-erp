@@ -2,22 +2,80 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.rbac import get_current_user
+from app.core.rbac import get_current_user, PermissionChecker
 from app.repositories.faculty import note_repo, document_repo, meeting_repo, reminder_repo, widget_preference_repo
+from app.repositories.faculty_assignment import faculty_assignment_repo
 from app.schemas.faculty import (
     NoteOut, NoteCreate, NoteUpdate, DocumentOut, MeetingOut, MeetingCreate, MeetingMinutesUpdate,
     ReminderOut, ReminderCreate, ReminderUpdate,
     DashboardWidgetPreferenceItem, DashboardWidgetPreferenceOut,
+    FacultyAssignmentOut, FacultyAssignmentCreate,
 )
 from app.models.user import User
 from app.models.faculty import Note, Document, Meeting
 from app.services.engines.storage import storage_engine
 from app.services.engines.task import task_engine
 from app.services.engines.notification import notification_engine
+from app.services.engines.club_hierarchy import club_hierarchy_engine
 from app.repositories.club import member_repo
 import uuid
 
 router = APIRouter()
+
+# Scoped faculty role assignments — the admin surface for Class Teacher /
+# Course Coordinator / Club Faculty Coordinator scoping (see
+# app/core/faculty_scope.py). Gated by the existing "rbac:assign_roles"
+# permission, already HOD/super_admin-only — no new permission needed.
+VALID_ASSIGNMENT_TAGS = {"Class Teacher", "Course Coordinator", "Club Faculty Coordinator"}
+
+
+@router.get("/assignments", response_model=List[FacultyAssignmentOut])
+def list_faculty_assignments(
+    faculty_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(PermissionChecker(["rbac:assign_roles"])),
+):
+    if faculty_id:
+        return faculty_assignment_repo.get_by_faculty(db, faculty_id=faculty_id)
+    return faculty_assignment_repo.get_multi(db, limit=1000)
+
+
+@router.post("/assignments", response_model=FacultyAssignmentOut)
+def create_faculty_assignment(
+    assignment_in: FacultyAssignmentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(PermissionChecker(["rbac:assign_roles"])),
+):
+    if assignment_in.role_tag not in VALID_ASSIGNMENT_TAGS:
+        raise HTTPException(status_code=400, detail=f"role_tag must be one of {sorted(VALID_ASSIGNMENT_TAGS)}")
+    target = db.query(User).filter(User.id == assignment_in.faculty_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Faculty member not found")
+    if assignment_in.role_tag not in target.role_tags_list:
+        raise HTTPException(status_code=400, detail=f"{target.name} does not hold the '{assignment_in.role_tag}' tag")
+
+    assignment_dict = assignment_in.dict()
+    assignment_dict["id"] = f"fa_{uuid.uuid4().hex[:12]}"
+    assignment_dict["status"] = "active"
+    return faculty_assignment_repo.create(db, obj_in=assignment_dict)
+
+
+@router.delete("/assignments/{assignment_id}")
+def revoke_faculty_assignment(
+    assignment_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(PermissionChecker(["rbac:assign_roles"])),
+):
+    assignment = faculty_assignment_repo.get(db, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    faculty_assignment_repo.update(db, db_obj=assignment, obj_in={"status": "revoked"})
+    return {"status": "success"}
+
+
+@router.get("/my-assignments", response_model=List[FacultyAssignmentOut])
+def get_my_assignments(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return [a for a in faculty_assignment_repo.get_by_faculty(db, faculty_id=current_user.id) if a.status == "active"]
 
 # 1. Personal Notes
 @router.get("/notes", response_model=List[NoteOut])
@@ -113,13 +171,10 @@ def create_meeting(meet_in: MeetingCreate, db: Session = Depends(get_db), curren
     # notify nobody in that club — Master Plan §44's Meeting -> Notification
     # Engine -> Faculty Notified chain, mirrored here for the club side.
     if created.club_id:
-        for m in member_repo.get_club_members(db, club_id=created.club_id):
-            if m.status == "active" and m.role in ("President", "Vice President"):
-                notification_engine.send_notification(
-                    db, user_id=m.student_id, title="New club meeting scheduled",
-                    content=f"{created.title} on {created.date} at {created.time}.",
-                    source_module="faculty",
-                )
+        club_hierarchy_engine.notify_club_leadership(
+            db, club_id=created.club_id, title="New club meeting scheduled",
+            content=f"{created.title} on {created.date} at {created.time}.",
+        )
     return created
 
 @router.post("/meetings/{meeting_id}/minutes", response_model=MeetingOut)

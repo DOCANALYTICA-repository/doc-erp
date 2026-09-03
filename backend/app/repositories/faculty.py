@@ -43,6 +43,12 @@ class TaskRepository(BaseRepository[Task]):
     def get_by_source(self, db: Session, *, source: str) -> List[Task]:
         return db.query(Task).filter(Task.source_module == source).all()
 
+    def get_by_related_entity(self, db: Session, *, related_entity_type: str, related_entity_id: str) -> List[Task]:
+        return db.query(Task).filter(
+            Task.related_entity_type == related_entity_type,
+            Task.related_entity_id == related_entity_id,
+        ).all()
+
 class ReminderRepository(BaseRepository[Reminder]):
     def get_by_owner(self, db: Session, *, owner_id: str) -> List[Reminder]:
         return db.query(Reminder).filter(Reminder.owner_id == owner_id).all()

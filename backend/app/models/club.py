@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, ForeignKey, DateTime
+from sqlalchemy import Column, String, Float, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from app.models.base import Base, TimestampMixin
 
@@ -37,16 +37,39 @@ class ClubMember(Base, TimestampMixin):
     # Assigned by Club Head / faculty / super_admin; layered on top of the
     # member's global role_tags rather than replacing them.
     permission_template = Column(String, nullable=True)
+    # Source of truth for rank once a configurable hierarchy exists for the
+    # club (see ClubHierarchyLevel below). `role` above stays as a
+    # denormalized display cache kept in sync whenever this is set/renamed —
+    # existing read paths that print `.role` keep working unmodified.
+    hierarchy_level_id = Column(String, ForeignKey("club_hierarchy_levels.id"), nullable=True)
 
     # Relationships
     student = relationship("User", back_populates="memberships")
     club = relationship("Club", back_populates="members")
+    hierarchy_level = relationship("ClubHierarchyLevel")
 
     @property
     def student_name(self) -> str | None:
         """Lets ClubMemberOut (from_attributes=True) expose the member's
         real name without every caller having to join/hydrate it manually."""
         return self.student.name if self.student else None
+
+
+class ClubHierarchyLevel(Base, TimestampMixin):
+    """One rank in a club's configurable leadership structure. Multiple
+    rows may share (club_id, level_order) to represent sibling positions at
+    the same rank (e.g. "VP of Analytics" and "VP of Marketing"). Lower
+    level_order = higher rank; values are seeded sparse (10, 20, 30...) so
+    a new rank can be inserted between two existing ones without
+    renumbering anything."""
+    __tablename__ = "club_hierarchy_levels"
+
+    id = Column(String, primary_key=True, index=True)
+    club_id = Column(String, ForeignKey("clubs.id"), nullable=False)
+    level_order = Column(Integer, nullable=False)
+    title = Column(String, nullable=False)
+
+    club = relationship("Club")
 
 
 class Event(Base, TimestampMixin):

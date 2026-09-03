@@ -29,6 +29,11 @@ interface PlatformStore {
   capabilities: Record<string, string>;
   isSearchOpen: boolean;
   isNotificationsOpen: boolean;
+  // True until App's session-restore effect has had a chance to run.
+  // RequireAuth must wait on this before deciding to redirect to /login —
+  // otherwise a hard refresh on a valid session incorrectly bounces the
+  // user out before localStorage is read (confirmed race).
+  isSessionRestoring: boolean;
 
   // Actions. Navigation itself now lives in React Router (Phase 1C) — this
   // store only holds session/identity state, never "which screen am I on."
@@ -36,6 +41,7 @@ interface PlatformStore {
   logout: () => void;
   setSearchOpen: (open: boolean) => void;
   setNotificationsOpen: (open: boolean) => void;
+  finishSessionRestore: () => void;
 
   // Helpers
   hasPermission: (permission: string) => boolean;
@@ -48,11 +54,14 @@ export const useStore = create<PlatformStore>((set, get) => ({
   capabilities: {},
   isSearchOpen: false,
   isNotificationsOpen: false,
+  isSessionRestoring: true,
 
   login: (user, token, capabilities = {}) => {
     localStorage.setItem('doc_user_session', JSON.stringify({ user, token, capabilities }));
     set({ user, token, capabilities });
   },
+
+  finishSessionRestore: () => set({ isSessionRestoring: false }),
 
   logout: () => {
     localStorage.removeItem('doc_user_session');

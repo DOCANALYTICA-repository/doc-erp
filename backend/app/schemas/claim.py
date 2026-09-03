@@ -36,6 +36,7 @@ class ClaimBase(BaseModel):
     programme: str
     section: str
     submission_type: str = "individual"
+    club_id: Optional[str] = None  # required when submission_type == "club"
     date_range: str
     reason: Optional[str] = None
 
@@ -52,10 +53,21 @@ class ClaimOut(ClaimBase):
     status: str
     late_submission_flag: bool
     current_workflow_stage: str
+    revision_reason: Optional[str] = None
+    last_revised_by: Optional[str] = None
+    last_revised_stage: Optional[str] = None
     participants: List[ClaimParticipantOut] = []
 
     class Config:
         from_attributes = True
+
+class ClaimResubmit(BaseModel):
+    """PUT /claims/{claim_id}/resubmit body — edits a returned claim in
+    place. Only fields the student actually changed need be supplied."""
+    date_range: Optional[str] = None
+    reason: Optional[str] = None
+    missed_classes: Optional[List[AttendanceEntryCreate]] = None
+    removed_document_ids: Optional[List[str]] = None
 
 class SupportingDocumentOut(BaseModel):
     id: str

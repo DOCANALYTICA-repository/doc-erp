@@ -9,10 +9,11 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal, engine
 from app.models import Base
 from app.models.user import User
-from app.models.club import Club, ClubMember, Event, Budget, Reimbursement, Sponsorship, AnnualPlan, ClubDocument, EventAttendance
+from app.models.club import Club, ClubMember, Event, Budget, Reimbursement, Sponsorship, AnnualPlan, ClubDocument, EventAttendance, ClubHierarchyLevel
 from app.models.claim import Claim, ClaimParticipant, AttendanceEntry, SupportingDocument, TimetableSession
 from app.models.faculty import Note, Document, Meeting, Task
 from app.models.notification import Notification
+from app.models.faculty_assignment import FacultyAssignment
 from app.core.security import get_password_hash
 
 def seed_database():
@@ -166,29 +167,55 @@ def seed_database():
         db.add_all([club_comm, club_cult])
         db.commit()
 
+        print("Generating scoped faculty assignments...")
+        fa1 = FacultyAssignment(
+            id="fa_1", faculty_id="fac_class_teacher", role_tag="Class Teacher",
+            programme="B.Com (Hons)", semester="5", section="A", status="active",
+        )
+        fa2 = FacultyAssignment(
+            id="fa_2", faculty_id="fac_class_teacher", role_tag="Course Coordinator",
+            programme="B.Com (Hons)", status="active",
+        )
+        fa3 = FacultyAssignment(
+            id="fa_3", faculty_id="fac_subject_2", role_tag="Club Faculty Coordinator",
+            club_id="club_commerce", status="active",
+        )
+        db.add_all([fa1, fa2, fa3])
+        db.commit()
+
+        print("Generating default club hierarchies...")
+        DEFAULT_LEVELS = [(10, "President"), (20, "Vice President"), (30, "Core Member"), (40, "Member")]
+        hierarchy_by_club_and_title = {}
+        for club_id in ("club_commerce", "club_cultural"):
+            for level_order, title in DEFAULT_LEVELS:
+                level_id = f"chl_{club_id}_{level_order}"
+                db.add(ClubHierarchyLevel(id=level_id, club_id=club_id, level_order=level_order, title=title))
+                hierarchy_by_club_and_title[(club_id, title)] = level_id
+        db.commit()
+
         print("Generating memberships...")
         m1 = ClubMember(
             id="mbr_1", student_id="std_president", club_id="club_commerce",
             role="President", status="active", academic_year="2025-2026",
-            join_date="2025-06-10"
+            join_date="2025-06-10", hierarchy_level_id=hierarchy_by_club_and_title[("club_commerce", "President")],
         )
         m2 = ClubMember(
             id="mbr_2", student_id="std_vp", club_id="club_commerce",
             role="Vice President", status="active", academic_year="2025-2026",
-            join_date="2025-06-10"
+            join_date="2025-06-10", hierarchy_level_id=hierarchy_by_club_and_title[("club_commerce", "Vice President")],
         )
         m3 = ClubMember(
             id="mbr_3", student_id="std_regular_1", club_id="club_commerce",
             role="Core Member", status="active", academic_year="2025-2026",
-            join_date="2025-07-01"
+            join_date="2025-07-01", hierarchy_level_id=hierarchy_by_club_and_title[("club_commerce", "Core Member")],
         )
         m4 = ClubMember(
             id="mbr_4", student_id="std_regular_2", club_id="club_cultural",
             role="Core Member", status="active", academic_year="2025-2026",
-            join_date="2025-07-02"
+            join_date="2025-07-02", hierarchy_level_id=hierarchy_by_club_and_title[("club_cultural", "Core Member")],
         )
         db.add_all([m1, m2, m3, m4])
-        
+
         print("Generating club events & budgets...")
         budget_comm = Budget(
             id="bud_comm_2025", club_id="club_commerce", academic_year="2025-2026",
@@ -336,6 +363,28 @@ def seed_database():
             file_url="/storage/medical/certificate_regular_1.pdf"
         )
         db.add(doc1)
+        db.commit()
+
+        print("Generating mock club-submission claim...")
+        claim2 = Claim(
+            id="cl_club_1",
+            reference_number="ACP-2026-000102",
+            category="co_curricular",
+            academic_year="2025-2026",
+            semester="5",
+            programme="B.Com (Hons)",
+            section="A",
+            submission_type="club",
+            club_id="club_commerce",
+            submitted_by="std_president",
+            submission_date="2026-07-10",
+            date_range="2026-07-15 to 2026-07-15",
+            reason="National Commerce Conclave 2026 — co-curricular participation as event organizer.",
+            status="submitted",
+            late_submission_flag=False,
+            current_workflow_stage="initial_review",
+        )
+        db.add(claim2)
         db.commit()
 
         print("Generating faculty workspace items...")

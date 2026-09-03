@@ -1,12 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
+import { useStore } from '../../context/useStore';
 import { SideNav, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
+import { Button } from '@astryxdesign/core/Button';
+import { DateInput } from '@astryxdesign/core/DateInput';
+import { Skeleton } from '@astryxdesign/core/Skeleton';
+import { useToast } from '@astryxdesign/core/Toast';
 import { Users, Calendar, Wallet, FileText, Award, Layers, Plus, CheckCircle, Clock } from 'lucide-react';
+import { ClubHierarchyChart } from './ClubHierarchyChart';
+import { PageLoader } from '../../components/ui/PageLoader';
 
 const CURRENT_ACADEMIC_YEAR = '2025-2026';
 
+const ANNUAL_PLAN_STAGE_PERMISSIONS: Record<string, string> = {
+  faculty_coordinator_review: 'clubs:approve_plan_faculty_coordinator',
+  cultural_coordinator_review: 'clubs:approve_plan_cultural_coordinator',
+  hod_review: 'clubs:approve_plan_hod',
+};
+
 export const ClubsDashboard: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'members' | 'events' | 'budget' | 'reimbursements' | 'sponsorships' | 'recruitment' | 'announcements' | 'annual-plan' | 'documents' | 'reports' | 'analytics' | 'settings'>('dashboard');
+  const hasPermission = useStore(state => state.hasPermission);
+  const showToast = useToast();
+  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'members' | 'structure' | 'tasks' | 'events' | 'budget' | 'reimbursements' | 'sponsorships' | 'recruitment' | 'announcements' | 'annual-plan' | 'documents' | 'reports' | 'analytics' | 'settings'>('dashboard');
 
   // Club selector (Phase 4) — replaces the previous hardcoded club_commerce.
   // A user only ever sees/switches between clubs they're actually a member
@@ -60,6 +75,21 @@ export const ClubsDashboard: React.FC = () => {
   const [docTags, setDocTags] = useState('');
   const [docsView, setDocsView] = useState<'all' | 'knowledge-base'>('all');
 
+  // Task Manager (club-scoped, wraps the existing Task engine)
+  const [clubTasks, setClubTasks] = useState<any[]>([]);
+  const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskPriority, setTaskPriority] = useState('medium');
+  const [taskAssigneeId, setTaskAssigneeId] = useState('');
+
+  // Club settings (contact email)
+  const [contactEmailDraft, setContactEmailDraft] = useState('');
+
+  const [isLoadingMemberships, setIsLoadingMemberships] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hierarchyLevels, setHierarchyLevels] = useState<any[]>([]);
+
   // Bumped after any mutation (create/submit/review/upload/...) to force the
   // main data effect below to refetch. Toggling activeSubTab back and forth
   // does NOT work for this — React batches both setState calls into one
@@ -68,18 +98,21 @@ export const ClubsDashboard: React.FC = () => {
   const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
+    setIsLoadingMemberships(true);
     api.get<any[]>('/clubs/my-memberships').then(clubs => {
       setMyClubs(clubs);
       if (clubs.length > 0) setSelectedClubId(prev => prev ?? clubs[0].id);
-    }).catch(console.error);
+    }).catch(console.error).finally(() => setIsLoadingMemberships(false));
   }, []);
 
   useEffect(() => {
     if (!selectedClubId) return;
     async function loadData() {
+      setIsLoading(true);
       try {
         const club = await api.get<any>(`/clubs/${selectedClubId}`);
         setClubInfo(club);
+        setContactEmailDraft(club.contact_email || '');
 
         const mbrs = await api.get<any[]>(`/clubs/${selectedClubId}/members`);
         setMembers(mbrs);
@@ -110,8 +143,16 @@ export const ClubsDashboard: React.FC = () => {
 
         const kb = await api.get<any[]>(`/clubs/${selectedClubId}/knowledge-base`);
         setKnowledgeBase(kb);
+
+        const tsk = await api.get<any[]>(`/clubs/${selectedClubId}/tasks`);
+        setClubTasks(tsk);
+
+        const hier = await api.get<any[]>(`/clubs/${selectedClubId}/hierarchy`);
+        setHierarchyLevels(hier);
       } catch (e) {
         console.error(e);
+      } finally {
+        setIsLoading(false);
       }
     }
     loadData();
@@ -138,6 +179,10 @@ export const ClubsDashboard: React.FC = () => {
     api.get<any>(endpoints[reportType]).then(setReportData).catch(console.error);
   }, [activeSubTab, selectedClubId, reportType]);
 
+  if (isLoadingMemberships) {
+    return <PageLoader label="Loading your clubs..." />;
+  }
+
   if (myClubs.length === 0) {
     return (
       <div className="w-full min-h-[calc(100vh-4rem)] flex items-center justify-center text-sm text-slate-400">
@@ -147,15 +192,15 @@ export const ClubsDashboard: React.FC = () => {
   }
 
   return (
-    <div className="w-full min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-[#0c0c0c] flex flex-col">
+    <div className="w-full min-h-[calc(100vh-4rem)] bg-slate-50 flex flex-col">
       {/* Club Selector */}
       {myClubs.length > 1 && (
-        <div className="w-full border-b border-slate-200/40 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-2 flex gap-2 items-center">
+        <div className="w-full border-b border-slate-200/40 bg-white px-6 py-2 flex gap-2 items-center">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Club:</span>
           <select
             value={selectedClubId ?? ''}
             onChange={(e) => setSelectedClubId(e.target.value)}
-            className="text-xs px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-950 dark:text-white"
+            className="text-xs px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-950"
           >
             {myClubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -163,10 +208,12 @@ export const ClubsDashboard: React.FC = () => {
       )}
 
       {/* Sub Navbar (Horizontal Top Bar) */}
-      <div className="w-full border-b border-slate-200/40 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-2.5 flex gap-4 overflow-x-auto scrollbar-none z-10 shadow-sm">
+      <div className="w-full border-b border-slate-200/40 bg-white px-6 py-2.5 flex gap-4 overflow-x-auto scrollbar-none z-10 shadow-sm">
         {[
           { id: 'dashboard', label: 'Dashboard' },
           { id: 'members', label: 'Members' },
+          { id: 'structure', label: 'Structure' },
+          { id: 'tasks', label: 'Tasks' },
           { id: 'recruitment', label: 'Recruitment' },
           { id: 'events', label: 'Annual Events' },
           { id: 'announcements', label: 'Announcements' },
@@ -182,11 +229,7 @@ export const ClubsDashboard: React.FC = () => {
           <button
             key={item.id}
             onClick={() => setActiveSubTab(item.id as any)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap focus:outline-none ${
-              activeSubTab === item.id
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
-                : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-            }`}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap focus:outline-none ${ activeSubTab === item.id ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-900 ' }`}
           >
             {item.label}
           </button>
@@ -195,14 +238,20 @@ export const ClubsDashboard: React.FC = () => {
 
       {/* Workspace Content */}
       <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-5xl w-full mx-auto">
+        {isLoading ? (
+          <div className="space-y-4">
+            {[0, 1, 2].map(i => <Skeleton key={i} height={80} index={i} />)}
+          </div>
+        ) : (
+        <>
         {clubInfo && (
           <div className="mb-8 flex items-center gap-4">
-            <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+            <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-200">
               <img src={clubInfo.logo} className="w-full h-full object-cover" alt="Club Logo" />
             </div>
             <div>
               <span className="text-xs font-bold text-sky-500 uppercase tracking-wider">{clubInfo.category} Club</span>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{clubInfo.name}</h1>
+              <h1 className="text-2xl font-bold text-slate-900">{clubInfo.name}</h1>
               <p className="text-xs text-slate-500 mt-1">{clubInfo.description}</p>
             </div>
           </div>
@@ -212,24 +261,24 @@ export const ClubsDashboard: React.FC = () => {
         {activeSubTab === 'dashboard' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm flex items-center justify-between">
+              <div className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm flex items-center justify-between">
                 <div>
                   <div className="text-xs font-medium text-slate-400">Total Members</div>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{members.length}</div>
+                  <div className="text-2xl font-bold text-slate-900 mt-1">{members.length}</div>
                 </div>
                 <Users className="w-8 h-8 text-sky-500/80" />
               </div>
-              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm flex items-center justify-between">
+              <div className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm flex items-center justify-between">
                 <div>
                   <div className="text-xs font-medium text-slate-400">Total Events</div>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{events.length}</div>
+                  <div className="text-2xl font-bold text-slate-900 mt-1">{events.length}</div>
                 </div>
                 <Calendar className="w-8 h-8 text-emerald-500/80" />
               </div>
-              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm flex items-center justify-between">
+              <div className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm flex items-center justify-between">
                 <div>
                   <div className="text-xs font-medium text-slate-400">Budget Spent</div>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+                  <div className="text-2xl font-bold text-slate-900 mt-1">
                     Rs {budgets[0]?.spent_amount.toLocaleString() || '0'}
                   </div>
                 </div>
@@ -238,15 +287,15 @@ export const ClubsDashboard: React.FC = () => {
             </div>
 
             {/* Quick Activity List */}
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm">
-              <h3 className="font-bold text-slate-900 dark:text-white mb-4 text-sm">Key Operational Indicators</h3>
+            <div className="p-6 rounded-2xl bg-white border border-slate-200/60 shadow-sm">
+              <h3 className="font-bold text-slate-900 mb-4 text-sm">Key Operational Indicators</h3>
               <div className="space-y-3">
                 {events.map((evt, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/80 text-xs">
+                  <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs">
                     <div className="flex items-center gap-3">
                       <div className={`w-2.5 h-2.5 rounded-full ${evt.status === 'approved' ? 'bg-emerald-500' : 'bg-yellow-500'}`} />
                       <div>
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">{evt.title}</span>
+                        <span className="font-semibold text-slate-800">{evt.title}</span>
                         <span className="text-[10px] text-slate-400 ml-2">({evt.date})</span>
                       </div>
                     </div>
@@ -260,9 +309,9 @@ export const ClubsDashboard: React.FC = () => {
 
         {/* Tab 2: Members */}
         {activeSubTab === 'members' && (
-          <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 text-slate-400 uppercase font-semibold">
+              <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 uppercase font-semibold">
                 <tr>
                   <th className="px-6 py-4">Student Name</th>
                   <th className="px-6 py-4">Club Responsibility</th>
@@ -270,14 +319,33 @@ export const ClubsDashboard: React.FC = () => {
                   <th className="px-6 py-4">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
+              <tbody className="divide-y divide-slate-100 text-slate-700">
                 {members.map(mbr => (
                   <tr key={mbr.id}>
-                    <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{mbr.student_name ?? mbr.student_id}</td>
-                    <td className="px-6 py-4">{mbr.role}</td>
+                    <td className="px-6 py-4 font-semibold text-slate-900">{mbr.student_name ?? mbr.student_id}</td>
+                    <td className="px-6 py-4">
+                      {clubInfo?.viewer_can_manage_settings && hierarchyLevels.length > 0 ? (
+                        <select
+                          defaultValue={mbr.hierarchy_level_id ?? ''}
+                          onChange={async (e) => {
+                            if (!e.target.value) return;
+                            await api.put(`/clubs/${selectedClubId}/members/${mbr.id}/hierarchy-level`, {
+                              hierarchy_level_id: e.target.value,
+                            });
+                            setReloadTick(t => t + 1);
+                          }}
+                          className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg"
+                        >
+                          <option value="" disabled>{mbr.role}</option>
+                          {[...hierarchyLevels].sort((a, b) => a.level_order - b.level_order).map(l => (
+                            <option key={l.id} value={l.id}>{l.title}</option>
+                          ))}
+                        </select>
+                      ) : mbr.role}
+                    </td>
                     <td className="px-6 py-4">{mbr.academic_year}</td>
                     <td className="px-6 py-4">
-                      <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-medium">
+                      <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 font-medium">
                         {mbr.status}
                       </span>
                     </td>
@@ -292,7 +360,7 @@ export const ClubsDashboard: React.FC = () => {
         {activeSubTab === 'events' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm">Annual Event Schedule</h3>
+              <h3 className="font-bold text-slate-900 text-sm">Annual Event Schedule</h3>
               <button
                 onClick={() => setEventFormOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors"
@@ -311,29 +379,27 @@ export const ClubsDashboard: React.FC = () => {
                   setEventFormOpen(false);
                   setReloadTick(t => t + 1);
                 }}
-                className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs"
+                className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs"
               >
-                <input required placeholder="Event title" value={eventTitle} onChange={e => setEventTitle(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
-                <input required type="date" value={eventDate} onChange={e => setEventDate(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
-                <input required placeholder="Venue" value={eventVenue} onChange={e => setEventVenue(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
-                <input required type="number" placeholder="Budget (Rs)" value={eventBudget} onChange={e => setEventBudget(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
+                <input required placeholder="Event title" value={eventTitle} onChange={e => setEventTitle(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+                <DateInput label="Event date" isLabelHidden value={eventDate || undefined} onChange={(v) => setEventDate(v || '')} isRequired />
+                <input required placeholder="Venue" value={eventVenue} onChange={e => setEventVenue(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+                <input required type="number" placeholder="Budget (Rs)" value={eventBudget} onChange={e => setEventBudget(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
                 <button type="submit" className="sm:col-span-4 py-2 bg-slate-900 text-white rounded-lg font-semibold">Submit Proposal</button>
               </form>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {events.map(evt => (
-                <div key={evt.id} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                <div key={evt.id} className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        evt.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
-                      }`}>{evt.status}</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${ evt.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600' }`}>{evt.status}</span>
                       <span className="text-[10px] text-slate-400">{evt.date}</span>
                     </div>
-                    <h4 className="font-bold text-slate-900 dark:text-white text-sm">{evt.title}</h4>
+                    <h4 className="font-bold text-slate-900 text-sm">{evt.title}</h4>
                     <p className="text-xs text-slate-500 mt-2 leading-relaxed">{evt.description}</p>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/60 flex justify-between text-[10px] text-slate-400">
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-[10px] text-slate-400">
                     <span>Venue: {evt.venue}</span>
                     <span>Budget: Rs {evt.budget.toLocaleString()}</span>
                   </div>
@@ -346,20 +412,20 @@ export const ClubsDashboard: React.FC = () => {
         {/* Tab 4: Budget */}
         {activeSubTab === 'budget' && budgets.length > 0 && (
           <div className="space-y-6">
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm">
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-2">Academic Year {budgets[0].academic_year}</h3>
+            <div className="p-6 rounded-2xl bg-white border border-slate-200/60 shadow-sm">
+              <h3 className="font-bold text-slate-900 text-sm mb-2">Academic Year {budgets[0].academic_year}</h3>
               <div className="mt-6 flex flex-col gap-2">
                 <div className="flex justify-between text-xs text-slate-400 font-medium">
                   <span>Usage Compliance</span>
                   <span>{Math.round((budgets[0].spent_amount / budgets[0].allocated_amount) * 100)}% Used</span>
                 </div>
-                <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-slate-900 dark:bg-white rounded-full transition-all duration-500"
+                    className="h-full bg-slate-900 rounded-full transition-all duration-500"
                     style={{ width: `${(budgets[0].spent_amount / budgets[0].allocated_amount) * 100}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 mt-2">
+                <div className="flex justify-between text-xs font-semibold text-slate-700 mt-2">
                   <span>Spent: Rs {budgets[0].spent_amount.toLocaleString()}</span>
                   <span>Allocated: Rs {budgets[0].allocated_amount.toLocaleString()}</span>
                 </div>
@@ -372,7 +438,7 @@ export const ClubsDashboard: React.FC = () => {
         {activeSubTab === 'reimbursements' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm">Reimbursement Vouchers</h3>
+              <h3 className="font-bold text-slate-900 text-sm">Reimbursement Vouchers</h3>
               <button
                 onClick={() => setVoucherFormOpen(true)}
                 className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors"
@@ -391,16 +457,16 @@ export const ClubsDashboard: React.FC = () => {
                   setVoucherFormOpen(false);
                   setReloadTick(t => t + 1);
                 }}
-                className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs"
+                className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs"
               >
-                <input required type="number" placeholder="Amount (Rs)" value={voucherAmount} onChange={e => setVoucherAmount(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
-                <input placeholder="Receipt link (optional)" value={voucherReceiptUrl} onChange={e => setVoucherReceiptUrl(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
+                <input required type="number" placeholder="Amount (Rs)" value={voucherAmount} onChange={e => setVoucherAmount(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+                <input placeholder="Receipt link (optional)" value={voucherReceiptUrl} onChange={e => setVoucherReceiptUrl(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
                 <button type="submit" className="py-2 bg-slate-900 text-white rounded-lg font-semibold">Submit Request</button>
               </form>
             )}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+            <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-semibold uppercase">
+                <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-semibold uppercase">
                   <tr>
                     <th className="px-6 py-4">Requestor</th>
                     <th className="px-6 py-4">Amount</th>
@@ -408,17 +474,17 @@ export const ClubsDashboard: React.FC = () => {
                     <th className="px-6 py-4">Link</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
+                <tbody className="divide-y divide-slate-100 text-slate-700">
                   {reimbursements.map(re => (
                     <tr key={re.id}>
-                      <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{re.requested_by}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-900">{re.requested_by}</td>
                       <td className="px-6 py-4">Rs {re.amount.toLocaleString()}</td>
                       <td className="px-6 py-4">
-                        <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-medium">
+                        <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 font-medium">
                           {re.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-indigo-600 dark:text-indigo-400 cursor-pointer hover:underline">View Receipt</td>
+                      <td className="px-6 py-4 text-indigo-600 cursor-pointer hover:underline">View Receipt</td>
                     </tr>
                   ))}
                 </tbody>
@@ -430,16 +496,16 @@ export const ClubsDashboard: React.FC = () => {
         {/* Tab 6: Sponsorships */}
         {activeSubTab === 'sponsorships' && (
           <div className="space-y-6">
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm">
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-4">Sponsorship Tracker</h3>
+            <div className="p-6 rounded-2xl bg-white border border-slate-200/60 shadow-sm">
+              <h3 className="font-bold text-slate-900 text-sm mb-4">Sponsorship Tracker</h3>
               <div className="space-y-4">
                 {sponsorships.map(sp => (
-                  <div key={sp.id} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs">
+                  <div key={sp.id} className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
                     <div>
-                      <h4 className="font-bold text-slate-900 dark:text-white">{sp.sponsor_name}</h4>
+                      <h4 className="font-bold text-slate-900">{sp.sponsor_name}</h4>
                       <span className="text-[10px] text-slate-400 mt-1 block uppercase font-medium">{sp.status}</span>
                     </div>
-                    <span className="font-bold text-slate-800 dark:text-slate-200">Rs {sp.amount.toLocaleString()}</span>
+                    <span className="font-bold text-slate-800">Rs {sp.amount.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
@@ -450,17 +516,15 @@ export const ClubsDashboard: React.FC = () => {
         {/* Tab 7: Recruitment (Phase 4 — new) */}
         {activeSubTab === 'recruitment' && (
           <div className="space-y-6">
-            <h3 className="font-bold text-slate-900 dark:text-white text-sm">Recruitment Drives</h3>
+            <h3 className="font-bold text-slate-900 text-sm">Recruitment Drives</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {recruitmentDrives.map(drive => (
-                <div key={drive.id} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm">
+                <div key={drive.id} className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm">
                   <div className="flex items-center justify-between mb-2">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      drive.status === 'open' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600'
-                    }`}>{drive.status}</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${ drive.status === 'open' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600' }`}>{drive.status}</span>
                     <span className="text-[10px] text-slate-400">{drive.recruitment_period}</span>
                   </div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">{drive.title}</h4>
+                  <h4 className="font-bold text-slate-900 text-sm">{drive.title}</h4>
                   <p className="text-xs text-slate-500 mt-2 leading-relaxed">{drive.eligibility}</p>
                   <div className="mt-3 text-[10px] text-slate-400">Positions available: {drive.positions_available}</div>
                 </div>
@@ -476,7 +540,7 @@ export const ClubsDashboard: React.FC = () => {
         {activeSubTab === 'announcements' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm">Club Announcements</h3>
+              <h3 className="font-bold text-slate-900 text-sm">Club Announcements</h3>
               <button
                 onClick={() => setAnnouncementFormOpen(true)}
                 className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors"
@@ -495,11 +559,11 @@ export const ClubsDashboard: React.FC = () => {
                   setAnnouncementFormOpen(false);
                   setReloadTick(t => t + 1);
                 }}
-                className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-3 text-xs"
+                className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm space-y-3 text-xs"
               >
-                <input required placeholder="Title" value={announcementTitle} onChange={e => setAnnouncementTitle(e.target.value)} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
-                <textarea required rows={3} placeholder="Message" value={announcementBody} onChange={e => setAnnouncementBody(e.target.value)} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
-                <select value={announcementType} onChange={e => setAnnouncementType(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg">
+                <input required placeholder="Title" value={announcementTitle} onChange={e => setAnnouncementTitle(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+                <textarea required rows={3} placeholder="Message" value={announcementBody} onChange={e => setAnnouncementBody(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+                <select value={announcementType} onChange={e => setAnnouncementType(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
                   <option value="general">General Update</option>
                   <option value="recruitment">Recruitment</option>
                   <option value="event">Event Update</option>
@@ -510,9 +574,9 @@ export const ClubsDashboard: React.FC = () => {
             )}
             <div className="space-y-4">
               {announcements.map(a => (
-                <div key={a.id} className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm text-xs">
+                <div key={a.id} className="p-4 rounded-xl bg-white border border-slate-200/60 shadow-sm text-xs">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-900 dark:text-white">{a.title}</span>
+                    <span className="font-bold text-slate-900">{a.title}</span>
                     <span className="text-[10px] uppercase text-slate-400">{a.announcement_type}</span>
                   </div>
                   <p className="text-slate-500 mt-2 leading-relaxed">{a.body}</p>
@@ -527,7 +591,7 @@ export const ClubsDashboard: React.FC = () => {
         {activeSubTab === 'annual-plan' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm">Annual Planning Workspace</h3>
+              <h3 className="font-bold text-slate-900 text-sm">Annual Planning Workspace</h3>
               <button
                 onClick={() => setPlanFormOpen(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition-colors"
@@ -547,11 +611,11 @@ export const ClubsDashboard: React.FC = () => {
                   setPlanFormOpen(false);
                   setReloadTick(t => t + 1);
                 }}
-                className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-3 text-xs"
+                className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm space-y-3 text-xs"
               >
-                <textarea required rows={2} placeholder="Vision" value={planVision} onChange={e => setPlanVision(e.target.value)} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
-                <textarea rows={2} placeholder="Objectives" value={planObjectives} onChange={e => setPlanObjectives(e.target.value)} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
-                <input type="number" placeholder="Budget allocation (Rs)" value={planBudget} onChange={e => setPlanBudget(e.target.value)} className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
+                <textarea required rows={2} placeholder="Vision" value={planVision} onChange={e => setPlanVision(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+                <textarea rows={2} placeholder="Objectives" value={planObjectives} onChange={e => setPlanObjectives(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+                <input type="number" placeholder="Budget allocation (Rs)" value={planBudget} onChange={e => setPlanBudget(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
                 <button type="submit" className="py-2 px-4 bg-slate-900 text-white rounded-lg font-semibold">Save as Draft ({CURRENT_ACADEMIC_YEAR})</button>
               </form>
             )}
@@ -560,9 +624,9 @@ export const ClubsDashboard: React.FC = () => {
                 const stages = ['draft', 'faculty_coordinator_review', 'cultural_coordinator_review', 'hod_review', 'approved', 'locked'];
                 const stageIdx = stages.indexOf(plan.status);
                 return (
-                  <div key={plan.id} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm">
+                  <div key={plan.id} className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="font-bold text-slate-900 dark:text-white text-sm">Academic Year {plan.academic_year}</span>
+                      <span className="font-bold text-slate-900 text-sm">Academic Year {plan.academic_year}</span>
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-50 text-sky-600">
                         {plan.status.replace(/_/g, ' ')}
                       </span>
@@ -570,12 +634,12 @@ export const ClubsDashboard: React.FC = () => {
                     {/* Stage timeline */}
                     <div className="flex items-center gap-1 mb-4">
                       {stages.map((s, idx) => (
-                        <div key={s} className={`h-1.5 flex-1 rounded-full ${idx <= stageIdx ? 'bg-emerald-500' : 'bg-slate-100 dark:bg-slate-800'}`} title={s} />
+                        <div key={s} className={`h-1.5 flex-1 rounded-full ${idx <= stageIdx ? 'bg-emerald-500' : 'bg-slate-100 '}`} title={s} />
                       ))}
                     </div>
                     <p className="text-xs text-slate-500 leading-relaxed">{plan.vision}</p>
                     {plan.review_comments && (
-                      <div className="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 text-[11px]">
+                      <div className="mt-3 p-3 rounded-lg bg-amber-50 text-amber-700 text-[11px]">
                         Review comment: {plan.review_comments}
                       </div>
                     )}
@@ -586,16 +650,20 @@ export const ClubsDashboard: React.FC = () => {
                           className="px-3 py-1.5 bg-slate-900 text-white rounded-lg font-semibold"
                         >Submit for Review</button>
                       )}
-                      {['faculty_coordinator_review', 'cultural_coordinator_review', 'hod_review'].includes(plan.status) && (
+                      {ANNUAL_PLAN_STAGE_PERMISSIONS[plan.status] && hasPermission(ANNUAL_PLAN_STAGE_PERMISSIONS[plan.status]) && (
                         <>
-                          <button
-                            onClick={async () => { await api.post(`/clubs/annual-plans/${plan.id}/review`, { action: 'approve' }); setReloadTick(t => t + 1); }}
-                            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold"
-                          >Approve</button>
-                          <button
-                            onClick={async () => { await api.post(`/clubs/annual-plans/${plan.id}/review`, { action: 'reject', comments: 'Please revise.' }); setReloadTick(t => t + 1); }}
-                            className="px-3 py-1.5 bg-rose-600 text-white rounded-lg font-semibold"
-                          >Reject</button>
+                          <Button
+                            label="Approve"
+                            variant="primary"
+                            size="sm"
+                            clickAction={async () => { await api.post(`/clubs/annual-plans/${plan.id}/review`, { action: 'approve' }); setReloadTick(t => t + 1); }}
+                          />
+                          <Button
+                            label="Reject"
+                            variant="destructive"
+                            size="sm"
+                            clickAction={async () => { await api.post(`/clubs/annual-plans/${plan.id}/review`, { action: 'reject', comments: 'Please revise.' }); setReloadTick(t => t + 1); }}
+                          />
                         </>
                       )}
                       {plan.status === 'approved' && (
@@ -635,19 +703,19 @@ export const ClubsDashboard: React.FC = () => {
                 setDocFile(null); setDocName(''); setDocTags('');
                 setReloadTick(t => t + 1);
               }}
-              className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs"
+              className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs"
             >
-              <input required type="file" onChange={e => setDocFile(e.target.files?.[0] ?? null)} className="sm:col-span-2 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
-              <input placeholder="Display name (optional)" value={docName} onChange={e => setDocName(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
-              <select value={docCategory} onChange={e => setDocCategory(e.target.value)} className="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg">
+              <input required type="file" onChange={e => setDocFile(e.target.files?.[0] ?? null)} className="sm:col-span-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+              <input placeholder="Display name (optional)" value={docName} onChange={e => setDocName(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+              <select value={docCategory} onChange={e => setDocCategory(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
                 {['Annual Plans', 'Reports', 'Meeting Documents', 'Policies', 'Templates', 'Recruitment Material', 'Financial Documents', 'Brand Assets', 'Presentations'].map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              <input placeholder="Tags (comma separated, e.g. sop,knowledge-base)" value={docTags} onChange={e => setDocTags(e.target.value)} className="sm:col-span-3 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg" />
+              <input placeholder="Tags (comma separated, e.g. sop,knowledge-base)" value={docTags} onChange={e => setDocTags(e.target.value)} className="sm:col-span-3 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
               <button type="submit" className="py-2 bg-slate-900 text-white rounded-lg font-semibold">Upload</button>
             </form>
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+            <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-semibold uppercase">
+                <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-semibold uppercase">
                   <tr>
                     <th className="px-6 py-4">Name</th>
                     <th className="px-6 py-4">Category</th>
@@ -656,10 +724,10 @@ export const ClubsDashboard: React.FC = () => {
                     <th className="px-6 py-4">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
+                <tbody className="divide-y divide-slate-100 text-slate-700">
                   {(docsView === 'all' ? documents : knowledgeBase).map(d => (
                     <tr key={d.id}>
-                      <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{d.name}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-900">{d.name}</td>
                       <td className="px-6 py-4">{d.category}</td>
                       <td className="px-6 py-4">v{d.version}</td>
                       <td className="px-6 py-4">{d.tags}</td>
@@ -669,7 +737,7 @@ export const ClubsDashboard: React.FC = () => {
                             const { url } = await api.get<{ url: string }>(`/clubs/documents/${d.id}/download-url`);
                             window.open(url, '_blank');
                           }}
-                          className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                          className="text-indigo-600 hover:underline"
                         >Download</button>
                       </td>
                     </tr>
@@ -697,12 +765,12 @@ export const ClubsDashboard: React.FC = () => {
                 <button
                   key={id}
                   onClick={() => setReportType(id)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg ${reportType === id ? 'bg-slate-900 text-white' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500'}`}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg ${reportType === id ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-500'}`}
                 >{label}</button>
               ))}
             </div>
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm">
-              <pre className="text-[11px] whitespace-pre-wrap text-slate-600 dark:text-slate-300 leading-relaxed">
+            <div className="p-6 rounded-2xl bg-white border border-slate-200/60 shadow-sm">
+              <pre className="text-[11px] whitespace-pre-wrap text-slate-600 leading-relaxed">
                 {reportData ? JSON.stringify(reportData, null, 2) : 'Loading report…'}
               </pre>
             </div>
@@ -713,9 +781,9 @@ export const ClubsDashboard: React.FC = () => {
         {activeSubTab === 'analytics' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {analytics?.widgets?.map((w: any) => (
-              <div key={w.key} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm">
-                <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-3">{w.title}</h4>
-                <pre className="text-[11px] whitespace-pre-wrap text-slate-600 dark:text-slate-300 leading-relaxed">
+              <div key={w.key} className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm">
+                <h4 className="font-bold text-slate-900 text-sm mb-3">{w.title}</h4>
+                <pre className="text-[11px] whitespace-pre-wrap text-slate-600 leading-relaxed">
                   {JSON.stringify(w.data, null, 2)}
                 </pre>
               </div>
@@ -724,41 +792,73 @@ export const ClubsDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* Tab 13: Club Settings — permission template assignment (Clubs PRD §17) */}
+        {/* Tab 13: Club Settings — contact email + permission template assignment (Clubs PRD §17) */}
         {activeSubTab === 'settings' && (
           <div className="space-y-6">
-            <h3 className="font-bold text-slate-900 dark:text-white text-sm">Permission Templates</h3>
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+            <div className="p-6 rounded-2xl bg-white border border-slate-200/60 shadow-sm space-y-3 max-w-md">
+              <h3 className="font-bold text-slate-900 text-sm">Official Contact Email</h3>
+              {clubInfo?.viewer_can_manage_settings ? (
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={contactEmailDraft}
+                    onChange={e => setContactEmailDraft(e.target.value)}
+                    className="flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg"
+                    placeholder="club@christuniversity.in"
+                  />
+                  <Button
+                    label="Save"
+                    variant="primary"
+                    size="sm"
+                    clickAction={async () => {
+                      await api.put(`/clubs/${selectedClubId}/settings`, { contact_email: contactEmailDraft });
+                      showToast({ body: 'Contact email updated.', type: 'info' });
+                      setReloadTick(t => t + 1);
+                    }}
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500">{clubInfo?.contact_email || 'Not set.'}</p>
+              )}
+            </div>
+
+            <h3 className="font-bold text-slate-900 text-sm">Permission Templates</h3>
+            <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-semibold uppercase">
+                <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-semibold uppercase">
                   <tr>
                     <th className="px-6 py-4">Member</th>
                     <th className="px-6 py-4">Club Role</th>
                     <th className="px-6 py-4">Permission Template</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
+                <tbody className="divide-y divide-slate-100 text-slate-700">
                   {members.map(m => (
                     <tr key={m.id}>
-                      <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{m.student_name ?? m.student_id}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-900">{m.student_name ?? m.student_id}</td>
                       <td className="px-6 py-4">{m.role}</td>
                       <td className="px-6 py-4">
-                        <select
-                          defaultValue={m.permission_template ?? ''}
-                          onChange={async (e) => {
-                            await api.put(`/clubs/${selectedClubId}/members/${m.id}/permission-template`, {
-                              permission_template: e.target.value || null,
-                            });
-                          }}
-                          className="px-2 py-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg"
-                        >
-                          <option value="">Member</option>
-                          <option value="Club Head">Club Head</option>
-                          <option value="Documentation Head">Documentation Head</option>
-                          <option value="Events Head">Events Head</option>
-                          <option value="Sponsorship Head">Sponsorship Head</option>
-                          <option value="Finance Head">Finance Head</option>
-                        </select>
+                        {clubInfo?.viewer_can_manage_settings ? (
+                          <select
+                            defaultValue={m.permission_template ?? ''}
+                            onChange={async (e) => {
+                              await api.put(`/clubs/${selectedClubId}/members/${m.id}/permission-template`, {
+                                permission_template: e.target.value || null,
+                              });
+                              showToast({ body: 'Permission template updated.', type: 'info' });
+                            }}
+                            className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg"
+                          >
+                            <option value="">Member</option>
+                            <option value="Club Head">Club Head</option>
+                            <option value="Documentation Head">Documentation Head</option>
+                            <option value="Events Head">Events Head</option>
+                            <option value="Sponsorship Head">Sponsorship Head</option>
+                            <option value="Finance Head">Finance Head</option>
+                          </select>
+                        ) : (
+                          <span className="text-slate-500">{m.permission_template || 'Member'}</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -766,6 +866,131 @@ export const ClubsDashboard: React.FC = () => {
               </table>
             </div>
           </div>
+        )}
+
+        {/* Tab: Structure — configurable club hierarchy */}
+        {activeSubTab === 'structure' && selectedClubId && (
+          <ClubHierarchyChart
+            clubId={selectedClubId}
+            members={members}
+            canEdit={!!clubInfo?.viewer_can_edit_hierarchy}
+            onMembersChanged={() => setReloadTick(t => t + 1)}
+          />
+        )}
+
+        {/* Tab: Tasks — club-scoped task manager (allocation + review of contribution work) */}
+        {activeSubTab === 'tasks' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-900 text-sm">Task Manager</h3>
+              {clubInfo?.viewer_can_assign_tasks && (
+                <Button
+                  label="Assign Task"
+                  variant="primary"
+                  size="sm"
+                  icon={<Plus className="w-3.5 h-3.5" />}
+                  onClick={() => setTaskFormOpen(true)}
+                />
+              )}
+            </div>
+            {taskFormOpen && (
+              <div className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                <input required placeholder="Task title" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
+                <DateInput label="Due date" isLabelHidden value={taskDueDate || undefined} onChange={(v) => setTaskDueDate(v || '')} isRequired />
+                <select value={taskPriority} onChange={e => setTaskPriority(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+                <select value={taskAssigneeId} onChange={e => setTaskAssigneeId(e.target.value)} className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+                  <option value="">Select assignee</option>
+                  {members.filter(m => m.status === 'active').map(m => (
+                    <option key={m.id} value={m.student_id}>{m.student_name ?? m.student_id}</option>
+                  ))}
+                </select>
+                <Button
+                  label="Submit"
+                  variant="primary"
+                  size="sm"
+                  isDisabled={!taskTitle || !taskDueDate || !taskAssigneeId}
+                  clickAction={async () => {
+                    await api.post(`/clubs/${selectedClubId}/tasks`, {
+                      title: taskTitle, due_date: taskDueDate, priority: taskPriority, assignee_id: taskAssigneeId,
+                    });
+                    setTaskTitle(''); setTaskDueDate(''); setTaskAssigneeId('');
+                    setTaskFormOpen(false);
+                    showToast({ body: 'Task assigned.', type: 'info' });
+                    setReloadTick(t => t + 1);
+                  }}
+                />
+              </div>
+            )}
+            <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-semibold uppercase">
+                  <tr>
+                    <th className="px-6 py-4">Title</th>
+                    <th className="px-6 py-4">Due Date</th>
+                    <th className="px-6 py-4">Priority</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {clubTasks.map(t => (
+                    <tr key={t.id}>
+                      <td className="px-6 py-4 font-bold text-slate-900">{t.title}</td>
+                      <td className="px-6 py-4">{t.due_date}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-0.5 rounded font-bold uppercase text-[9px] ${t.priority === 'high' ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-600'}`}>{t.priority}</span>
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-slate-500">{t.status.replace(/_/g, ' ')}</td>
+                      <td className="px-6 py-4 flex gap-2">
+                        {t.status !== 'completed' && t.status !== 'pending_review' && (
+                          <Button
+                            label="Mark Done"
+                            variant="secondary"
+                            size="sm"
+                            clickAction={async () => {
+                              await api.put(`/tasks/${t.id}`, { status: 'pending_review' });
+                              setReloadTick(x => x + 1);
+                            }}
+                          />
+                        )}
+                        {t.status === 'pending_review' && clubInfo?.viewer_can_assign_tasks && (
+                          <>
+                            <Button
+                              label="Approve"
+                              variant="primary"
+                              size="sm"
+                              clickAction={async () => {
+                                await api.post(`/clubs/${selectedClubId}/tasks/${t.id}/review`, { action: 'approve' });
+                                setReloadTick(x => x + 1);
+                              }}
+                            />
+                            <Button
+                              label="Send Back"
+                              variant="secondary"
+                              size="sm"
+                              clickAction={async () => {
+                                await api.post(`/clubs/${selectedClubId}/tasks/${t.id}/review`, { action: 'reject' });
+                                setReloadTick(x => x + 1);
+                              }}
+                            />
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {clubTasks.length === 0 && (
+                    <tr><td colSpan={5} className="px-6 py-8 text-center text-slate-400">No tasks assigned yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        </>
         )}
       </main>
     </div>

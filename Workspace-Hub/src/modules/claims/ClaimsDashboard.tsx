@@ -1,34 +1,49 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../services/api';
+import { api, ApiError } from '../../services/api';
 import { useStore } from '../../context/useStore';
 import { SideNav, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
-import { FileText, Plus, Calendar, Compass, ShieldAlert, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { Button } from '@astryxdesign/core/Button';
+import { DateRangeInput } from '@astryxdesign/core/DateRangeInput';
+import { Skeleton } from '@astryxdesign/core/Skeleton';
+import { useToast } from '@astryxdesign/core/Toast';
+import { FileText, Plus, Compass, ShieldAlert, CheckCircle, Clock, AlertTriangle, Paperclip } from 'lucide-react';
+import { ClaimStatusStepper } from './components/ClaimStatusStepper';
+import { PageLoader } from '../../components/ui/PageLoader';
+
+type SubTab = 'dashboard' | 'my_claims' | 'new_claim' | 'review_queue';
 
 export const ClaimsDashboard: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'my_claims' | 'new_claim' | 'review_queue'>('dashboard');
   const user = useStore(state => state.user);
-  
+  const isFaculty = user?.primary_role === 'faculty';
+  const [activeSubTab, setActiveSubTab] = useState<SubTab>(isFaculty ? 'review_queue' : 'dashboard');
+  const showToast = useToast();
+
   const [claims, setClaims] = useState<any[]>([]);
   const [timetable, setTimetable] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [documentsByClaimId, setDocumentsByClaimId] = useState<Record<string, any[]>>({});
 
   // Submit claim form state
   const [category, setCategory] = useState<'medical' | 'co_curricular'>('medical');
-  const [dateRange, setDateRange] = useState('');
+  const [dateRange, setDateRange] = useState<{ start: string; end: string } | null>(null);
   const [reason, setReason] = useState('');
   const [selectedHours, setSelectedHours] = useState<string[]>([]);
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
 
-  // A claim's academic context now comes from the logged-in student's own
-  // profile (Phase 1D fields), never a hardcoded literal — this was the
-  // reason the whole feature could only ever work for one seeded demo
-  // persona before.
+  // Revise / resubmit inline state
+  const [revisingClaimId, setRevisingClaimId] = useState<string | null>(null);
+  const [reviseReason, setReviseReason] = useState('');
+  const [resubmittingClaimId, setResubmittingClaimId] = useState<string | null>(null);
+  const [resubmitDateRange, setResubmitDateRange] = useState<{ start: string; end: string } | null>(null);
+
   const programme = user?.programme || '';
   const semester = user?.semester || '';
   const section = user?.section || '';
 
   useEffect(() => {
     async function loadData() {
+      setIsLoading(true);
       try {
         const list = await api.get<any[]>('/claims');
         setClaims(list);
@@ -41,6 +56,8 @@ export const ClaimsDashboard: React.FC = () => {
         }
       } catch (e) {
         console.error(e);
+      } finally {
+        setIsLoading(false);
       }
     }
     loadData();
@@ -49,34 +66,50 @@ export const ClaimsDashboard: React.FC = () => {
   // Soft duplicate-claim check as the student types a date range — never
   // blocks submission, only warns (per the PRD).
   useEffect(() => {
-    if (!dateRange.trim()) { setDuplicateWarning(null); return; }
+    if (!dateRange) { setDuplicateWarning(null); return; }
     const t = setTimeout(() => {
-      api.get<any>(`/claims/duplicate-check?date_range=${encodeURIComponent(dateRange)}`)
+      const dr = `${dateRange.start} to ${dateRange.end}`;
+      api.get<any>(`/claims/duplicate-check?date_range=${encodeURIComponent(dr)}`)
         .then(res => setDuplicateWarning(res.has_potential_duplicate ? res.message : null))
         .catch(() => setDuplicateWarning(null));
     }, 400);
     return () => clearTimeout(t);
   }, [dateRange]);
 
-  const handleSubmitClaim = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const loadDocuments = async (claimId: string) => {
+    if (documentsByClaimId[claimId]) return;
+    try {
+      const docs = await api.get<any[]>(`/claims/${claimId}/documents`);
+      setDocumentsByClaimId(prev => ({ ...prev, [claimId]: docs }));
+    } catch (e) {
+      setDocumentsByClaimId(prev => ({ ...prev, [claimId]: [] }));
+    }
+  };
+
+  const openDocument = async (claimId: string, documentId: string) => {
+    const res = await api.get<{ url: string }>(`/claims/${claimId}/documents/${documentId}/download-url`);
+    window.open(res.url, '_blank');
+  };
+
+  const handleSubmitClaim = async () => {
+    if (!dateRange) {
+      showToast({ body: 'Please select a date range for this claim.', type: 'error' });
+      return;
+    }
     if (selectedHours.length === 0) {
-      alert("Please select at least one missed class hour from the timetable.");
+      showToast({ body: 'Please select at least one missed class hour from the timetable.', type: 'error' });
       return;
     }
     if (category === 'medical' && !certificateFile) {
-      alert("A medical certificate is required for this claim category.");
+      showToast({ body: 'A medical certificate is required for this claim category.', type: 'error' });
       return;
     }
 
-    // Every selected entry uses the FIRST date in the range the student
-    // actually typed — not a hardcoded literal unrelated to their input.
-    const entryDate = dateRange.split('to')[0].trim();
     const missedClasses = selectedHours.map(hourId => {
       const slot = timetable.find(t => t.id === hourId);
       return {
         subject: slot.subject,
-        date: entryDate,
+        date: dateRange.start,
         hour: slot.hour,
         subject_faculty_id: slot.faculty_id
       };
@@ -88,7 +121,7 @@ export const ClaimsDashboard: React.FC = () => {
       semester,
       programme,
       section,
-      date_range: dateRange,
+      date_range: `${dateRange.start} to ${dateRange.end}`,
       reason,
       missed_classes: missedClasses
     };
@@ -102,277 +135,417 @@ export const ClaimsDashboard: React.FC = () => {
         await api.upload(`/claims/${claim.id}/documents`, formData);
       }
       setCertificateFile(null);
-      setDateRange('');
+      setDateRange(null);
       setReason('');
       setSelectedHours([]);
+      showToast({ body: 'Claim submitted for initial review.', type: 'info' });
       setActiveSubTab('my_claims');
     } catch (err) {
-      console.error(err);
-      alert('Could not submit the claim. Please check the form and try again.');
+      const message = err instanceof ApiError && err.status === 403
+        ? 'Only students can submit attendance claims.'
+        : 'Could not submit the claim. Please check the form and try again.';
+      showToast({ body: message, type: 'error' });
+      throw err;
     }
   };
 
+  const approveClaim = async (claimId: string) => {
+    await api.post(`/claims/${claimId}/approve-stage?action=approve`, {});
+    showToast({ body: 'Claim approved and moved to the next stage.', type: 'info' });
+    setClaims(await api.get<any[]>('/claims'));
+  };
+
+  const submitRevision = async (claimId: string) => {
+    if (!reviseReason.trim()) {
+      showToast({ body: 'A reason is required to revise a claim.', type: 'error' });
+      return;
+    }
+    await api.post(`/claims/${claimId}/approve-stage?action=revise&feedback=${encodeURIComponent(reviseReason)}`, {});
+    showToast({ body: 'Claim returned to the student for revision.', type: 'info' });
+    setRevisingClaimId(null);
+    setReviseReason('');
+    setClaims(await api.get<any[]>('/claims'));
+  };
+
+  const submitResubmit = async (claimId: string) => {
+    const body: any = {};
+    if (resubmitDateRange) body.date_range = `${resubmitDateRange.start} to ${resubmitDateRange.end}`;
+    await api.put(`/claims/${claimId}/resubmit`, body);
+    showToast({ body: 'Claim resubmitted for review.', type: 'info' });
+    setResubmittingClaimId(null);
+    setResubmitDateRange(null);
+    setClaims(await api.get<any[]>('/claims'));
+  };
+
+  // Faculty cannot submit claims (backend-enforced) — they get only the
+  // Review Queue, no "All Claims"/"New Submission" tabs to be confused by.
+  const navItems: { id: SubTab; label: string }[] = isFaculty
+    ? [{ id: 'review_queue', label: 'Review Queue' }]
+    : [
+        { id: 'dashboard', label: 'Overview' },
+        { id: 'my_claims', label: 'All Claims' },
+      ];
+
   return (
-    <div className="w-full min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-[#0c0c0c] flex flex-col">
+    <div className="w-full min-h-[calc(100vh-4rem)] bg-slate-50 flex flex-col">
       {/* Sub Navbar (Horizontal Top Bar) */}
-      <div className="w-full border-b border-slate-200/40 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-2.5 flex gap-4 overflow-x-auto scrollbar-none z-10 shadow-sm">
-        {[
-          { id: 'dashboard', label: 'Overview' },
-          { id: 'my_claims', label: 'My Claims' },
-          { id: 'new_claim', label: 'New Submission' },
-          ...(user?.primary_role === 'faculty' ? [{ id: 'review_queue', label: 'Review Queue' }] : [])
-        ].map(item => (
-          <button
-            key={item.id}
-            onClick={() => setActiveSubTab(item.id as any)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap focus:outline-none ${
-              activeSubTab === item.id 
-                ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm' 
-                : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
+      <div className="w-full border-b border-slate-200/40 bg-white px-6 py-2.5 flex items-center justify-between gap-4 overflow-x-auto scrollbar-none z-10 shadow-sm">
+        <div className="flex gap-4">
+          {navItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => setActiveSubTab(item.id)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap focus:outline-none ${
+                activeSubTab === item.id
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        {!isFaculty && (
+          <Button
+            label="New Claim"
+            variant="primary"
+            size="sm"
+            icon={<Plus className="w-3.5 h-3.5" />}
+            onClick={() => setActiveSubTab('new_claim')}
+          />
+        )}
       </div>
 
       {/* Workspace Content */}
       <main className="flex-1 p-6 md:p-8 overflow-y-auto max-w-5xl w-full mx-auto">
         <div className="mb-6">
-          <span className="text-xs font-bold text-sky-500 uppercase tracking-wider">Attendance Claims Workflow</span>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">Claim Process Management</h1>
-          <p className="text-xs text-slate-500 mt-1">Submit medical certificates or pre-approved co-curricular attendance requests for faculty review.</p>
+          <span className="text-xs font-bold text-sky-600 uppercase tracking-wider">Attendance Claims Workflow</span>
+          <h1 className="text-2xl font-bold text-slate-900 mt-1">Claim Process Management</h1>
+          <p className="text-xs text-slate-500 mt-1">
+            {isFaculty
+              ? 'Review attendance claims awaiting your action.'
+              : 'Submit medical certificates or pre-approved co-curricular attendance requests for faculty review.'}
+          </p>
         </div>
 
-        {/* Tab 1: Dashboard Overview */}
-        {activeSubTab === 'dashboard' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-              {[
-                { title: 'Total Submissions', count: claims.length, icon: FileText, color: 'text-indigo-500' },
-                { title: 'Approved Claims', count: claims.filter(c => c.status === 'approved' || c.status === 'closed').length, icon: CheckCircle, color: 'text-emerald-500' },
-                { title: 'Pending Review', count: claims.filter(c => c.status === 'submitted' || c.status === 'under_review').length, icon: Clock, color: 'text-yellow-500' },
-                { title: 'Action Required', count: claims.filter(c => c.status === 'returned').length, icon: AlertTriangle, color: 'text-rose-500' }
-              ].map((card, i) => (
-                <div key={i} className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                  <div>
-                    <div className="text-xs font-medium text-slate-400">{card.title}</div>
-                    <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{card.count}</div>
-                  </div>
-                  <card.icon className={`w-8 h-8 ${card.color}`} />
-                </div>
-              ))}
-            </div>
-
-            {/* Quick Claims List */}
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm">
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-4">Latest Claim Submissions</h3>
-              <div className="space-y-4">
-                {claims.slice(0, 3).map((claim, idx) => (
-                  <div key={idx} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800/60 flex items-center justify-between text-xs">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-950 dark:text-white">{claim.reference_number}</span>
-                        <span className="px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-[10px] uppercase font-bold">{claim.category}</span>
+        {isLoading ? (
+          <div className="space-y-4">
+            {[0, 1, 2].map(i => <Skeleton key={i} height={72} index={i} />)}
+          </div>
+        ) : (
+          <>
+            {/* Tab 1: Dashboard Overview */}
+            {activeSubTab === 'dashboard' && !isFaculty && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                  {[
+                    { title: 'Total Submissions', count: claims.length, icon: FileText, color: 'text-indigo-500' },
+                    { title: 'Approved Claims', count: claims.filter(c => c.status === 'approved' || c.status === 'closed').length, icon: CheckCircle, color: 'text-emerald-500' },
+                    { title: 'Pending Review', count: claims.filter(c => c.status === 'submitted' || c.status === 'under_review').length, icon: Clock, color: 'text-yellow-500' },
+                    { title: 'Action Required', count: claims.filter(c => c.status === 'returned').length, icon: AlertTriangle, color: 'text-rose-500' }
+                  ].map((card, i) => (
+                    <div key={i} className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-medium text-slate-400">{card.title}</div>
+                        <div className="text-2xl font-bold text-slate-900 mt-1">{card.count}</div>
                       </div>
-                      <p className="text-slate-500 mt-1">Duration: {claim.date_range} | Stage: <span className="font-semibold text-slate-700 dark:text-slate-300">{claim.current_workflow_stage}</span></p>
+                      <card.icon className={`w-8 h-8 ${card.color}`} />
                     </div>
-                    <span className={`px-2.5 py-1 rounded-full font-bold uppercase text-[10px] ${
-                      claim.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-yellow-50 text-yellow-600'
-                    }`}>{claim.status}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 2: Claims List */}
-        {activeSubTab === 'my_claims' && (
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-semibold uppercase">
-                  <tr>
-                    <th className="px-6 py-4">Reference No</th>
-                    <th className="px-6 py-4">Category</th>
-                    <th className="px-6 py-4">Date Range</th>
-                    <th className="px-6 py-4">Current Workflow Stage</th>
-                    <th className="px-6 py-4">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
-                  {claims.map(claim => (
-                    <tr key={claim.id}>
-                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{claim.reference_number}</td>
-                      <td className="px-6 py-4 font-medium uppercase text-slate-500">{claim.category}</td>
-                      <td className="px-6 py-4">{claim.date_range}</td>
-                      <td className="px-6 py-4 font-semibold text-slate-700 dark:text-slate-300">{claim.current_workflow_stage}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded font-bold uppercase text-[10px] ${
-                          claim.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-yellow-50 text-yellow-600'
-                        }`}>
-                          {claim.status}
-                        </span>
-                      </td>
-                    </tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 3: New Claim Submission */}
-        {activeSubTab === 'new_claim' && (
-          <form onSubmit={handleSubmitClaim} className="space-y-6">
-            <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm space-y-4">
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm">Create New Attendance Claim</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-slate-500">Claim Category</label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as any)}
-                    className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-lg text-slate-950 dark:text-white"
-                  >
-                    <option value="medical">Medical (Certificate Required)</option>
-                    <option value="co_curricular">Co-Curricular (Pre-Approval Required)</option>
-                  </select>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-slate-500">Date Range</label>
-                  <input
-                    type="text"
-                    placeholder="YYYY-MM-DD to YYYY-MM-DD"
-                    value={dateRange}
-                    onChange={(e) => setDateRange(e.target.value)}
-                    required
-                    className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-lg text-slate-950 dark:text-white"
-                  />
-                  {duplicateWarning && (
-                    <span className="text-[10px] text-amber-600 flex items-center gap-1 mt-1">
-                      <AlertTriangle className="w-3 h-3" /> {duplicateWarning}
-                    </span>
-                  )}
-                </div>
-              </div>
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-500">Missed Timetable Sessions (Select all that apply)</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {timetable.map(slot => (
-                    <label key={slot.id} className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 flex items-start gap-3 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={selectedHours.includes(slot.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedHours([...selectedHours, slot.id]);
-                          } else {
-                            setSelectedHours(selectedHours.filter(id => id !== slot.id));
-                          }
-                        }}
-                        className="mt-0.5"
-                      />
-                      <div className="text-[10px]">
-                        <div className="font-bold text-slate-900 dark:text-white">{slot.subject}</div>
-                        <div className="text-slate-400 mt-0.5">{slot.hour}</div>
-                        <div className="text-slate-400">Faculty: {slot.faculty}</div>
+                <div className="p-6 rounded-2xl bg-white border border-slate-200/60 shadow-sm">
+                  <h3 className="font-bold text-slate-900 text-sm mb-4">Latest Claim Submissions</h3>
+                  <div className="space-y-4">
+                    {claims.slice(0, 3).map((claim, idx) => (
+                      <div key={idx} className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-950">{claim.reference_number}</span>
+                            <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[10px] uppercase font-bold">{claim.category}</span>
+                          </div>
+                          <p className="text-slate-500 mt-1">Duration: {claim.date_range}</p>
+                        </div>
+                        <ClaimStatusStepper
+                          status={claim.status}
+                          currentStage={claim.current_workflow_stage}
+                          submissionType={claim.submission_type}
+                          referenceNumber={claim.reference_number}
+                          revisionReason={claim.revision_reason}
+                        />
                       </div>
-                    </label>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
+            )}
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-500">Detailed Explanation / Reason</label>
-                <textarea
-                  rows={4}
-                  placeholder="Explain why you missed these academic sessions..."
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  required
-                  className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-lg text-slate-950 dark:text-white"
-                />
+            {/* Tab 2: All Claims */}
+            {activeSubTab === 'my_claims' && !isFaculty && (
+              <div className="space-y-6">
+                <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-semibold uppercase">
+                      <tr>
+                        <th className="px-6 py-4">Reference No</th>
+                        <th className="px-6 py-4">Category</th>
+                        <th className="px-6 py-4">Date Range</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {claims.map(claim => (
+                        <React.Fragment key={claim.id}>
+                          <tr>
+                            <td className="px-6 py-4 font-bold text-slate-900">{claim.reference_number}</td>
+                            <td className="px-6 py-4 font-medium uppercase text-slate-500">{claim.category}</td>
+                            <td className="px-6 py-4">{claim.date_range}</td>
+                            <td className="px-6 py-4">
+                              <ClaimStatusStepper
+                                status={claim.status}
+                                currentStage={claim.current_workflow_stage}
+                                submissionType={claim.submission_type}
+                                referenceNumber={claim.reference_number}
+                                revisionReason={claim.revision_reason}
+                              />
+                            </td>
+                            <td className="px-6 py-4">
+                              {claim.status === 'returned' && (
+                                <Button
+                                  label="Resubmit"
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => setResubmittingClaimId(resubmittingClaimId === claim.id ? null : claim.id)}
+                                />
+                              )}
+                            </td>
+                          </tr>
+                          {resubmittingClaimId === claim.id && (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-4 bg-slate-50">
+                                <div className="flex flex-col gap-3 max-w-sm">
+                                  <p className="text-[10px] text-slate-500">Revision requested: {claim.revision_reason || 'No reason provided.'}</p>
+                                  <DateRangeInput
+                                    label="Updated Date Range"
+                                    value={resubmitDateRange}
+                                    onChange={setResubmitDateRange}
+                                  />
+                                  <Button
+                                    label="Submit Resubmission"
+                                    variant="primary"
+                                    size="sm"
+                                    clickAction={() => submitResubmit(claim.id)}
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+            )}
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-semibold text-slate-500">
-                  Upload Certificate PDF {category === 'medical' && <span className="text-rose-500">*</span>}
-                </label>
-                <input
-                  type="file"
-                  accept="application/pdf,image/*"
-                  onChange={(e) => setCertificateFile(e.target.files?.[0] ?? null)}
-                  required={category === 'medical'}
-                  className="text-xs text-slate-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white"
-                />
+            {/* Tab 3: New Claim Submission */}
+            {activeSubTab === 'new_claim' && !isFaculty && (
+              <div className="space-y-6">
+                <div className="p-6 rounded-2xl bg-white border border-slate-200/60 shadow-sm space-y-4">
+                  <h3 className="font-bold text-slate-900 text-sm">Create New Attendance Claim</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-slate-500">Claim Category</label>
+                      <select
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value as any)}
+                        className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-950"
+                      >
+                        <option value="medical">Medical (Certificate Required)</option>
+                        <option value="co_curricular">Co-Curricular (Pre-Approval Required)</option>
+                      </select>
+                    </div>
+                    <DateRangeInput
+                      label="Date Range"
+                      value={dateRange}
+                      onChange={setDateRange}
+                      status={duplicateWarning ? { type: 'warning', message: duplicateWarning } : undefined}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-slate-500">Missed Timetable Sessions (Select all that apply)</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {timetable.map(slot => (
+                        <label key={slot.id} className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-start gap-3 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={selectedHours.includes(slot.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedHours([...selectedHours, slot.id]);
+                              } else {
+                                setSelectedHours(selectedHours.filter(id => id !== slot.id));
+                              }
+                            }}
+                            className="mt-0.5"
+                          />
+                          <div className="text-[10px]">
+                            <div className="font-bold text-slate-900">{slot.subject}</div>
+                            <div className="text-slate-400 mt-0.5">{slot.hour}</div>
+                            <div className="text-slate-400">Faculty: {slot.faculty}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-slate-500">Detailed Explanation / Reason</label>
+                    <textarea
+                      rows={4}
+                      placeholder="Explain why you missed these academic sessions..."
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      required
+                      className="px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-950"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-slate-500">
+                      Upload Certificate PDF {category === 'medical' && <span className="text-rose-500">*</span>}
+                    </label>
+                    <input
+                      type="file"
+                      accept="application/pdf,image/*"
+                      onChange={(e) => setCertificateFile(e.target.files?.[0] ?? null)}
+                      required={category === 'medical'}
+                      className="text-xs text-slate-400 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-900 file:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    label="Submit Form to Class Teacher"
+                    variant="primary"
+                    clickAction={handleSubmitClaim}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={user?.primary_role === 'super_admin'}
-                className="px-5 py-2.5 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-lg text-xs font-semibold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow"
-              >
-                {user?.primary_role === 'super_admin' ? 'View-Only Admin Mode' : 'Submit Form to Class Teacher'}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Tab 4: Faculty Review Queue */}
-        {activeSubTab === 'review_queue' && (
-          <div className="space-y-6">
-            <h3 className="font-bold text-slate-900 dark:text-white text-sm">Review Queue</h3>
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800 text-slate-400 font-semibold uppercase">
-                  <tr>
-                    <th className="px-6 py-4">Reference No</th>
-                    <th className="px-6 py-4">Student</th>
-                    <th className="px-6 py-4">Reason</th>
-                    <th className="px-6 py-4">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
-                  {claims.map(claim => (
-                    <tr key={claim.id}>
-                      <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{claim.reference_number}</td>
-                      <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">{claim.submitter_name}</td>
-                      <td className="px-6 py-4 max-w-xs truncate">{claim.reason}</td>
-                      <td className="px-6 py-4 flex gap-2">
-                        <button
-                          disabled={user?.primary_role === 'super_admin'}
-                          onClick={async () => {
-                            await api.post(`/claims/${claim.id}/approve-stage?action=approve`, {});
-                            alert("Approved!");
-                            setActiveSubTab('dashboard');
-                          }}
-                          className="px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded font-semibold text-[10px]"
-                        >
-                          Approve
-                        </button>
-                        <button
-                          disabled={user?.primary_role === 'super_admin'}
-                          onClick={async () => {
-                            await api.post(`/claims/${claim.id}/approve-stage?action=revise`, {});
-                            alert("Returned for revision!");
-                            setActiveSubTab('dashboard');
-                          }}
-                          className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded font-semibold text-[10px]"
-                        >
-                          Revise
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+            {/* Tab 4: Faculty Review Queue */}
+            {activeSubTab === 'review_queue' && isFaculty && (
+              <div className="space-y-6">
+                <h3 className="font-bold text-slate-900 text-sm">Review Queue</h3>
+                <div className="bg-white border border-slate-200/60 rounded-2xl overflow-hidden shadow-sm">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-100 text-slate-400 font-semibold uppercase">
+                      <tr>
+                        <th className="px-6 py-4">Reference No</th>
+                        <th className="px-6 py-4">Student</th>
+                        <th className="px-6 py-4">Reason</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4">Documents</th>
+                        <th className="px-6 py-4">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {claims.length === 0 && (
+                        <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-400">No claims currently awaiting your review.</td></tr>
+                      )}
+                      {claims.map(claim => (
+                        <React.Fragment key={claim.id}>
+                          <tr>
+                            <td className="px-6 py-4 font-bold text-slate-900">{claim.reference_number}</td>
+                            <td className="px-6 py-4 font-semibold text-slate-900">{claim.submitter_name}</td>
+                            <td className="px-6 py-4 max-w-xs truncate">{claim.reason}</td>
+                            <td className="px-6 py-4">
+                              <ClaimStatusStepper
+                                status={claim.status}
+                                currentStage={claim.current_workflow_stage}
+                                submissionType={claim.submission_type}
+                                referenceNumber={claim.reference_number}
+                                revisionReason={claim.revision_reason}
+                              />
+                            </td>
+                            <td className="px-6 py-4">
+                              <button
+                                onClick={() => loadDocuments(claim.id)}
+                                className="flex items-center gap-1 text-slate-500 hover:text-slate-900"
+                              >
+                                <Paperclip className="w-3.5 h-3.5" />
+                                {documentsByClaimId[claim.id] ? documentsByClaimId[claim.id].length : '...'}
+                              </button>
+                            </td>
+                            <td className="px-6 py-4 flex gap-2">
+                              <Button
+                                label="Approve"
+                                variant="primary"
+                                size="sm"
+                                clickAction={() => approveClaim(claim.id)}
+                              />
+                              <Button
+                                label="Revise"
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setRevisingClaimId(revisingClaimId === claim.id ? null : claim.id)}
+                              />
+                            </td>
+                          </tr>
+                          {documentsByClaimId[claim.id] && documentsByClaimId[claim.id].length > 0 && (
+                            <tr>
+                              <td colSpan={6} className="px-6 py-3 bg-slate-50">
+                                <div className="flex gap-3 flex-wrap">
+                                  {documentsByClaimId[claim.id].map(doc => (
+                                    <button
+                                      key={doc.id}
+                                      onClick={() => openDocument(claim.id, doc.id)}
+                                      className="text-[10px] px-2 py-1 rounded bg-white border border-slate-200 text-slate-600 hover:text-slate-900"
+                                    >
+                                      {doc.document_type}
+                                    </button>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          {revisingClaimId === claim.id && (
+                            <tr>
+                              <td colSpan={6} className="px-6 py-4 bg-slate-50">
+                                <div className="flex flex-col gap-3 max-w-md">
+                                  <label className="text-[10px] font-semibold text-slate-500">
+                                    Reason for revision (required, visible to the student)
+                                  </label>
+                                  <textarea
+                                    rows={2}
+                                    value={reviseReason}
+                                    onChange={(e) => setReviseReason(e.target.value)}
+                                    className="px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg"
+                                  />
+                                  <div>
+                                    <Button
+                                      label="Send Back to Student"
+                                      variant="destructive"
+                                      size="sm"
+                                      clickAction={() => submitRevision(claim.id)}
+                                    />
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>

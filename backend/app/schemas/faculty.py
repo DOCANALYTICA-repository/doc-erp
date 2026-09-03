@@ -1,6 +1,24 @@
 from typing import List, Optional
 from pydantic import BaseModel
 
+class FacultyAssignmentBase(BaseModel):
+    faculty_id: str
+    role_tag: str  # Class Teacher, Course Coordinator, Club Faculty Coordinator
+    programme: Optional[str] = None
+    semester: Optional[str] = None
+    section: Optional[str] = None
+    club_id: Optional[str] = None
+
+class FacultyAssignmentCreate(FacultyAssignmentBase):
+    pass
+
+class FacultyAssignmentOut(FacultyAssignmentBase):
+    id: str
+    status: str
+
+    class Config:
+        from_attributes = True
+
 class NoteBase(BaseModel):
     title: str
     content: Optional[str] = None

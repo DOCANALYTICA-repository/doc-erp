@@ -3,9 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.rbac import PermissionChecker, get_current_user, get_resolved_permissions
+from app.core import faculty_scope
 from app.repositories.claim import claim_repo, claim_participant_repo, attendance_entry_repo, timetable_repo, doc_repo
 from app.schemas.claim import (
-    ClaimOut, ClaimCreate, TimetableSessionOut, TimetableSessionCreate,
+    ClaimOut, ClaimCreate, ClaimResubmit, TimetableSessionOut, TimetableSessionCreate,
     SupportingDocumentOut, DuplicateClaimWarning,
 )
 from app.models.user import User
@@ -96,6 +97,9 @@ def submit_attendance_claim(
     db: Session = Depends(get_db),
     current_user: User = Depends(PermissionChecker(["claims:submit"]))
 ):
+    if claim_in.submission_type == "club" and not claim_in.club_id:
+        raise HTTPException(status_code=400, detail="club_id is required when submission_type is 'club'")
+
     claim_id = f"cl_{uuid.uuid4().hex[:12]}"
     ref_num = f"ACP-{datetime.now().year}-{uuid.uuid4().hex[:6].upper()}"
 
@@ -120,6 +124,7 @@ def submit_attendance_claim(
         "programme": claim_in.programme,
         "section": claim_in.section,
         "submission_type": claim_in.submission_type,
+        "club_id": claim_in.club_id,
         "submitted_by": current_user.id,
         "submission_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "date_range": claim_in.date_range,
@@ -181,13 +186,16 @@ def _to_claim_out(claim: Claim) -> ClaimOut:
 
 def _claims_pending_for_subject_faculty(db: Session, faculty_id: str) -> List[Claim]:
     """Every claim where this faculty member has at least one of their own
-    pending AttendanceEntry rows — this is what get_pending_by_faculty()
-    already computed but that list_claims() never called."""
+    pending AttendanceEntry rows AND the claim has actually reached the
+    subject_faculty stage. AttendanceEntry rows are all created "pending"
+    at submission time (before Class Teacher review even happens), so
+    without the stage check a subject faculty member would see claims still
+    awaiting Class Teacher approval in their Review Queue — confirmed bug."""
     entries = attendance_entry_repo.get_pending_by_faculty(db, faculty_id=faculty_id)
     seen = {}
     for entry in entries:
         claim = entry.participant.claim if entry.participant else None
-        if claim and claim.id not in seen:
+        if claim and claim.current_workflow_stage == "subject_faculty" and claim.id not in seen:
             seen[claim.id] = claim
     return list(seen.values())
 
@@ -208,14 +216,16 @@ def list_claims(db: Session = Depends(get_db), current_user: User = Depends(get_
                 Claim.current_workflow_stage == "initial_review",
                 Claim.submission_type == "individual",
             ).all():
-                results[c.id] = c
+                if faculty_scope.is_class_teacher_for(db, current_user.id, c.programme, c.semester, c.section):
+                    results[c.id] = c
 
         if "Club Faculty Coordinator" in tags:
             for c in db.query(Claim).filter(
                 Claim.current_workflow_stage == "initial_review",
                 Claim.submission_type == "club",
             ).all():
-                results[c.id] = c
+                if faculty_scope.is_club_faculty_coordinator_for(db, current_user.id, c.club_id):
+                    results[c.id] = c
 
         if "claims:review_faculty" in permissions:
             for c in _claims_pending_for_subject_faculty(db, current_user.id):
@@ -223,7 +233,8 @@ def list_claims(db: Session = Depends(get_db), current_user: User = Depends(get_
 
         if "Course Coordinator" in tags or "HOD" in tags:
             for c in db.query(Claim).filter(Claim.current_workflow_stage == "course_coordinator").all():
-                results[c.id] = c
+                if "HOD" in tags or faculty_scope.is_course_coordinator_for(db, current_user.id, c.programme):
+                    results[c.id] = c
 
         return [_to_claim_out(c) for c in results.values()]
 
@@ -247,11 +258,23 @@ def get_claim(claim_id: str, db: Session = Depends(get_db), current_user: User =
         tags = set(current_user.role_tags_list)
         permissions = get_resolved_permissions(current_user)
         is_reviewer = (
-            ("Class Teacher" in tags and claim.submission_type == "individual")
-            or ("Club Faculty Coordinator" in tags and claim.submission_type == "club")
-            or ("Course Coordinator" in tags or "HOD" in tags)
+            (
+                "Class Teacher" in tags and claim.submission_type == "individual"
+                and faculty_scope.is_class_teacher_for(db, current_user.id, claim.programme, claim.semester, claim.section)
+            )
+            or (
+                "Club Faculty Coordinator" in tags and claim.submission_type == "club"
+                and faculty_scope.is_club_faculty_coordinator_for(db, current_user.id, claim.club_id)
+            )
+            or ("HOD" in tags and claim.current_workflow_stage in ("course_coordinator", "attendance_office"))
+            or (
+                "Course Coordinator" in tags
+                and claim.current_workflow_stage in ("course_coordinator", "attendance_office")
+                and faculty_scope.is_course_coordinator_for(db, current_user.id, claim.programme)
+            )
             or (
                 "claims:review_faculty" in permissions
+                and claim.current_workflow_stage == "subject_faculty"
                 and any(
                     entry.subject_faculty_id == current_user.id
                     for participant in claim.participants
@@ -282,6 +305,8 @@ def approve_claim_stage(
         raise HTTPException(status_code=404, detail="Claim not found")
     if action not in ("approve", "reject", "revise"):
         raise HTTPException(status_code=400, detail="Invalid action")
+    if action == "revise" and not (feedback and feedback.strip()):
+        raise HTTPException(status_code=400, detail="A reason is required to revise a claim")
 
     stage = claim.current_workflow_stage
     tags = set(current_user.role_tags_list)
@@ -291,11 +316,19 @@ def approve_claim_stage(
     def deny(detail: str):
         raise HTTPException(status_code=403, detail=detail)
 
+    def record_revision():
+        if action in ("revise", "reject"):
+            claim.revision_reason = feedback
+            claim.last_revised_by = current_user.id
+            claim.last_revised_stage = stage
+
     if stage == "initial_review":
         allowed = is_super_admin or (
             claim.submission_type == "individual" and "claims:review_class_teacher" in permissions
+            and faculty_scope.is_class_teacher_for(db, current_user.id, claim.programme, claim.semester, claim.section)
         ) or (
             claim.submission_type == "club" and "claims:review_faculty_coordinator" in permissions
+            and faculty_scope.is_club_faculty_coordinator_for(db, current_user.id, claim.club_id)
         )
         if not allowed:
             deny("Only the assigned Class Teacher or Club Faculty Coordinator may act at this stage")
@@ -306,6 +339,7 @@ def approve_claim_stage(
         else:
             claim.status = "returned" if action == "revise" else "rejected"
             claim.current_workflow_stage = "closed"
+            record_revision()
 
     elif stage == "subject_faculty":
         if not (is_super_admin or "claims:review_faculty" in permissions):
@@ -335,10 +369,14 @@ def approve_claim_stage(
                 db.add(entry)
             claim.status = "returned" if action == "revise" else "rejected"
             claim.current_workflow_stage = "closed"
+            record_revision()
 
     elif stage == "course_coordinator":
         if not (is_super_admin or "claims:approve_coordinator" in permissions):
             deny("Only the Course Coordinator / HOD may act at this stage")
+        if not is_super_admin and "HOD" not in tags and "Course Coordinator" in tags:
+            if not faculty_scope.is_course_coordinator_for(db, current_user.id, claim.programme):
+                deny("You are not the assigned Course Coordinator for this programme")
 
         if action == "approve":
             claim.current_workflow_stage = "attendance_office"
@@ -346,10 +384,14 @@ def approve_claim_stage(
         else:
             claim.status = "returned" if action == "revise" else "rejected"
             claim.current_workflow_stage = "closed"
+            record_revision()
 
     elif stage == "attendance_office":
         if not (is_super_admin or "claims:approve_coordinator" in permissions):
             deny("Only the Course Coordinator / HOD may close this claim")
+        if not is_super_admin and "HOD" not in tags and "Course Coordinator" in tags:
+            if not faculty_scope.is_course_coordinator_for(db, current_user.id, claim.programme):
+                deny("You are not the assigned Course Coordinator for this programme")
         claim.current_workflow_stage = "closed"
         claim.status = "closed"
 
@@ -384,6 +426,120 @@ def approve_claim_stage(
             )
 
     return {"status": "success", "new_stage": claim.current_workflow_stage, "claim_status": claim.status}
+
+
+# 4b. Resubmit — edits a returned claim in place (per product decision: no
+# new linked claim, same record, reviewers see continuity) and notifies the
+# reviewer who returned it (plus whoever now holds initial_review scope,
+# since the two may differ) with a plain-dict diff of what changed.
+@router.put("/{claim_id}/resubmit", response_model=ClaimOut)
+def resubmit_claim(
+    claim_id: str,
+    resubmit_in: ClaimResubmit,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    claim = claim_repo.get(db, claim_id)
+    if not claim:
+        raise HTTPException(status_code=404, detail="Claim not found")
+    if claim.submitted_by != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the claim's submitter may resubmit it")
+    if claim.status != "returned":
+        raise HTTPException(status_code=400, detail="Only a returned claim may be resubmitted")
+
+    diff = {}
+
+    if resubmit_in.date_range is not None and resubmit_in.date_range != claim.date_range:
+        diff["date_range"] = {"old": claim.date_range, "new": resubmit_in.date_range}
+        claim.date_range = resubmit_in.date_range
+
+    if resubmit_in.reason is not None and resubmit_in.reason != claim.reason:
+        diff["reason"] = {"old": claim.reason, "new": resubmit_in.reason}
+        claim.reason = resubmit_in.reason
+
+    if resubmit_in.missed_classes is not None:
+        old_labels = [f"{e.subject} ({e.date} {e.hour})" for p in claim.participants for e in p.entries]
+        for participant in claim.participants:
+            for entry in list(participant.entries):
+                db.delete(entry)
+        db.flush()
+        new_labels = []
+        for participant in claim.participants:
+            for mc in resubmit_in.missed_classes:
+                entry_id = f"ae_{uuid.uuid4().hex[:12]}"
+                db.add(AttendanceEntry(
+                    id=entry_id,
+                    claim_participant_id=participant.id,
+                    subject=mc.subject,
+                    date=mc.date,
+                    hour=mc.hour,
+                    subject_faculty_id=mc.subject_faculty_id,
+                    status="pending",
+                ))
+                new_labels.append(f"{mc.subject} ({mc.date} {mc.hour})")
+        if old_labels != new_labels:
+            diff["missed_classes"] = {"old": old_labels, "new": new_labels}
+
+    if resubmit_in.removed_document_ids:
+        removed = []
+        for doc_id in resubmit_in.removed_document_ids:
+            doc = doc_repo.get(db, doc_id)
+            if doc and doc.claim_id == claim_id:
+                removed.append(doc.document_type)
+                db.delete(doc)
+        if removed:
+            diff["documents_removed"] = removed
+
+    reviewer_id = claim.last_revised_by
+    reviewer_stage = claim.last_revised_stage
+
+    claim.status = "submitted"
+    claim.current_workflow_stage = "initial_review"
+    claim.revision_reason = None
+    db.add(claim)
+    db.commit()
+    db.refresh(claim)
+
+    diff_parts = []
+    if "date_range" in diff:
+        diff_parts.append(f"date range: '{diff['date_range']['old']}' -> '{diff['date_range']['new']}'")
+    if "reason" in diff:
+        diff_parts.append("reason updated")
+    if "missed_classes" in diff:
+        diff_parts.append("missed classes updated")
+    if "documents_removed" in diff:
+        diff_parts.append(f"{len(diff['documents_removed'])} document(s) removed")
+    diff_summary = "; ".join(diff_parts) if diff_parts else "no fields changed"
+
+    notify_ids = set()
+    if reviewer_id:
+        notify_ids.add(reviewer_id)
+
+    if claim.submission_type == "individual":
+        for candidate in db.query(User).filter(User.role_tags_str.like("%Class Teacher%")).all():
+            if faculty_scope.is_class_teacher_for(db, candidate.id, claim.programme, claim.semester, claim.section):
+                notify_ids.add(candidate.id)
+    else:
+        for candidate in db.query(User).filter(User.role_tags_str.like("%Club Faculty Coordinator%")).all():
+            if faculty_scope.is_club_faculty_coordinator_for(db, candidate.id, claim.club_id):
+                notify_ids.add(candidate.id)
+
+    for uid in notify_ids:
+        notification_engine.send_notification(
+            db, user_id=uid, title=f"Claim {claim.reference_number} resubmitted",
+            content=f"The claim was resubmitted after being sent back at the {reviewer_stage or 'review'} stage. Changes: {diff_summary}.",
+            source_module="claims",
+        )
+
+    return _to_claim_out(claim)
+
+
+# 4c. List Supporting Documents — every reviewer who can see the claim can
+# see its documents (previously no reviewer role could see any document).
+@router.get("/{claim_id}/documents", response_model=List[SupportingDocumentOut])
+def list_claim_documents(claim_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    get_claim(claim_id, db, current_user)  # reuses the exact same visibility rule, raises 403/404 as needed
+    return doc_repo.get_by_claim(db, claim_id=claim_id)
 
 
 # 5. Supporting Documents — real upload via the Storage Engine (Phase 1C/5).

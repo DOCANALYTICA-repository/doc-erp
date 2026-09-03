@@ -12,9 +12,12 @@ import { RequireAuth } from './routes/RequireAuth';
 
 export default function App() {
   const login = useStore((state) => state.login);
+  const finishSessionRestore = useStore((state) => state.finishSessionRestore);
 
   // Restore session on load — real routes now mean this no longer needs to
-  // decide "which screen to show," only "am I logged in."
+  // decide "which screen to show," only "am I logged in." RequireAuth waits
+  // on isSessionRestoring before redirecting, so a hard refresh on a valid
+  // session doesn't get bounced to /login before this effect runs.
   useEffect(() => {
     const saved = localStorage.getItem('doc_user_session');
     if (saved) {
@@ -25,6 +28,7 @@ export default function App() {
         localStorage.removeItem('doc_user_session');
       }
     }
+    finishSessionRestore();
   }, []);
 
   return (

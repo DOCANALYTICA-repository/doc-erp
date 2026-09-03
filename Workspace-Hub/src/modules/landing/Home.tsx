@@ -127,11 +127,11 @@ export const LandingHome: React.FC = () => {
   }, []);
 
   return (
-    <div ref={heroContainerRef} className="w-full min-h-screen bg-slate-50 dark:bg-[#0a0a0a] transition-colors duration-300 overflow-x-hidden relative">
+    <div ref={heroContainerRef} className="w-full min-h-screen bg-slate-50 transition-colors duration-300 overflow-x-hidden relative">
       
       {/* Morphing Background SVG Blob */}
-      <div className="absolute top-20 left-1/2 -translate-x-1/2 -z-10 opacity-30 dark:opacity-20 pointer-events-none w-[500px] h-[500px]">
-        <svg viewBox="0 0 400 400" className="w-full h-full fill-indigo-200/50 dark:fill-indigo-950/20 blur-2xl">
+      <div className="absolute top-20 left-1/2 -translate-x-1/2 -z-10 opacity-30 pointer-events-none w-[500px] h-[500px]">
+        <svg viewBox="0 0 400 400" className="w-full h-full fill-indigo-200/50 blur-2xl">
           <path
             ref={svgPathRef}
             d="M150,50 C230,50 280,120 280,200 C280,280 200,320 150,320 C80,320 40,260 40,200 C40,120 70,50 150,50 Z"
@@ -140,24 +140,24 @@ export const LandingHome: React.FC = () => {
       </div>
 
       {/* Public Header/Navbar */}
-      <header className="fixed top-0 left-0 right-0 z-50 glass-nav border-b border-slate-200/40 dark:border-slate-800/40">
+      <header className="fixed top-0 left-0 right-0 z-50 glass-nav border-b border-slate-200/40">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 dark:bg-white flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white dark:text-slate-900" />
+            <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <span className="font-semibold text-lg tracking-tight text-slate-900 dark:text-white">Department of Commerce</span>
+            <span className="font-semibold text-lg tracking-tight text-slate-900">Department of Commerce</span>
           </div>
           <nav className="hidden md:flex items-center gap-8">
-            <a href="#about" className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">About</a>
-            <a href="#courses" className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">Courses</a>
-            <a href="#clubs" className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">Clubs</a>
-            <a href="#gallery" className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">Gallery</a>
-            <a href="#contact" className="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">Contact</a>
+            <a href="#about" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">About</a>
+            <a href="#courses" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Courses</a>
+            <a href="#clubs" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Clubs</a>
+            <a href="#gallery" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Gallery</a>
+            <a href="#contact" className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors">Contact</a>
           </nav>
           <button
             onClick={() => navigate('/login')}
-            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-medium rounded-lg text-sm transition-all shadow-sm"
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-lg text-sm transition-all shadow-sm"
           >
             DOC Portal Login
           </button>
@@ -166,27 +166,27 @@ export const LandingHome: React.FC = () => {
 
       {/* Hero Section */}
       <section className="pt-36 pb-20 px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
-        <div className="hero-badge inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 text-xs font-semibold mb-6 shadow-sm border border-slate-200/50 dark:border-slate-800/80">
+        <div className="hero-badge inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-800 text-xs font-semibold mb-6 shadow-sm border border-slate-200/50">
           <Sparkles className="w-3.5 h-3.5 text-yellow-500 animate-pulse" />
           CHRIST (Deemed to be University)
         </div>
-        <h1 className="hero-title text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-white max-w-4xl leading-tight">
+        <h1 className="hero-title text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 max-w-4xl leading-tight">
           Shape the Future of Global Commerce & Finance
         </h1>
-        <p className="hero-desc mt-6 text-lg text-slate-600 dark:text-slate-400 max-w-2xl leading-relaxed">
+        <p className="hero-desc mt-6 text-lg text-slate-600 max-w-2xl leading-relaxed">
           Unlock leadership opportunities, master technical accounting standards, and run student-led club operations within a premier environment of academic excellence.
         </p>
         <div className="hero-cta mt-10 flex flex-col sm:flex-row gap-4 items-center justify-center w-full sm:w-auto">
           <button
             onClick={() => navigate('/login')}
-            className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-medium rounded-lg flex items-center justify-center gap-2 transition-all shadow"
+            className="w-full sm:w-auto px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-all shadow"
           >
             Access ERP Portal
             <ArrowRight className="w-4 h-4" />
           </button>
           <a
             href="#courses"
-            className="w-full sm:w-auto px-6 py-3 bg-white hover:bg-slate-50 text-slate-950 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800/80 border border-slate-200 dark:border-slate-800 font-medium rounded-lg text-center transition-all shadow-sm"
+            className="w-full sm:w-auto px-6 py-3 bg-white hover:bg-slate-50 text-slate-950 border border-slate-200 font-medium rounded-lg text-center transition-all shadow-sm"
           >
             Explore Programmes
           </a>
@@ -194,22 +194,22 @@ export const LandingHome: React.FC = () => {
       </section>
 
       {/* Department Statistics Section */}
-      <section className="stats-section py-12 bg-white dark:bg-slate-950/40 border-y border-slate-200/40 dark:border-slate-900/60">
+      <section className="stats-section py-12 bg-white border-y border-slate-200/40">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           <div className="stat-card">
-            <div className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">{stats ? `${stats.total_students}+` : '—'}</div>
+            <div className="text-3xl md:text-4xl font-extrabold text-slate-900">{stats ? `${stats.total_students}+` : '—'}</div>
             <div className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Enrolled Students</div>
           </div>
           <div className="stat-card">
-            <div className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">{stats ? `${stats.faculty_count}+` : '—'}</div>
+            <div className="text-3xl md:text-4xl font-extrabold text-slate-900">{stats ? `${stats.faculty_count}+` : '—'}</div>
             <div className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Faculty Advisors</div>
           </div>
           <div className="stat-card">
-            <div className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">{stats?.number_of_clubs ?? '—'}</div>
+            <div className="text-3xl md:text-4xl font-extrabold text-slate-900">{stats?.number_of_clubs ?? '—'}</div>
             <div className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Operational Clubs</div>
           </div>
           <div className="stat-card">
-            <div className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">{stats ? `${stats.years_established} Years` : '—'}</div>
+            <div className="text-3xl md:text-4xl font-extrabold text-slate-900">{stats ? `${stats.years_established} Years` : '—'}</div>
             <div className="text-xs font-medium text-slate-500 mt-1 uppercase tracking-wider">Academic Legacy</div>
           </div>
         </div>
@@ -219,59 +219,59 @@ export const LandingHome: React.FC = () => {
       <section id="about" className="py-20 px-6 max-w-7xl mx-auto scroll-mt-10">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Our Vision & Mission</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-slate-900">Our Vision & Mission</h2>
             <div className="mt-6 space-y-6">
-              <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm">
-                <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <div className="p-5 rounded-xl bg-white border border-slate-200/60 shadow-sm">
+                <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                   <Compass className="w-4 h-4 text-indigo-500" /> Vision
                 </h3>
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                <p className="mt-2 text-sm text-slate-600 leading-relaxed">
                   To be a center of excellence in commerce education, nurturing socially responsible leaders, financial experts, and outstanding researchers.
                 </p>
               </div>
-              <div className="p-5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 shadow-sm">
-                <h3 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <div className="p-5 rounded-xl bg-white border border-slate-200/60 shadow-sm">
+                <h3 className="font-semibold text-slate-900 flex items-center gap-2">
                   <BookOpen className="w-4 h-4 text-emerald-500" /> Mission
                 </h3>
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                <p className="mt-2 text-sm text-slate-600 leading-relaxed">
                   To provide holistic commerce education integrated with global standards, professional certifications, corporate internships, and ethical principles.
                 </p>
               </div>
             </div>
           </div>
-          <div className="hero-image relative aspect-video rounded-2xl overflow-hidden shadow-lg border border-slate-200 dark:border-slate-800 bg-slate-100">
+          <div className="hero-image relative aspect-video rounded-2xl overflow-hidden shadow-lg border border-slate-200 bg-slate-100">
             <img src={docDeptImg} className="w-full h-full object-cover" alt="Department of Commerce" />
           </div>
         </div>
       </section>
 
       {/* Course Catalogue Section */}
-      <section id="courses" className="courses-section py-20 bg-slate-100/60 dark:bg-slate-950/20 border-y border-slate-200/50 dark:border-slate-900/60 scroll-mt-10">
+      <section id="courses" className="courses-section py-20 bg-slate-100/60 border-y border-slate-200/50 scroll-mt-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-xl mx-auto mb-16">
-            <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Academic Programmes</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-slate-900">Academic Programmes</h2>
             <p className="text-sm text-slate-500 mt-3">Choose from our specialized undergraduate pathways integrated with professional skills.</p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
             {courses.map(course => (
-              <div key={course.id} className="course-card rounded-2xl border border-slate-200/60 dark:border-slate-800/80 bg-white dark:bg-slate-900 p-6 flex flex-col justify-between shadow-sm hover:shadow transition-shadow">
+              <div key={course.id} className="course-card rounded-2xl border border-slate-200/60 bg-white p-6 flex flex-col justify-between shadow-sm hover:shadow transition-shadow">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">{course.name}</h3>
+                  <h3 className="text-lg font-bold text-slate-900">{course.name}</h3>
                   <p className="text-xs text-slate-500 mt-2 leading-relaxed">{course.description}</p>
                   
                   {activeCourseId === course.id ? (
                     <div className="mt-5 space-y-4 animate-fade-in">
                       <div>
-                        <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200">Learning Outcomes:</h4>
-                        <ul className="mt-1.5 list-disc list-inside text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
+                        <h4 className="text-xs font-semibold text-slate-800">Learning Outcomes:</h4>
+                        <ul className="mt-1.5 list-disc list-inside text-[11px] text-slate-600 space-y-1">
                           {course.outcomes.map((out, idx) => <li key={idx}>{out}</li>)}
                         </ul>
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200">Career Roles:</h4>
+                        <h4 className="text-xs font-semibold text-slate-800">Career Roles:</h4>
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
                           {course.careers.map((car, idx) => (
-                            <span key={idx} className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] text-slate-600 dark:text-slate-300 font-medium">
+                            <span key={idx} className="px-2 py-0.5 rounded bg-slate-100 text-[10px] text-slate-600 font-medium">
                               {car}
                             </span>
                           ))}
@@ -282,7 +282,7 @@ export const LandingHome: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setActiveCourseId(activeCourseId === course.id ? null : course.id)}
-                  className="w-full mt-6 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-850 dark:hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
+                  className="w-full mt-6 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5"
                 >
                   {activeCourseId === course.id ? "Hide Details" : "View Curriculum Outcomes"}
                 </button>
@@ -296,20 +296,20 @@ export const LandingHome: React.FC = () => {
       <section id="clubs" className="clubs-section py-20 px-6 max-w-7xl mx-auto scroll-mt-10">
         <div className="text-center max-w-xl mx-auto mb-16">
           <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">Dynamic Campus Culture</span>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white mt-1">Student-run Associations</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900 mt-1">Student-run Associations</h2>
           <p className="text-sm text-slate-500 mt-2">Get involved in our diverse specialized clubs to develop hands-on logistics and planning capabilities.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
           {clubs.map((club) => (
-            <div key={club.id} className="club-card p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col justify-between">
+            <div key={club.id} className="club-card p-6 rounded-2xl border border-slate-200/60 bg-white shadow-sm flex flex-col justify-between">
               <div>
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   {club.category}
                 </span>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-4">{club.name}</h3>
+                <h3 className="text-lg font-bold text-slate-900 mt-4">{club.name}</h3>
                 <p className="text-xs text-slate-500 mt-2 leading-relaxed">{club.description}</p>
               </div>
-              <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
                 <span>Inquiries:</span>
                 <a href={`mailto:${club.contact_email}`} className="text-indigo-500 hover:underline">{club.contact_email}</a>
               </div>
@@ -319,10 +319,10 @@ export const LandingHome: React.FC = () => {
       </section>
 
       {/* Photo Gallery Section */}
-      <section id="gallery" className="py-20 bg-slate-100/60 dark:bg-slate-950/20 border-y border-slate-200/50 dark:border-slate-900/60 scroll-mt-10">
+      <section id="gallery" className="py-20 bg-slate-100/60 border-y border-slate-200/50 scroll-mt-10">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-xl mx-auto mb-16">
-            <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Campus Live Stream</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-slate-900">Campus Live Stream</h2>
             <p className="text-sm text-slate-500 mt-3">Glimpses of recent academic summits, recruitment days, and cultural fests.</p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -330,7 +330,7 @@ export const LandingHome: React.FC = () => {
               <div
                 key={img.id}
                 onClick={() => setActiveLightboxImg(img.url)}
-                className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer border border-slate-200 dark:border-slate-800 shadow-sm bg-slate-200"
+                className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer border border-slate-200 shadow-sm bg-slate-200"
               >
                 <img src={img.url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt={img.title} />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
@@ -345,14 +345,14 @@ export const LandingHome: React.FC = () => {
       {/* Contact Section */}
       <section id="contact" className="py-20 px-6 max-w-3xl mx-auto scroll-mt-10">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Contact Department</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900">Contact Department</h2>
           <p className="text-sm text-slate-500 mt-3">Address and details for official inquiries.</p>
         </div>
-        <div className="p-6 rounded-2xl border border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-6">
+        <div className="p-6 rounded-2xl border border-slate-200/60 bg-white shadow-sm space-y-6">
           <div className="flex items-start gap-4">
             <MapPin className="w-5 h-5 text-slate-400 mt-0.5" />
             <div>
-              <h4 className="font-semibold text-slate-900 dark:text-white text-sm">Department Office Address</h4>
+              <h4 className="font-semibold text-slate-900 text-sm">Department Office Address</h4>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                 Department of Commerce, Block IV,<br />
                 CHRIST (Deemed to be University), Hosur Road,<br />
@@ -360,10 +360,10 @@ export const LandingHome: React.FC = () => {
               </p>
             </div>
           </div>
-          <div className="flex items-start gap-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+          <div className="flex items-start gap-4 border-t border-slate-100 pt-4">
             <Mail className="w-5 h-5 text-slate-400 mt-0.5" />
             <div>
-              <h4 className="font-semibold text-slate-900 dark:text-white text-sm">Official Support Email</h4>
+              <h4 className="font-semibold text-slate-900 text-sm">Official Support Email</h4>
               <p className="text-xs text-slate-500 mt-1">commerce.support@christuniversity.in</p>
             </div>
           </div>
@@ -371,7 +371,7 @@ export const LandingHome: React.FC = () => {
       </section>
 
       {/* Footer */}
-      <footer className="py-12 bg-white dark:bg-[#060606] border-t border-slate-200/60 dark:border-slate-900">
+      <footer className="py-12 bg-white border-t border-slate-200/60">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between text-xs text-slate-500 gap-4">
           <span>&copy; {new Date().getFullYear()} Department of Commerce, CHRIST (Deemed to be University). All rights reserved.</span>
           <div className="flex gap-6">

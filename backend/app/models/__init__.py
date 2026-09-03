@@ -7,6 +7,8 @@ from app.models.club import (
 from app.models.claim import Claim, ClaimParticipant, AttendanceEntry, SupportingDocument, TimetableSession
 from app.models.faculty import Note, Document, Meeting, Task, Reminder, DashboardWidgetPreference
 from app.models.notification import Notification
+from app.models.faculty_assignment import FacultyAssignment
+from app.models.club import ClubHierarchyLevel
 
 __all__ = [
     "Base",
@@ -34,5 +36,7 @@ __all__ = [
     "Task",
     "Reminder",
     "DashboardWidgetPreference",
-    "Notification"
+    "Notification",
+    "FacultyAssignment",
+    "ClubHierarchyLevel",
 ]

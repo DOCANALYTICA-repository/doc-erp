@@ -28,6 +28,7 @@ class ClubMemberOut(BaseModel):
     academic_year: str
     join_date: Optional[str] = None
     permission_template: Optional[str] = None
+    hierarchy_level_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -36,6 +37,49 @@ class ClubMemberOut(BaseModel):
 class PermissionTemplateAssign(BaseModel):
     # Club Head, Documentation Head, Events Head, Sponsorship Head, Finance Head, or null to clear
     permission_template: Optional[str] = None
+
+class ClubDetailOut(ClubOut):
+    """Returned only by GET /clubs/{club_id} — per-viewer capability flags,
+    computed server-side so the frontend never has to re-derive hierarchy/
+    scope logic itself."""
+    viewer_can_edit_hierarchy: bool = False
+    viewer_can_manage_settings: bool = False
+    viewer_can_assign_tasks: bool = False
+
+class ClubSettingsUpdate(BaseModel):
+    contact_email: Optional[str] = None
+
+class ClubHierarchyLevelBase(BaseModel):
+    level_order: int
+    title: str
+
+class ClubHierarchyLevelCreate(ClubHierarchyLevelBase):
+    pass
+
+class ClubHierarchyLevelUpdate(BaseModel):
+    level_order: Optional[int] = None
+    title: Optional[str] = None
+
+class ClubHierarchyLevelOut(ClubHierarchyLevelBase):
+    id: str
+    club_id: str
+
+    class Config:
+        from_attributes = True
+
+class ClubHierarchyMemberAssign(BaseModel):
+    hierarchy_level_id: str
+
+class ClubTaskCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    due_date: str
+    priority: str = "medium"
+    assignee_id: str
+
+class ClubTaskReviewAction(BaseModel):
+    action: str  # approve, reject
+    comments: Optional[str] = None
 
 class EventBase(BaseModel):
     title: str

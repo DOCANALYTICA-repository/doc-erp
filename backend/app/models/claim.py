@@ -13,6 +13,7 @@ class Claim(Base, TimestampMixin):
     programme = Column(String, nullable=False)
     section = Column(String, nullable=False)
     submission_type = Column(String, default="individual", nullable=False) # individual, club
+    club_id = Column(String, ForeignKey("clubs.id"), nullable=True)  # required when submission_type == "club" — scopes visibility to that club's Faculty Coordinator
     submitted_by = Column(String, ForeignKey("users.id"), nullable=False)
     submission_date = Column(String, nullable=False)
     date_range = Column(String, nullable=False)
@@ -21,8 +22,16 @@ class Claim(Base, TimestampMixin):
     late_submission_flag = Column(Boolean, default=False, nullable=False)
     current_workflow_stage = Column(String, default="initial_review", nullable=False) # initial_review, subject_faculty, course_coordinator, attendance_office, closed
 
+    # Revise/resubmit tracking — set whenever a stage revises or rejects the
+    # claim; cleared on resubmission. Lets the frontend show WHY a claim was
+    # sent back and lets the resubmit endpoint know who to notify.
+    revision_reason = Column(String, nullable=True)
+    last_revised_by = Column(String, ForeignKey("users.id"), nullable=True)
+    last_revised_stage = Column(String, nullable=True)  # initial_review, subject_faculty, course_coordinator
+
     # Relationships
     submitter = relationship("User", foreign_keys=[submitted_by])
+    club = relationship("Club", foreign_keys=[club_id])
     participants = relationship("ClaimParticipant", back_populates="claim", cascade="all, delete-orphan")
     documents = relationship("SupportingDocument", back_populates="claim", cascade="all, delete-orphan")
 

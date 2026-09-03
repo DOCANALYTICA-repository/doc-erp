@@ -2,7 +2,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from app.models.club import (
     Club, ClubMember, Event, Budget, Reimbursement, Sponsorship, RecruitmentDrive, RecruitmentApplication,
-    Announcement, AnnualPlan, ClubDocument, EventAttendance,
+    Announcement, AnnualPlan, ClubDocument, EventAttendance, ClubHierarchyLevel,
 )
 from app.repositories.base import BaseRepository
 
@@ -98,6 +98,21 @@ class ClubDocumentRepository(BaseRepository[ClubDocument]):
             current = self.get(db, current.previous_version_id) if current.previous_version_id else None
         return versions
 
+class HierarchyRepository(BaseRepository[ClubHierarchyLevel]):
+    def get_by_club(self, db: Session, *, club_id: str) -> List[ClubHierarchyLevel]:
+        return db.query(ClubHierarchyLevel).filter(ClubHierarchyLevel.club_id == club_id).order_by(
+            ClubHierarchyLevel.level_order, ClubHierarchyLevel.title
+        ).all()
+
+    def get_top_level_order(self, db: Session, *, club_id: str) -> Optional[int]:
+        levels = self.get_by_club(db, club_id=club_id)
+        return min((l.level_order for l in levels), default=None)
+
+    def get_bottom_level_order(self, db: Session, *, club_id: str) -> Optional[int]:
+        levels = self.get_by_club(db, club_id=club_id)
+        return max((l.level_order for l in levels), default=None)
+
+
 class EventAttendanceRepository(BaseRepository[EventAttendance]):
     def get_by_event(self, db: Session, *, event_id: str) -> List[EventAttendance]:
         return db.query(EventAttendance).filter(EventAttendance.event_id == event_id).all()
@@ -119,3 +134,4 @@ announcement_repo = AnnouncementRepository(Announcement)
 annual_plan_repo = AnnualPlanRepository(AnnualPlan)
 club_document_repo = ClubDocumentRepository(ClubDocument)
 event_attendance_repo = EventAttendanceRepository(EventAttendance)
+hierarchy_repo = HierarchyRepository(ClubHierarchyLevel)

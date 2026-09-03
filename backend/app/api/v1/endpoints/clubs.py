@@ -3,24 +3,33 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.rbac import PermissionChecker, get_current_user, get_resolved_permissions
+from app.core import faculty_scope
+from app.repositories.faculty_assignment import faculty_assignment_repo
 from app.repositories.club import (
     club_repo, member_repo, event_repo, budget_repo, reimbursement_repo, sponsorship_repo,
     recruitment_drive_repo, recruitment_application_repo, announcement_repo,
-    annual_plan_repo, club_document_repo, event_attendance_repo,
+    annual_plan_repo, club_document_repo, event_attendance_repo, hierarchy_repo,
 )
+from app.repositories.faculty import task_repo
 from app.schemas.club import (
-    ClubOut, ClubMemberOut, EventOut, EventCreate, BudgetOut, ReimbursementOut, ReimbursementCreate,
+    ClubOut, ClubDetailOut, ClubMemberOut, EventOut, EventCreate, BudgetOut, ReimbursementOut, ReimbursementCreate,
     SponsorshipOut, SponsorshipCreate,
     RecruitmentDriveOut, RecruitmentDriveCreate, RecruitmentApplicationOut, RecruitmentApplicationCreate,
     RecruitmentApplicationUpdate, AnnouncementOut, AnnouncementCreate,
     AnnualPlanOut, AnnualPlanCreate, AnnualPlanUpdate, AnnualPlanReviewAction,
     ClubDocumentOut, PermissionTemplateAssign,
+    ClubSettingsUpdate, ClubHierarchyLevelOut, ClubHierarchyLevelCreate, ClubHierarchyLevelUpdate,
+    ClubHierarchyMemberAssign, ClubTaskCreate, ClubTaskReviewAction,
 )
+from app.schemas.task import TaskOut
 from app.models.user import User
-from app.models.club import EventAttendance
+from app.models.club import EventAttendance, ClubHierarchyLevel
+from app.models.faculty import Task
 from app.services.engines.reporting import reporting_engine
 from app.services.engines.storage import storage_engine
 from app.services.engines.notification import notification_engine
+from app.services.engines.club_hierarchy import club_hierarchy_engine
+from app.services.engines.task import task_engine
 import uuid
 
 router = APIRouter()
@@ -57,8 +66,28 @@ def _require_club_head_or_admin(db: Session, current_user: User, club_id: str) -
     membership = member_repo.get_by_student_and_club(db, student_id=current_user.id, club_id=club_id)
     if not membership or membership.status != "active":
         raise HTTPException(status_code=403, detail="You are not an active member of this club")
-    if membership.role != "President" and membership.permission_template != "Club Head":
+    if not club_hierarchy_engine.is_top_level(db, membership) and membership.permission_template != "Club Head":
         raise HTTPException(status_code=403, detail="Only the Club Head may assign permission templates")
+
+
+def _require_task_assigner(db: Session, current_user: User, club_id: str) -> None:
+    """Task-assignment permission = any hierarchy level except the bottom
+    rank (per product decision — "anyone with a tag other than associate,
+    the lowest level")."""
+    if current_user.primary_role == "super_admin":
+        return
+    membership = member_repo.get_by_student_and_club(db, student_id=current_user.id, club_id=club_id)
+    if not membership or membership.status != "active":
+        raise HTTPException(status_code=403, detail="You are not an active member of this club")
+    if club_hierarchy_engine.is_bottom_level(db, membership):
+        raise HTTPException(status_code=403, detail="Members at the base level cannot assign tasks")
+
+
+def _require_club_faculty_coordinator_or_admin(db: Session, current_user: User, club_id: str) -> None:
+    if current_user.primary_role == "super_admin":
+        return
+    if not faculty_scope.is_club_faculty_coordinator_for(db, current_user.id, club_id):
+        raise HTTPException(status_code=403, detail="You are not the assigned Faculty Coordinator for this club")
 
 
 # Annual Plan approval workflow (Clubs PRD §24.3)
@@ -94,12 +123,29 @@ def get_my_club_memberships(db: Session = Depends(get_db), current_user: User = 
     club_ids = {m.club_id for m in memberships if m.status == "active"}
     return [c for c in club_repo.get_multi(db) if c.id in club_ids]
 
-@router.get("/{club_id}", response_model=ClubOut)
+def _viewer_capabilities(db: Session, current_user: User, club_id: str) -> dict:
+    def check(fn) -> bool:
+        try:
+            fn(db, current_user, club_id)
+            return True
+        except HTTPException:
+            return False
+
+    return {
+        "viewer_can_edit_hierarchy": check(_require_club_faculty_coordinator_or_admin),
+        "viewer_can_manage_settings": check(_require_club_head_or_admin),
+        "viewer_can_assign_tasks": check(_require_task_assigner),
+    }
+
+
+@router.get("/{club_id}", response_model=ClubDetailOut)
 def get_club(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     club = club_repo.get(db, club_id)
     if not club:
         raise HTTPException(status_code=404, detail="Club not found")
-    return club
+    club_hierarchy_engine.ensure_default_hierarchy(db, club_id)
+    caps = _viewer_capabilities(db, current_user, club_id)
+    return ClubDetailOut(**ClubOut.model_validate(club).model_dump(), **caps)
 
 # 2. Members
 @router.get("/{club_id}/members", response_model=List[ClubMemberOut])
@@ -125,11 +171,15 @@ def create_club_event(
     created = event_repo.create(db, obj_in=event_dict)
 
     # Cross-module regression fix (Phase 7): event proposals used to be
-    # created with zero signal to anyone who needed to act on them.
+    # created with zero signal to anyone who needed to act on them. Scoped
+    # to THIS club's assigned coordinator(s) — a global tag scan used to
+    # notify every Club Faculty Coordinator system-wide, regardless of club.
     club = club_repo.get(db, club_id)
-    for coordinator in db.query(User).filter(User.role_tags_str.like("%Club Faculty Coordinator%")).all():
+    for assignment in faculty_assignment_repo.get_active_by_club_and_tag(
+        db, club_id=club_id, role_tag=faculty_scope.CLUB_FACULTY_COORDINATOR
+    ):
         notification_engine.send_notification(
-            db, user_id=coordinator.id, title="New event proposal",
+            db, user_id=assignment.faculty_id, title="New event proposal",
             content=f"{club.name if club else club_id} proposed a new event: {created.title}.",
             source_module="clubs",
         )
@@ -299,11 +349,7 @@ def update_annual_plan(
 
 
 def _notify_club_leadership(db: Session, *, club_id: str, title: str, content: str) -> None:
-    for m in member_repo.get_club_members(db, club_id=club_id):
-        if m.status == "active" and m.role in ("President", "Vice President"):
-            notification_engine.send_notification(
-                db, user_id=m.student_id, title=title, content=content, source_module="clubs"
-            )
+    club_hierarchy_engine.notify_club_leadership(db, club_id=club_id, title=title, content=content)
 
 
 @router.post("/annual-plans/{plan_id}/submit", response_model=AnnualPlanOut)
@@ -352,6 +398,14 @@ def review_annual_plan(
     perms = get_resolved_permissions(current_user)
     if "*" not in perms and required_permission not in perms:
         raise HTTPException(status_code=403, detail=f"Not enough permissions. Missing: {required_permission}")
+
+    # A Faculty Coordinator is scoped to one specific club — without this
+    # check, a coordinator of ANY club could approve/reject THIS club's
+    # plan just by holding the global tag. Cultural Coordinator/HOD stages
+    # stay unscoped (department/college-wide), matching current behavior.
+    if plan.status == "faculty_coordinator_review" and "*" not in perms:
+        if not faculty_scope.is_club_faculty_coordinator_for(db, current_user.id, plan.club_id):
+            raise HTTPException(status_code=403, detail="You are not the assigned Faculty Coordinator for this club")
 
     if review_in.action == "reject":
         updated = annual_plan_repo.update(db, db_obj=plan, obj_in={
@@ -607,3 +661,185 @@ def assign_permission_template(
         source_module="clubs",
     )
     return updated
+
+
+# 16. Club Settings — official contact email (no endpoint updated any Club
+# field before this; Club.contact_email already existed in the schema but
+# had no write path or UI).
+@router.put("/{club_id}/settings", response_model=ClubOut)
+def update_club_settings(
+    club_id: str,
+    settings_in: ClubSettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_club_head_or_admin(db, current_user, club_id)
+    club = club_repo.get(db, club_id)
+    if not club:
+        raise HTTPException(status_code=404, detail="Club not found")
+    return club_repo.update(db, db_obj=club, obj_in=settings_in.model_dump(exclude_unset=True))
+
+
+# 17. Configurable Club Hierarchy (org-chart / structure)
+@router.get("/{club_id}/hierarchy", response_model=List[ClubHierarchyLevelOut])
+def get_club_hierarchy(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_active_club_member(db, current_user, club_id)
+    return club_hierarchy_engine.ensure_default_hierarchy(db, club_id)
+
+
+@router.post("/{club_id}/hierarchy/levels", response_model=ClubHierarchyLevelOut)
+def create_hierarchy_level(
+    club_id: str,
+    level_in: ClubHierarchyLevelCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_club_faculty_coordinator_or_admin(db, current_user, club_id)
+    level = ClubHierarchyLevel(
+        id=f"chl_{uuid.uuid4().hex[:12]}", club_id=club_id,
+        level_order=level_in.level_order, title=level_in.title,
+    )
+    db.add(level)
+    db.commit()
+    db.refresh(level)
+    return level
+
+
+@router.put("/{club_id}/hierarchy/levels/{level_id}", response_model=ClubHierarchyLevelOut)
+def update_hierarchy_level(
+    club_id: str,
+    level_id: str,
+    level_in: ClubHierarchyLevelUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_club_faculty_coordinator_or_admin(db, current_user, club_id)
+    level = db.query(ClubHierarchyLevel).filter(
+        ClubHierarchyLevel.id == level_id, ClubHierarchyLevel.club_id == club_id
+    ).first()
+    if not level:
+        raise HTTPException(status_code=404, detail="Hierarchy level not found")
+    update_data = level_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(level, field, value)
+    db.add(level)
+    if "title" in update_data:
+        # Cascade the rename to every member's denormalized display `.role`
+        # cache so it never goes stale.
+        for member in member_repo.get_club_members(db, club_id=club_id):
+            if member.hierarchy_level_id == level_id:
+                member.role = update_data["title"]
+                db.add(member)
+    db.commit()
+    db.refresh(level)
+    return level
+
+
+@router.delete("/{club_id}/hierarchy/levels/{level_id}")
+def delete_hierarchy_level(
+    club_id: str,
+    level_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_club_faculty_coordinator_or_admin(db, current_user, club_id)
+    level = db.query(ClubHierarchyLevel).filter(
+        ClubHierarchyLevel.id == level_id, ClubHierarchyLevel.club_id == club_id
+    ).first()
+    if not level:
+        raise HTTPException(status_code=404, detail="Hierarchy level not found")
+    still_assigned = any(
+        m.hierarchy_level_id == level_id for m in member_repo.get_club_members(db, club_id=club_id)
+    )
+    if still_assigned:
+        raise HTTPException(status_code=400, detail="Reassign members off this position before deleting it")
+    db.delete(level)
+    db.commit()
+    return {"status": "success"}
+
+
+@router.put("/{club_id}/members/{member_id}/hierarchy-level", response_model=ClubMemberOut)
+def assign_member_hierarchy_level(
+    club_id: str,
+    member_id: str,
+    assignment: ClubHierarchyMemberAssign,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_club_head_or_admin(db, current_user, club_id)
+    member = member_repo.get(db, member_id)
+    if not member or member.club_id != club_id:
+        raise HTTPException(status_code=404, detail="Club member not found")
+    level = db.query(ClubHierarchyLevel).filter(
+        ClubHierarchyLevel.id == assignment.hierarchy_level_id, ClubHierarchyLevel.club_id == club_id
+    ).first()
+    if not level:
+        raise HTTPException(status_code=404, detail="Hierarchy level not found")
+    updated = member_repo.update(db, db_obj=member, obj_in={
+        "hierarchy_level_id": level.id, "role": level.title,
+    })
+    return updated
+
+
+# 18. Club Task Manager — thin wrapper over the existing, already-built
+# TaskEngine/Task model (source_module="clubs"); this is also what makes
+# the Contribution Report (already querying source_module=="clubs") start
+# populating instead of being silently empty.
+@router.get("/{club_id}/tasks", response_model=List[TaskOut])
+def get_club_tasks(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    _require_active_club_member(db, current_user, club_id)
+    return task_repo.get_by_related_entity(db, related_entity_type="club", related_entity_id=club_id)
+
+
+@router.post("/{club_id}/tasks", response_model=TaskOut)
+def create_club_task(
+    club_id: str,
+    task_in: ClubTaskCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_task_assigner(db, current_user, club_id)
+    assignee_membership = member_repo.get_by_student_and_club(db, student_id=task_in.assignee_id, club_id=club_id)
+    if not assignee_membership or assignee_membership.status != "active":
+        raise HTTPException(status_code=400, detail="Assignee must be an active member of this club")
+    return task_engine.create_task(
+        db, title=task_in.title, description=task_in.description, due_date=task_in.due_date,
+        priority=task_in.priority, assignee_id=task_in.assignee_id, creator_id=current_user.id,
+        source_module="clubs", related_entity_type="club", related_entity_id=club_id,
+    )
+
+
+@router.post("/{club_id}/tasks/{task_id}/review", response_model=TaskOut)
+def review_club_task(
+    club_id: str,
+    task_id: str,
+    review_in: ClubTaskReviewAction,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Officer validation gate — prevents an assignee from unilaterally
+    marking their own work complete, since that number feeds the
+    Contribution Report/Leaderboard. Assignee marks pending_review via the
+    existing generic PUT /tasks/{id}; only a non-bottom-rank member (or the
+    task's creator) may approve/reject it here."""
+    _require_task_assigner(db, current_user, club_id)
+    task = db.query(Task).filter(
+        Task.id == task_id, Task.related_entity_type == "club", Task.related_entity_id == club_id
+    ).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if task.status != "pending_review":
+        raise HTTPException(status_code=400, detail="This task is not awaiting review")
+    if review_in.action not in ("approve", "reject"):
+        raise HTTPException(status_code=400, detail="action must be 'approve' or 'reject'")
+    task.status = "completed" if review_in.action == "approve" else "in_progress"
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    notification_engine.send_notification(
+        db, user_id=task.assignee_id,
+        title=f"Task {'approved' if review_in.action == 'approve' else 'sent back'}",
+        content=review_in.comments or f"Your task '{task.title}' was {task.status}.",
+        source_module="clubs", task_id=task.id,
+    )
+    return task
