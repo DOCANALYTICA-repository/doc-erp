@@ -93,3 +93,14 @@ class TimetableSession(Base, TimestampMixin):
 
     # Relationships
     faculty = relationship("User", foreign_keys=[faculty_id])
+
+    @property
+    def faculty_name(self) -> str:
+        """Who actually teaches this slot.
+
+        A plain property rather than a schema-level join: with
+        from_attributes=True, TimetableSessionOut picks it up with no endpoint
+        changes at all. Callers MUST selectinload(TimetableSession.faculty) or
+        this becomes one SELECT per slot.
+        """
+        return self.faculty.name if self.faculty else ""

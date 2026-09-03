@@ -185,7 +185,7 @@ def seed_database():
             id="club_commerce",
             name="Commerce Club",
             category="Academic",
-            logo="https://picsum.photos/id/105/200/200",
+            logo=None,  # no third-party host for the most-viewed element on the page; the UI renders initials
             description="Fostering academic excellence, analytical reasoning and industrial insights in finance and economics.",
             brand_colors="#1e3a8a,#3b82f6",
             contact_email="commerce.club@christuniversity.in",
@@ -195,7 +195,7 @@ def seed_database():
             id="club_cultural",
             name="Cultural Committee",
             category="Cultural",
-            logo="https://picsum.photos/id/106/200/200",
+            logo=None,
             description="The heart of theatrical, musical, and artistic expression for the Department of Commerce.",
             brand_colors="#9d174d,#ec4899",
             contact_email="cultural.club@christuniversity.in",

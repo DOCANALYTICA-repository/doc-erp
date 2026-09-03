@@ -106,17 +106,17 @@ const MOCK_DATA = {
           student_name: "Vikram Aditya",
           status: "pending",
           entries: [
-            { id: "ae_1", subject: "Corporate Accounting", date: "2026-07-06", hour: "09:00 AM - 10:00 AM", subject_faculty: "Dr. Anil Kumar", status: "pending" },
-            { id: "ae_2", subject: "Financial Management", date: "2026-07-06", hour: "10:00 AM - 11:00 AM", subject_faculty: "Prof. Sarah Abraham", status: "pending" }
+            { id: "ae_1", subject: "Corporate Accounting", date: "2026-07-06", hour: "09:00 AM - 10:00 AM", subject_faculty_name: "Dr. Anil Kumar", status: "pending" },
+            { id: "ae_2", subject: "Financial Management", date: "2026-07-06", hour: "10:00 AM - 11:00 AM", subject_faculty_name: "Prof. Sarah Abraham", status: "pending" }
           ]
         }
       ]
     }
   ],
   timetable: [
-    { id: "tt_m1", day_of_week: "Monday", subject: "Corporate Accounting", hour: "09:00 AM - 10:00 AM", faculty: "Dr. Anil Kumar", faculty_id: "fac_subject_2", programme: "B.Com (Hons)", semester: "5", section: "A" },
-    { id: "tt_m2", day_of_week: "Monday", subject: "Financial Management", hour: "10:00 AM - 11:00 AM", faculty: "Prof. Sarah Abraham", faculty_id: "fac_class_teacher", programme: "B.Com (Hons)", semester: "5", section: "A" },
-    { id: "tt_m3", day_of_week: "Monday", subject: "Taxation Law", hour: "11:15 AM - 12:15 PM", faculty: "Dr. Anil Kumar", faculty_id: "fac_subject_2", programme: "B.Com (Hons)", semester: "5", section: "A" }
+    { id: "tt_m1", day_of_week: "Monday", subject: "Corporate Accounting", hour: "09:00 AM - 10:00 AM", faculty_name: "Dr. Anil Kumar", faculty_id: "fac_subject_2", programme: "B.Com (Hons)", semester: "5", section: "A" },
+    { id: "tt_m2", day_of_week: "Monday", subject: "Financial Management", hour: "10:00 AM - 11:00 AM", faculty_name: "Prof. Sarah Abraham", faculty_id: "fac_class_teacher", programme: "B.Com (Hons)", semester: "5", section: "A" },
+    { id: "tt_m3", day_of_week: "Monday", subject: "Taxation Law", hour: "11:15 AM - 12:15 PM", faculty_name: "Dr. Anil Kumar", faculty_id: "fac_subject_2", programme: "B.Com (Hons)", semester: "5", section: "A" }
   ],
   notes: [
     { id: "nt_1", owner_id: "fac_class_teacher", title: "Syllabus Completion Targets", content: "Must complete Unit 3 (Direct Taxes) by July 18. Schedule revision test on July 21.", is_pinned: true, is_favorite: true, tags: "Syllabus,Academic" }

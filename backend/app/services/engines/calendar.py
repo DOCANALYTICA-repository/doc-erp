@@ -80,7 +80,9 @@ class CalendarEngine:
             sem = academic_context.get("semester")
             sec = academic_context.get("section")
             if prog and sem and sec:
-                sessions = db.query(TimetableSession).filter(
+                sessions = db.query(TimetableSession).options(
+                    selectinload(TimetableSession.faculty)
+                ).filter(
                     TimetableSession.programme == prog,
                     TimetableSession.semester == sem,
                     TimetableSession.section == sec

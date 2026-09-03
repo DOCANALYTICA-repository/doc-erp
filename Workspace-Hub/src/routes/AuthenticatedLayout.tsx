@@ -8,6 +8,7 @@ import { Button } from '@astryxdesign/core/Button';
 import { Skeleton } from '@astryxdesign/core/Skeleton';
 import { Sparkles, LogOut, Search, Bell, X, ChevronDown } from 'lucide-react';
 import { PageLoader } from '../components/ui/PageLoader';
+import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 
 /**
  * Shared authenticated shell — replaces the big conditionally-rendered
@@ -131,7 +132,11 @@ export const AuthenticatedLayout: React.FC = () => {
       }
     >
       <div className="w-full h-full min-h-[calc(100vh-4rem)]">
-        <Outlet />
+        {/* A crash inside a module must not take out the shell around it —
+            the nav, the search and the sign-out control stay usable. */}
+        <ErrorBoundary label="This workspace">
+          <Outlet />
+        </ErrorBoundary>
       </div>
 
       {isSearchOpen && searchQuery && (

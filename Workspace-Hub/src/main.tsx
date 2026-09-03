@@ -8,12 +8,15 @@ import "@astryxdesign/core/astryx.css";
 // style Tailwind utilities unavailable and the neutral theme inactive —
 // the app rendered on astryx.css's raw defaults only.
 import "@astryxdesign/core/tailwind-theme.css";
-import "@astryxdesign/theme-neutral/theme.css";
-// DOC Portal brand theme (Grey + Sky Blue + White, light-only) — extends
-// theme-neutral with ~10 token overrides. Built via `npx astryx theme build
-// ./src/theme/docPortalTheme.ts`; re-run that command after editing the
-// source file. Imported after theme-neutral so its @scope([data-astryx-theme
-// ="doc-portal"]) rules win (index.html sets data-astryx-theme="doc-portal").
+// theme-neutral is deliberately NOT imported. Its rules are all scoped
+// @scope([data-astryx-theme="neutral"]) while index.html sets
+// data-astryx-theme="doc-portal", so not one of them ever matched. It
+// contributed ~17.9 kB of dead CSS plus one `color-scheme: light dark`
+// declaration that fought the light-mode fix in index.css.
+//
+// DOC Portal brand theme (Grey + Sky Blue + White, light-only). Built via
+// `npx astryx theme build ./src/theme/docPortalTheme.ts`; re-run that command
+// after editing the source file.
 import "./theme/doc-portal.css";
 import App from './App.tsx';
 import './index.css';

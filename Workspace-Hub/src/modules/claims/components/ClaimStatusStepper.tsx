@@ -72,9 +72,16 @@ function StepperBody({ status, currentStage, submissionType = 'individual', refe
         <ul className="space-y-3">
           {STAGES.map((stage, idx) => {
             const label = submissionType === 'club' ? stage.clubLabel : stage.individualLabel;
+            // Drive the marker from currentStage in every case.
+            //
+            // status === 'approved' used to hardcode the marker onto index 3
+            // and grey out the rest, ignoring currentStage entirely. That was
+            // the frontend author working around the fact that an approved
+            // claim disappeared from every review queue and could never be
+            // closed — the stepper was hiding a dead end rather than showing
+            // one. The queue is fixed, so this can tell the truth now.
             let variant: 'success' | 'accent' | 'neutral' = 'neutral';
             if (status === 'closed') variant = 'success';
-            else if (status === 'approved') variant = idx < 3 ? 'success' : idx === 3 ? 'accent' : 'neutral';
             else if (idx < currentIndex) variant = 'success';
             else if (idx === currentIndex) variant = 'accent';
 

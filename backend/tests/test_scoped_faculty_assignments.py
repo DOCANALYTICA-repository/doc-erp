@@ -92,3 +92,82 @@ def test_club_faculty_coordinator_scoped_to_their_own_club(client):
     listing = client.get("/api/v1/claims", headers=coordinator_h).json()
     club_claim_ids = {c["id"] for c in listing if c.get("submission_type") == "club"}
     assert "cl_club_1" in club_claim_ids
+
+
+# ---------------------------------------------------------------------------
+# BLK-01: the Faculty Coordinator could not reach the plan he had to approve.
+#
+# The capability flags were already correct — the coordinator gets
+# viewer_can_edit_hierarchy: true. Only REACHABILITY was broken, in four
+# separate places, and each one alone was enough to block the workflow.
+# ---------------------------------------------------------------------------
+
+COORDINATOR = ("faculty.accounting@christuniversity.in", "faculty123")
+CULTURAL_COORDINATOR = ("faculty.cultural@christuniversity.in", "faculty123")
+HOD_USER = ("hod.commerce@christuniversity.in", "faculty123")
+UNTAGGED_FACULTY = ("faculty.finance@christuniversity.in", "faculty123")
+
+
+def test_coordinator_selector_contains_the_club_he_oversees(client):
+    """get_club_coordinator_club_ids() existed with zero call sites repo-wide,
+    so the coordinator's club selector came back empty."""
+    h = auth_headers(client, *COORDINATOR)
+    r = client.get("/api/v1/clubs/my-memberships", headers=h)
+    assert r.status_code == 200, r.text
+
+    by_id = {c["id"]: c for c in r.json()}
+    assert "club_commerce" in by_id, "the coordinator's own club is missing from his selector"
+    assert by_id["club_commerce"]["relationship"] == "faculty_coordinator"
+
+
+def test_coordinator_can_read_the_hierarchy_he_alone_may_edit(client):
+    """The sharpest instance of the read/write inversion: the only user
+    permitted to EDIT the club hierarchy was the only faculty user forbidden
+    from READING it."""
+    h = auth_headers(client, *COORDINATOR)
+    assert client.get("/api/v1/clubs/club_commerce/hierarchy", headers=h).status_code == 200
+
+
+def test_coordinator_can_read_the_list_containing_the_plan(client):
+    """Without this the coordinator 403s on /annual-plans, so he can never
+    learn the plan_id that POST /annual-plans/{id}/review requires."""
+    h = auth_headers(client, *COORDINATOR)
+    r = client.get("/api/v1/clubs/club_commerce/annual-plans", headers=h)
+    assert r.status_code == 200, r.text
+    assert any(p["id"] == "aplan_comm_2025" for p in r.json())
+
+
+def test_reviewer_inbox_shows_the_waiting_plan_only_to_its_reviewer(client):
+    r = client.get(
+        "/api/v1/clubs/annual-plans/awaiting-my-review",
+        headers=auth_headers(client, *COORDINATOR),
+    )
+    assert r.status_code == 200, r.text
+    rows = r.json()
+    assert any(p["id"] == "aplan_comm_2025" for p in rows)
+    # club_name is included so the inbox renders without a fetch per row.
+    assert all(p["club_name"] for p in rows)
+
+    # A faculty member with no relevant tag has an empty inbox, not a 403.
+    r = client.get(
+        "/api/v1/clubs/annual-plans/awaiting-my-review",
+        headers=auth_headers(client, *UNTAGGED_FACULTY),
+    )
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_full_three_stage_approval_chain_walks_to_approved(client):
+    """The end-to-end gate for this wave: a plan reaches 'approved'."""
+    def review(creds, expected_next):
+        r = client.post(
+            "/api/v1/clubs/annual-plans/aplan_comm_2025/review",
+            json={"action": "approve", "comments": "Looks good."},
+            headers=auth_headers(client, *creds),
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["status"] == expected_next, r.json()
+
+    review(COORDINATOR, "cultural_coordinator_review")
+    review(CULTURAL_COORDINATOR, "hod_review")
+    review(HOD_USER, "approved")

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
+import { describeError } from '../../services/errors';
 import { useStore } from '../../context/useStore';
 import { SideNav, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
 import { CheckSquare, FileText, Folder, BookOpen, Clock, Compass, Plus, Pin, Star, Share2, Info, Users } from 'lucide-react';
 import { Button } from '@astryxdesign/core/Button';
 import { DateInput } from '@astryxdesign/core/DateInput';
 import { Skeleton } from '@astryxdesign/core/Skeleton';
+import { useToast } from '@astryxdesign/core/Toast';
+import { asIsoDate } from '../../lib/date';
 
 export const FacultyDashboard: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'calendar' | 'tasks' | 'meetings' | 'notes' | 'documents' | 'directory' | 'reminders'>('dashboard');
@@ -21,6 +24,11 @@ export const FacultyDashboard: React.FC = () => {
   const [reminders, setReminders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDirectory, setIsLoadingDirectory] = useState(false);
+  // Bump to force a refetch of the workspace payloads. See the effect below.
+  const [reloadTick, setReloadTick] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const retryLoad = () => setReloadTick(t => t + 1);
+  const showToast = useToast();
 
   // Notes Form State
   const [noteTitle, setNoteTitle] = useState('');
@@ -39,37 +47,63 @@ export const FacultyDashboard: React.FC = () => {
   const [reminderTitle, setReminderTitle] = useState('');
   const [reminderDueDate, setReminderDueDate] = useState('');
 
+  /**
+   * Workspace data, loaded once — NOT once per tab click.
+   *
+   * activeSubTab used to be in this dependency array, so every one of the
+   * eight tab switches re-issued all five requests even though the tab bodies
+   * render from state that was already loaded. The five calls are now
+   * concurrent rather than sequential as well.
+   *
+   * reloadTick is the deliberate escape hatch: a write handler bumps it to
+   * force a refetch. Same pattern (and same reason) as ClubsDashboard.
+   */
   useEffect(() => {
+    let cancelled = false;
+
     async function loadData() {
       setIsLoading(true);
+      setLoadError(null);
       try {
-        const nList = await api.get<any[]>('/faculty/notes');
+        const [nList, dList, mList, tList, rList] = await Promise.all([
+          api.get<any[]>('/faculty/notes'),
+          api.get<any[]>('/faculty/documents'),
+          api.get<any[]>('/faculty/meetings'),
+          api.get<any[]>('/tasks'),
+          api.get<any[]>('/faculty/reminders'),
+        ]);
+        if (cancelled) return;
         setNotes(nList);
-
-        const dList = await api.get<any[]>('/faculty/documents');
         setDocs(dList);
-
-        const mList = await api.get<any[]>('/faculty/meetings');
         setMeetings(mList);
-
-        const tList = await api.get<any[]>('/tasks');
         setTasks(tList);
-
-        const rList = await api.get<any[]>('/faculty/reminders');
         setReminders(rList);
-
-        if (activeSubTab === 'calendar' || activeSubTab === 'dashboard') {
-          const cal = await api.get<any[]>('/calendar');
-          setCalendarEvents(cal);
-        }
       } catch (e) {
-        console.error(e);
+        if (!cancelled) {
+          console.error(e);
+          // A failed load is NOT an empty workspace. Say which it is, and
+          // give the user a way to try again — the previous handler logged to
+          // a console nobody sees and rendered "no notes yet".
+          setLoadError(describeError(e));
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
+
     loadData();
-  }, [activeSubTab]);
+    return () => { cancelled = true; };
+  }, [reloadTick]);
+
+  // The calendar is the one payload a tab genuinely needs on demand.
+  useEffect(() => {
+    if (activeSubTab !== 'calendar' && activeSubTab !== 'dashboard') return;
+    let cancelled = false;
+    api.get<any[]>('/calendar')
+      .then(cal => { if (!cancelled) setCalendarEvents(cal); })
+      .catch(console.error);
+    return () => { cancelled = true; };
+  }, [activeSubTab, reloadTick]);
 
   // Kept separate from loadData() above — previously every keystroke in the
   // directory search box re-fetched notes/docs/meetings/tasks/reminders too.
@@ -85,48 +119,113 @@ export const FacultyDashboard: React.FC = () => {
   }, [activeSubTab, directorySearch]);
 
   const togglePin = async (note: any) => {
-    const updated = await api.put<any>(`/faculty/notes/${note.id}`, { is_pinned: !note.is_pinned });
-    setNotes(notes.map(n => n.id === note.id ? updated : n));
+    try {
+      const updated = await api.put<any>(`/faculty/notes/${note.id}`, { is_pinned: !note.is_pinned });
+      // Functional update: these handlers used to write from a `notes` closure
+      // captured before the await, so two quick actions lost the first one.
+      setNotes(prev => prev.map(n => (n.id === note.id ? updated : n)));
+    } catch (e) {
+      showToast({ body: `Could not update the note: ${describeError(e)}`, type: 'error' });
+    }
   };
 
   const handleCreateReminder = async () => {
-    if (!reminderTitle || !reminderDueDate) return;
-    const created = await api.post<any>('/faculty/reminders', { title: reminderTitle, due_date: reminderDueDate, reminder_type: 'due_date' });
-    setReminders([...reminders, created]);
-    setReminderTitle(''); setReminderDueDate('');
+    if (!reminderTitle || !reminderDueDate) {
+      showToast({ body: 'Add a title and a due date first', type: 'error' });
+      return;
+    }
+    try {
+      const created = await api.post<any>('/faculty/reminders', {
+        title: reminderTitle, due_date: reminderDueDate, reminder_type: 'due_date',
+      });
+      setReminders(prev => [...prev, created]);
+      setReminderTitle('');
+      setReminderDueDate('');
+      showToast({ body: 'Reminder created', type: 'info' });
+    } catch (e) {
+      showToast({ body: `Could not create the reminder: ${describeError(e)}`, type: 'error' });
+    }
   };
 
   const completeReminder = async (reminder: any) => {
-    const updated = await api.put<any>(`/faculty/reminders/${reminder.id}`, { status: 'completed' });
-    setReminders(reminders.map(r => r.id === reminder.id ? updated : r));
+    try {
+      const updated = await api.put<any>(`/faculty/reminders/${reminder.id}`, { status: 'completed' });
+      setReminders(prev => prev.map(r => (r.id === reminder.id ? updated : r)));
+    } catch (e) {
+      showToast({ body: `Could not complete the reminder: ${describeError(e)}`, type: 'error' });
+    }
   };
 
+  /*
+   * The three handlers below all had the same shape and the same two bugs:
+   * they awaited a write, cleared nothing, and called setActiveSubTab to the
+   * tab they were already on — which is a no-op in React, so the new row
+   * simply never appeared and the user assumed the save had failed. And with
+   * no try/catch at all (Astryx's Button.clickAction is try/finally with no
+   * catch), a rejected write was an unhandled rejection with zero feedback.
+   *
+   * All three endpoints return the created row, so we append it directly
+   * rather than refetching five endpoints.
+   */
   const handleAddNote = async () => {
-    if (!noteTitle) return;
-    await api.post('/faculty/notes', { title: noteTitle, content: noteContent });
-    setNoteTitle('');
-    setNoteContent('');
-    setActiveSubTab('notes');
+    if (!noteTitle.trim()) {
+      showToast({ body: 'A note needs a title', type: 'error' });
+      return;
+    }
+    try {
+      const created = await api.post<any>('/faculty/notes', { title: noteTitle, content: noteContent });
+      setNotes(prev => [created, ...prev]);
+      setNoteTitle('');
+      setNoteContent('');
+      showToast({ body: 'Note saved', type: 'info' });
+    } catch (e) {
+      showToast({ body: `Could not save the note: ${describeError(e)}`, type: 'error' });
+    }
   };
 
   const handleCreateMeeting = async () => {
-    if (!meetTitle) return;
-    await api.post('/faculty/meetings', { title: meetTitle, date: meetDate, time: meetTime, venue: meetVenue });
-    setMeetTitle('');
-    setMeetDate('');
-    setMeetTime('');
-    setMeetVenue('');
-    setActiveSubTab('meetings');
+    // The form validated only the title, so a meeting could be created with
+    // no date, no time and no venue.
+    if (!meetTitle.trim() || !meetDate || !meetTime || !meetVenue.trim()) {
+      showToast({
+        body: 'Incomplete meeting — title, date, time and venue are all required.',
+        type: 'error',
+      });
+      return;
+    }
+    try {
+      const created = await api.post<any>('/faculty/meetings', {
+        title: meetTitle, date: meetDate, time: meetTime, venue: meetVenue,
+      });
+      setMeetings(prev => [...prev, created]);
+      setMeetTitle('');
+      setMeetDate('');
+      setMeetTime('');
+      setMeetVenue('');
+      showToast({ body: 'Meeting scheduled', type: 'info' });
+    } catch (e) {
+      showToast({ body: `Could not schedule the meeting: ${describeError(e)}`, type: 'error' });
+    }
   };
 
   const handleUploadDocument = async () => {
-    if (!docFile) return;
-    const formData = new FormData();
-    formData.append('file', docFile);
-    formData.append('name', docFile.name);
-    await api.upload('/faculty/documents', formData);
-    setDocFile(null);
-    setActiveSubTab('documents');
+    if (!docFile) {
+      showToast({ body: 'Choose a file first', type: 'error' });
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.append('file', docFile);
+      formData.append('name', docFile.name);
+      const created = await api.upload<any>('/faculty/documents', formData);
+      setDocs(prev => [created, ...prev]);
+      setDocFile(null);
+      showToast({ body: 'Document uploaded', type: 'info' });
+    } catch (e) {
+      // The server refuses oversized files (413) and disallowed types (415)
+      // with a specific reason. Surface it rather than a generic message.
+      showToast({ body: `Upload failed: ${describeError(e)}`, type: 'error' });
+    }
   };
 
   return (
@@ -164,6 +263,17 @@ export const FacultyDashboard: React.FC = () => {
         {isLoading ? (
           <div className="space-y-4">
             {[0, 1, 2].map(i => <Skeleton key={i} height={80} index={i} />)}
+          </div>
+        ) : loadError ? (
+          <div
+            role="alert"
+            className="rounded-xl border border-rose-200 bg-rose-50 p-6 flex flex-col items-start gap-3"
+          >
+            <div>
+              <h3 className="font-semibold text-rose-900">Your workspace didn't load</h3>
+              <p className="text-sm text-rose-800 mt-1">{loadError}</p>
+            </div>
+            <Button label="Try again" variant="secondary" clickAction={retryLoad} />
           </div>
         ) : (
         <>
@@ -298,7 +408,7 @@ export const FacultyDashboard: React.FC = () => {
                   <label className="text-slate-400 font-semibold">Title</label>
                   <input type="text" value={meetTitle} onChange={e => setMeetTitle(e.target.value)} required className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
                 </div>
-                <DateInput label="Date" value={meetDate || undefined} onChange={(v) => setMeetDate(v || '')} isRequired />
+                <DateInput label="Date" value={asIsoDate(meetDate)} onChange={(v) => setMeetDate(v || '')} isRequired />
                 <div className="flex flex-col gap-1.5">
                   <label className="text-slate-400 font-semibold">Time</label>
                   <input type="text" placeholder="02:30 PM" value={meetTime} onChange={e => setMeetTime(e.target.value)} required className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
@@ -478,7 +588,7 @@ export const FacultyDashboard: React.FC = () => {
                   <label className="text-slate-400 font-semibold">Title</label>
                   <input type="text" value={reminderTitle} onChange={e => setReminderTitle(e.target.value)} required className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg" />
                 </div>
-                <DateInput label="Due Date" value={reminderDueDate || undefined} onChange={(v) => setReminderDueDate(v || '')} isRequired />
+                <DateInput label="Due Date" value={asIsoDate(reminderDueDate)} onChange={(v) => setReminderDueDate(v || '')} isRequired />
                 <Button
                   label="Create Reminder"
                   isDisabled={!reminderTitle || !reminderDueDate}

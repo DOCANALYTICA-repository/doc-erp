@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from app.models.claim import Claim, ClaimParticipant, AttendanceEntry, SupportingDocument, TimetableSession
 from app.repositories.base import BaseRepository
 
@@ -32,15 +32,24 @@ class SupportingDocumentRepository(BaseRepository[SupportingDocument]):
         return db.query(SupportingDocument).filter(SupportingDocument.claim_id == claim_id).all()
 
 class TimetableSessionRepository(BaseRepository[TimetableSession]):
+    # Both reads eager-load the faculty relationship that
+    # TimetableSession.faculty_name reads. Without it, rendering a timetable
+    # is one extra SELECT per slot.
     def get_by_academic_context(self, db: Session, *, prog: str, sem: str, sec: str) -> List[TimetableSession]:
-        return db.query(TimetableSession).filter(
+        return db.query(TimetableSession).options(
+            selectinload(TimetableSession.faculty)
+        ).filter(
             TimetableSession.programme == prog,
             TimetableSession.semester == sem,
             TimetableSession.section == sec
-        ).all()
+        ).order_by(TimetableSession.day_of_week, TimetableSession.hour).all()
 
     def get_by_faculty(self, db: Session, *, faculty_id: str) -> List[TimetableSession]:
-        return db.query(TimetableSession).filter(TimetableSession.faculty_id == faculty_id).all()
+        return db.query(TimetableSession).options(
+            selectinload(TimetableSession.faculty)
+        ).filter(TimetableSession.faculty_id == faculty_id).order_by(
+            TimetableSession.day_of_week, TimetableSession.hour
+        ).all()
 
 claim_repo = ClaimRepository(Claim)
 claim_participant_repo = ClaimParticipantRepository(ClaimParticipant)

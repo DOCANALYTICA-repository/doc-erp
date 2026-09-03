@@ -16,6 +16,18 @@ interface ClubHierarchyChartProps {
   members: any[];
   canEdit: boolean;
   onMembersChanged: () => void;
+  /**
+   * The hierarchy the PARENT already fetched.
+   *
+   * This component used to re-fetch /clubs/{id}/hierarchy on mount, which the
+   * parent had loaded moments earlier — the endpoint was hit twice on every
+   * workspace load. It still owns its own copy of the list so that local
+   * edits (add/rename/delete a level) render immediately, but the initial
+   * value now comes in as a prop.
+   */
+  levels: HierarchyLevel[];
+  /** Ask the parent to refetch after a structural edit. */
+  onLevelsChanged: () => void;
 }
 
 /** Read-only-by-default org-chart: one row per rank (ascending level_order,
@@ -24,21 +36,20 @@ interface ClubHierarchyChartProps {
  * Coordinator, or super_admin), each row/box gets add/rename/delete
  * affordances. Plain flex layout — no graph library needed for "all levels
  * visible at once, siblings side-by-side." */
-export const ClubHierarchyChart: React.FC<ClubHierarchyChartProps> = ({ clubId, members, canEdit, onMembersChanged }) => {
-  const [levels, setLevels] = useState<HierarchyLevel[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export const ClubHierarchyChart: React.FC<ClubHierarchyChartProps> = ({
+  clubId, members, canEdit, onMembersChanged, levels: levelsFromParent, onLevelsChanged,
+}) => {
+  const [levels, setLevels] = useState<HierarchyLevel[]>(levelsFromParent);
+  const [isLoading, setIsLoading] = useState(false);
   const [newTitleByRank, setNewTitleByRank] = useState<Record<number, string>>({});
   const [newLevelTitle, setNewLevelTitle] = useState('');
 
-  const load = () => {
-    setIsLoading(true);
-    api.get<HierarchyLevel[]>(`/clubs/${clubId}/hierarchy`)
-      .then(setLevels)
-      .catch(console.error)
-      .finally(() => setIsLoading(false));
-  };
+  // Track the parent's copy rather than fetching our own.
+  useEffect(() => { setLevels(levelsFromParent); }, [levelsFromParent]);
 
-  useEffect(() => { load(); }, [clubId]);
+  // After a structural edit, re-read from the server via the parent so both
+  // copies stay in step.
+  const load = () => onLevelsChanged();
 
   if (isLoading) {
     return (

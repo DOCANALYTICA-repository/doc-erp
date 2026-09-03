@@ -8,6 +8,64 @@ import { api } from '../../services/api';
 // Register GSAP plugins
 gsap.registerPlugin(ScrollTrigger);
 
+/**
+ * Should we animate entrances at all?
+ *
+ * The rule this page learned the hard way: NEVER hide content in a way that
+ * requires JavaScript to un-hide it. gsap.from() (and, just as badly, a
+ * gsap.set(opacity: 0) followed by a tween) writes the hidden state to the DOM
+ * immediately, and browsers throttle requestAnimationFrame in a background or
+ * occluded tab. The headline was reproducibly stranded at 0.35 opacity
+ * FOREVER — the animation simply never ran.
+ *
+ * So the start state is only ever written when the document is actually
+ * visible and the user has not asked for reduced motion. Otherwise the
+ * un-animated markup — which is fully legible — is what stays on screen.
+ */
+function shouldAnimateEntrances(): boolean {
+  if (typeof document === 'undefined') return false;
+  if (document.visibilityState !== 'visible') return false;
+  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/** The finished state of every entrance animation on this page. */
+const ENTRANCE_END = { y: 0, opacity: 1 } as const;
+
+/**
+ * Reveal elements as their section scrolls into view.
+ *
+ * onLeave/refresh safety aside, the important property is the one above: if
+ * the tween never runs, the element was never hidden in the first place.
+ */
+function revealOnScroll(selector: string, trigger: string, stagger = 0.15) {
+  const targets = gsap.utils.toArray<HTMLElement>(selector);
+  if (targets.length === 0) return;
+
+  gsap.set(targets, { y: 40, opacity: 0 });
+  gsap.to(targets, {
+    scrollTrigger: { trigger, start: 'top 85%', toggleActions: 'play none none none' },
+    ...ENTRANCE_END,
+    duration: 0.8,
+    stagger,
+    ease: 'power3.out',
+  });
+}
+
+/**
+ * Force every animated element to its finished state, immediately.
+ *
+ * The safety net for a tab that becomes hidden PART-WAY through the timeline:
+ * rAF stops, the tween freezes, and without this the user returns to a
+ * half-faded page.
+ */
+function settleEntrances(scope: HTMLElement | null) {
+  if (!scope) return;
+  const targets = scope.querySelectorAll<HTMLElement>(
+    '.hero-badge, .hero-title, .hero-desc, .hero-cta, .stat-card, .course-card, .club-card'
+  );
+  gsap.set(Array.from(targets), ENTRANCE_END);
+}
+
 // Local illustration used for the static "About" section only — everything
 // else on this page (stats/courses/clubs/gallery) is Content-Engine-driven
 // (Phase 3), not hardcoded, per the Landing PRD's "presentation layer only,
@@ -60,71 +118,100 @@ export const LandingHome: React.FC = () => {
   const heroContainerRef = useRef<HTMLDivElement>(null);
   const svgPathRef = useRef<SVGPathElement>(null);
 
+  /**
+   * Hero + decorative animation.
+   *
+   * Two rules govern everything here, both learned from a shipped bug that
+   * left the headline permanently at 0.36 opacity:
+   *
+   *  1. NEVER animate FROM opacity: 0. gsap.from() writes the start state to
+   *     the DOM immediately, so if the timeline is throttled — a background
+   *     tab, a slow device, rAF starved — the element is stranded invisible
+   *     with nothing to finish the job. Animating TO the final state means
+   *     the un-animated state is the readable one, and the worst possible
+   *     failure is "no animation".
+   *
+   *  2. Only animate what is on the page NOW. This effect has empty deps;
+   *     .course-card and .club-card arrive later from the API, so those
+   *     tweens found zero targets and silently did nothing. They live in
+   *     their own effect below, keyed on the data.
+   */
   useEffect(() => {
+    if (!shouldAnimateEntrances()) return;
+
+    // If the tab is hidden mid-timeline, rAF stops and the tween freezes
+    // wherever it happens to be. Snap everything to its finished state
+    // instead — the user comes back to a readable page, not a half-faded one.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        settleEntrances(heroContainerRef.current);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
     const ctx = gsap.context(() => {
-      // 1. Multi-Step Timeline Load Animation
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-      tl.from('.hero-badge', { y: -30, opacity: 0, duration: 0.8 })
-        .from('.hero-title', { y: 50, opacity: 0, duration: 1.2 }, '-=0.5')
-        .from('.hero-desc', { y: 30, opacity: 0, duration: 0.8 }, '-=0.8')
-        .from('.hero-cta', { y: 20, opacity: 0, duration: 0.6, stagger: 0.15 }, '-=0.5');
 
-      // 2. Scroll-Triggered Metrics & Card Entrances
-      gsap.from('.stat-card', {
-        scrollTrigger: {
-          trigger: '.stats-section',
-          start: 'top 85%',
-          toggleActions: 'play none none none'
-        },
-        y: 40,
-        opacity: 0,
-        duration: 0.8,
-        stagger: 0.15,
-        ease: 'power3.out'
-      });
+      // set() the start state, then to() the finished state — see the note above.
+      const enter = (
+        selector: string,
+        startY: number,
+        to: gsap.TweenVars,
+        position?: string,
+      ) => {
+        const targets = gsap.utils.toArray<HTMLElement>(selector);
+        if (targets.length === 0) return;
+        gsap.set(targets, { y: startY, opacity: 0 });
+        tl.to(targets, { y: 0, opacity: 1, ...to }, position);
+      };
 
-      gsap.from('.course-card', {
-        scrollTrigger: {
-          trigger: '.courses-section',
-          start: 'top 85%',
-          toggleActions: 'play none none none'
-        },
-        y: 40,
-        opacity: 0,
-        duration: 0.8,
-        stagger: 0.12,
-        ease: 'power3.out'
-      });
+      enter('.hero-badge', -30, { duration: 0.8 });
+      enter('.hero-title', 50, { duration: 1.2 }, '-=0.5');
+      enter('.hero-desc', 30, { duration: 0.8 }, '-=0.8');
+      enter('.hero-cta', 20, { duration: 0.6, stagger: 0.15 }, '-=0.5');
 
-      gsap.from('.club-card', {
-        scrollTrigger: {
-          trigger: '.clubs-section',
-          start: 'top 85%',
-          toggleActions: 'play none none none'
-        },
-        y: 40,
-        opacity: 0,
-        duration: 0.8,
-        stagger: 0.15,
-        ease: 'power3.out'
-      });
+      revealOnScroll('.stat-card', '.stats-section');
 
-      // 3. SVG Fluid Path Morphing (looping organic blob outline)
-      const path1 = "M150,50 C230,50 280,120 280,200 C280,280 200,320 150,320 C80,320 40,260 40,200 C40,120 70,50 150,50 Z";
+      // SVG fluid path morphing (looping organic blob outline). Purely
+      // decorative, and it animates an attribute rather than opacity, so it
+      // cannot strand anything.
       const path2 = "M150,30 C250,50 290,90 290,180 C290,270 220,330 150,340 C60,350 30,270 30,180 C30,90 50,10 150,30 Z";
-      
-      gsap.to(svgPathRef.current, {
-        attr: { d: path2 },
-        duration: 5,
-        yoyo: true,
-        repeat: -1,
-        ease: 'sine.inOut'
-      });
+      if (svgPathRef.current) {
+        gsap.to(svgPathRef.current, {
+          attr: { d: path2 },
+          duration: 5,
+          yoyo: true,
+          repeat: -1,
+          ease: 'sine.inOut',
+        });
+      }
+    }, heroContainerRef);
 
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      ctx.revert();
+    };
+  }, []);
+
+  /**
+   * Card entrances for content that arrives from the API.
+   *
+   * Keyed on the array lengths, not on mount: at mount there are no
+   * .course-card or .club-card elements for a ScrollTrigger to attach to.
+   */
+  useEffect(() => {
+    if (courses.length === 0 && clubs.length === 0) return;
+    if (!shouldAnimateEntrances()) return;
+
+    const ctx = gsap.context(() => {
+      revealOnScroll('.course-card', '.courses-section', 0.12);
+      revealOnScroll('.club-card', '.clubs-section', 0.15);
+      // The triggers were created against a layout that has just grown.
+      ScrollTrigger.refresh();
     }, heroContainerRef);
 
     return () => ctx.revert();
-  }, []);
+  }, [courses.length, clubs.length]);
 
   return (
     <div ref={heroContainerRef} className="w-full min-h-screen bg-slate-50 transition-colors duration-300 overflow-x-hidden relative">
@@ -216,7 +303,7 @@ export const LandingHome: React.FC = () => {
       </section>
 
       {/* About Department Section */}
-      <section id="about" className="py-20 px-6 max-w-7xl mx-auto scroll-mt-10">
+      <section id="about" className="py-20 px-6 max-w-7xl mx-auto scroll-mt-20">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
             <h2 className="text-3xl font-bold tracking-tight text-slate-900">Our Vision & Mission</h2>
@@ -246,7 +333,7 @@ export const LandingHome: React.FC = () => {
       </section>
 
       {/* Course Catalogue Section */}
-      <section id="courses" className="courses-section py-20 bg-slate-100/60 border-y border-slate-200/50 scroll-mt-10">
+      <section id="courses" className="courses-section py-20 bg-slate-100/60 border-y border-slate-200/50 scroll-mt-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-xl mx-auto mb-16">
             <h2 className="text-3xl font-bold tracking-tight text-slate-900">Academic Programmes</h2>
@@ -293,7 +380,7 @@ export const LandingHome: React.FC = () => {
       </section>
 
       {/* Clubs & Student Life Section */}
-      <section id="clubs" className="clubs-section py-20 px-6 max-w-7xl mx-auto scroll-mt-10">
+      <section id="clubs" className="clubs-section py-20 px-6 max-w-7xl mx-auto scroll-mt-20">
         <div className="text-center max-w-xl mx-auto mb-16">
           <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">Dynamic Campus Culture</span>
           <h2 className="text-3xl font-bold tracking-tight text-slate-900 mt-1">Student-run Associations</h2>
@@ -319,7 +406,7 @@ export const LandingHome: React.FC = () => {
       </section>
 
       {/* Photo Gallery Section */}
-      <section id="gallery" className="py-20 bg-slate-100/60 border-y border-slate-200/50 scroll-mt-10">
+      <section id="gallery" className="py-20 bg-slate-100/60 border-y border-slate-200/50 scroll-mt-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-xl mx-auto mb-16">
             <h2 className="text-3xl font-bold tracking-tight text-slate-900">Campus Live Stream</h2>
@@ -343,7 +430,7 @@ export const LandingHome: React.FC = () => {
       </section>
 
       {/* Contact Section */}
-      <section id="contact" className="py-20 px-6 max-w-3xl mx-auto scroll-mt-10">
+      <section id="contact" className="py-20 px-6 max-w-3xl mx-auto scroll-mt-20">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold tracking-tight text-slate-900">Contact Department</h2>
           <p className="text-sm text-slate-500 mt-3">Address and details for official inquiries.</p>

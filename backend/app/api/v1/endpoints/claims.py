@@ -259,7 +259,15 @@ def list_claims(db: Session = Depends(get_db), current_user: User = Depends(get_
                 results[c.id] = c
 
         if "Course Coordinator" in tags or "HOD" in tags:
-            for c in db.query(Claim).filter(Claim.current_workflow_stage == "course_coordinator").all():
+            # attendance_office belongs here too. Omitting it meant that the
+            # moment a Course Coordinator approved a claim, it disappeared
+            # from EVERY review queue permanently — there is no other route
+            # that lists claims at that stage, so nothing could ever close.
+            # get_claim already grants read access at this stage; only the
+            # list query was missing it.
+            for c in db.query(Claim).filter(
+                Claim.current_workflow_stage.in_(["course_coordinator", "attendance_office"])
+            ).all():
                 if "HOD" in tags or faculty_scope.is_course_coordinator_for(db, current_user.id, c.programme):
                     results[c.id] = c
 
@@ -378,7 +386,18 @@ def approve_claim_stage(
             for entry in participant.entries
             if entry.subject_faculty_id == current_user.id and entry.status == "pending"
         ]
-        if not is_super_admin and not my_pending_entries:
+        # super_admin acts on behalf of EVERY subject faculty member here.
+        # Previously it fell through with an empty entry list, so approving
+        # changed nothing and the stage never advanced — an admin could not
+        # rescue a claim stuck behind an unavailable faculty member.
+        if is_super_admin:
+            my_pending_entries = [
+                entry
+                for participant in claim.participants
+                for entry in participant.entries
+                if entry.status == "pending"
+            ]
+        elif not my_pending_entries:
             deny("You have no pending attendance entries on this claim")
 
         if action == "approve":
@@ -419,8 +438,17 @@ def approve_claim_stage(
         if not is_super_admin and "HOD" not in tags and "Course Coordinator" in tags:
             if not faculty_scope.is_course_coordinator_for(db, current_user.id, claim.programme):
                 deny("You are not the assigned Course Coordinator for this programme")
-        claim.current_workflow_stage = "closed"
-        claim.status = "closed"
+
+        # This branch used to ignore `action` entirely and mark the claim
+        # closed-as-successful even when called with revise or reject — a
+        # rejection recorded as a success, on the final stage of the workflow.
+        if action == "approve":
+            claim.current_workflow_stage = "closed"
+            claim.status = "closed"
+        else:
+            claim.status = "returned" if action == "revise" else "rejected"
+            claim.current_workflow_stage = "closed"
+            record_revision()
 
     else:
         deny("This claim is already closed")
@@ -519,6 +547,23 @@ def resubmit_claim(
 
     reviewer_id = claim.last_revised_by
     reviewer_stage = claim.last_revised_stage
+
+    # Reset EVERY participant and entry back to pending — the same state they
+    # get at creation.
+    #
+    # This only happened when the student supplied new missed_classes (which
+    # deletes and recreates the entries). Resubmitting a corrected *reason*
+    # left the previously-rejected entries rejected, so the subject faculty's
+    # pending list was empty and they got a permanent 403 at the very stage
+    # the claim had just been sent back to. The claim could never leave
+    # subject_faculty again.
+    for participant in claim.participants:
+        participant.status = "pending"
+        db.add(participant)
+        for entry in participant.entries:
+            entry.status = "pending"
+            entry.feedback = None
+            db.add(entry)
 
     claim.status = "submitted"
     claim.current_workflow_stage = "initial_review"

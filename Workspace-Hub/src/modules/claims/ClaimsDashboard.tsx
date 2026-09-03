@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { api, ApiError } from '../../services/api';
+import { describeError } from '../../services/errors';
 import { useStore } from '../../context/useStore';
 import { SideNav, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
 import { Button } from '@astryxdesign/core/Button';
@@ -9,12 +10,32 @@ import { useToast } from '@astryxdesign/core/Toast';
 import { FileText, Plus, Compass, ShieldAlert, CheckCircle, Clock, AlertTriangle, Paperclip } from 'lucide-react';
 import { ClaimStatusStepper } from './components/ClaimStatusStepper';
 import { PageLoader } from '../../components/ui/PageLoader';
+import type { IsoDate } from '../../lib/date';
+
+// Astryx's DateRangeInput brands its dates as template-literal ISO strings.
+// Holding our state in the same shape means there is no coercion at the
+// boundary at all — a malformed date cannot reach the component.
+type DateRange = { start: IsoDate; end: IsoDate };
+
+// getDay() order, so DAY_NAMES[d.getDay()] indexes directly.
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+// Display order: the academic week starts on Monday.
+const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 
 type SubTab = 'dashboard' | 'my_claims' | 'new_claim' | 'review_queue';
 
 export const ClaimsDashboard: React.FC = () => {
   const user = useStore(state => state.user);
-  const isFaculty = user?.primary_role === 'faculty';
+  /**
+   * Does this user get the reviewer's view?
+   *
+   * super_admin belongs here. It used to test `primary_role === 'faculty'`
+   * alone, so an admin got the student tabs with no review queue at all — and
+   * therefore no way to rescue a stuck claim, which is precisely what the
+   * backend's super_admin bypass exists for.
+   */
+  const isFaculty =
+    user?.primary_role === 'faculty' || user?.primary_role === 'super_admin';
   const [activeSubTab, setActiveSubTab] = useState<SubTab>(isFaculty ? 'review_queue' : 'dashboard');
   const showToast = useToast();
 
@@ -25,17 +46,52 @@ export const ClaimsDashboard: React.FC = () => {
 
   // Submit claim form state
   const [category, setCategory] = useState<'medical' | 'co_curricular'>('medical');
-  const [dateRange, setDateRange] = useState<{ start: string; end: string } | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const [reason, setReason] = useState('');
   const [selectedHours, setSelectedHours] = useState<string[]>([]);
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
 
+  /**
+   * Timetable slots that actually fall inside the selected date range,
+   * grouped by day.
+   *
+   * The picker used to map the flat list and ignore day_of_week entirely, so
+   * the same subject appeared once per weekday it is taught with nothing to
+   * distinguish the instances — and a student picking "the Monday class"
+   * had no way to know which checkbox that was.
+   */
+  const visibleTimetable = useMemo<Array<[string, any[]]>>(() => {
+    const daysInRange = new Set<string>();
+    if (dateRange?.start && dateRange?.end) {
+      const start = new Date(dateRange.start);
+      const end = new Date(dateRange.end);
+      // A range longer than a fortnight covers every weekday anyway; cap the
+      // walk so a mistyped year cannot spin here.
+      for (let d = new Date(start); d <= end && daysInRange.size < 7; d.setDate(d.getDate() + 1)) {
+        daysInRange.add(DAY_NAMES[d.getDay()]);
+      }
+    }
+
+    const grouped = new Map<string, any[]>();
+    for (const slot of timetable) {
+      if (daysInRange.size > 0 && !daysInRange.has(slot.day_of_week)) continue;
+      const bucket = grouped.get(slot.day_of_week) ?? [];
+      bucket.push(slot);
+      grouped.set(slot.day_of_week, bucket);
+    }
+
+    return DAY_ORDER
+      .filter(day => grouped.has(day))
+      .map(day => [day, grouped.get(day)!] as [string, any[]]);
+  }, [timetable, dateRange]);
+
   // Revise / resubmit inline state
   const [revisingClaimId, setRevisingClaimId] = useState<string | null>(null);
   const [reviseReason, setReviseReason] = useState('');
   const [resubmittingClaimId, setResubmittingClaimId] = useState<string | null>(null);
-  const [resubmitDateRange, setResubmitDateRange] = useState<{ start: string; end: string } | null>(null);
+  const [resubmitDateRange, setResubmitDateRange] = useState<DateRange | null>(null);
+  const [resubmitReason, setResubmitReason] = useState('');
 
   const programme = user?.programme || '';
   const semester = user?.semester || '';
@@ -149,10 +205,29 @@ export const ClaimsDashboard: React.FC = () => {
     }
   };
 
+  /*
+   * The three review actions below had no try/catch at all.
+   *
+   * Astryx's Button.clickAction is try/finally with NO catch, so a rejected
+   * write became an unhandled rejection: the spinner stopped and absolutely
+   * nothing else happened. A faculty member clicking Approve on a claim they
+   * are not scoped for saw no error, no toast, no change — indistinguishable
+   * from a successful no-op.
+   *
+   * ApiError.message carries the FastAPI `detail`, so the real reason ("You
+   * are not the assigned Course Coordinator for this programme") reaches the
+   * user for free.
+   */
+  const refreshClaims = async () => setClaims(await api.get<any[]>('/claims'));
+
   const approveClaim = async (claimId: string) => {
-    await api.post(`/claims/${claimId}/approve-stage?action=approve`, {});
-    showToast({ body: 'Claim approved and moved to the next stage.', type: 'info' });
-    setClaims(await api.get<any[]>('/claims'));
+    try {
+      await api.post(`/claims/${claimId}/approve-stage?action=approve`, {});
+      showToast({ body: 'Claim approved and moved to the next stage.', type: 'info' });
+      await refreshClaims();
+    } catch (err) {
+      showToast({ body: `Could not approve this claim: ${describeError(err)}`, type: 'error' });
+    }
   };
 
   const submitRevision = async (claimId: string) => {
@@ -160,21 +235,62 @@ export const ClaimsDashboard: React.FC = () => {
       showToast({ body: 'A reason is required to revise a claim.', type: 'error' });
       return;
     }
-    await api.post(`/claims/${claimId}/approve-stage?action=revise&feedback=${encodeURIComponent(reviseReason)}`, {});
-    showToast({ body: 'Claim returned to the student for revision.', type: 'info' });
-    setRevisingClaimId(null);
-    setReviseReason('');
-    setClaims(await api.get<any[]>('/claims'));
+    try {
+      await api.post(
+        `/claims/${claimId}/approve-stage?action=revise&feedback=${encodeURIComponent(reviseReason)}`,
+        {},
+      );
+      showToast({ body: 'Claim returned to the student for revision.', type: 'info' });
+      setRevisingClaimId(null);
+      setReviseReason('');
+      await refreshClaims();
+    } catch (err) {
+      showToast({ body: `Could not return this claim: ${describeError(err)}`, type: 'error' });
+    }
+  };
+
+  /**
+   * Reject. There was no reject path in the UI at all, on either side —
+   * the backend has supported it at every stage since Phase 5, so a reviewer
+   * who needed to refuse a claim outright had to return it for revision
+   * indefinitely instead.
+   */
+  const rejectClaim = async (claimId: string) => {
+    if (!reviseReason.trim()) {
+      showToast({ body: 'A reason is required to reject a claim.', type: 'error' });
+      return;
+    }
+    try {
+      await api.post(
+        `/claims/${claimId}/approve-stage?action=reject&feedback=${encodeURIComponent(reviseReason)}`,
+        {},
+      );
+      showToast({ body: 'Claim rejected.', type: 'info' });
+      setRevisingClaimId(null);
+      setReviseReason('');
+      await refreshClaims();
+    } catch (err) {
+      showToast({ body: `Could not reject this claim: ${describeError(err)}`, type: 'error' });
+    }
   };
 
   const submitResubmit = async (claimId: string) => {
     const body: any = {};
     if (resubmitDateRange) body.date_range = `${resubmitDateRange.start} to ${resubmitDateRange.end}`;
-    await api.put(`/claims/${claimId}/resubmit`, body);
-    showToast({ body: 'Claim resubmitted for review.', type: 'info' });
-    setResubmittingClaimId(null);
-    setResubmitDateRange(null);
-    setClaims(await api.get<any[]>('/claims'));
+    // Resubmit could previously only change the date range. The endpoint has
+    // always accepted a corrected reason too, and that is the single most
+    // common thing a claim is sent back for.
+    if (resubmitReason.trim()) body.reason = resubmitReason.trim();
+    try {
+      await api.put(`/claims/${claimId}/resubmit`, body);
+      showToast({ body: 'Claim resubmitted for review.', type: 'info' });
+      setResubmittingClaimId(null);
+      setResubmitDateRange(null);
+      setResubmitReason('');
+      await refreshClaims();
+    } catch (err) {
+      showToast({ body: `Could not resubmit this claim: ${describeError(err)}`, type: 'error' });
+    }
   };
 
   // Faculty cannot submit claims (backend-enforced) — they get only the
@@ -325,11 +441,30 @@ export const ClaimsDashboard: React.FC = () => {
                             <tr>
                               <td colSpan={5} className="px-6 py-4 bg-slate-50">
                                 <div className="flex flex-col gap-3 max-w-sm">
-                                  <p className="text-[10px] text-slate-500">Revision requested: {claim.revision_reason || 'No reason provided.'}</p>
+                                  <p className="text-sm text-slate-600">
+                                    Revision requested: {claim.revision_reason || 'No reason provided.'}
+                                  </p>
                                   <DateRangeInput
                                     label="Updated Date Range"
                                     value={resubmitDateRange}
                                     onChange={setResubmitDateRange}
+                                  />
+                                  {/* Resubmit could only change the date range,
+                                      even though a corrected reason is the most
+                                      common thing a claim is sent back for. */}
+                                  <label
+                                    htmlFor={`resubmit-reason-${claim.id}`}
+                                    className="text-sm font-semibold text-slate-600"
+                                  >
+                                    Updated reason
+                                  </label>
+                                  <textarea
+                                    id={`resubmit-reason-${claim.id}`}
+                                    rows={3}
+                                    value={resubmitReason}
+                                    onChange={(e) => setResubmitReason(e.target.value)}
+                                    placeholder={claim.reason}
+                                    className="px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg"
                                   />
                                   <Button
                                     label="Submit Resubmission"
@@ -376,29 +511,47 @@ export const ClaimsDashboard: React.FC = () => {
 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-slate-500">Missed Timetable Sessions (Select all that apply)</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {timetable.map(slot => (
-                        <label key={slot.id} className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-start gap-3 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={selectedHours.includes(slot.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedHours([...selectedHours, slot.id]);
-                              } else {
-                                setSelectedHours(selectedHours.filter(id => id !== slot.id));
-                              }
-                            }}
-                            className="mt-0.5"
-                          />
-                          <div className="text-[10px]">
-                            <div className="font-bold text-slate-900">{slot.subject}</div>
-                            <div className="text-slate-400 mt-0.5">{slot.hour}</div>
-                            <div className="text-slate-400">Faculty: {slot.faculty}</div>
+                    {visibleTimetable.length === 0 ? (
+                      <p className="text-sm text-slate-500">
+                        {dateRange
+                          ? 'No timetabled classes fall in the selected dates.'
+                          : 'Pick a date range above to see the classes you missed.'}
+                      </p>
+                    ) : (
+                      <div className="flex flex-col gap-4">
+                        {visibleTimetable.map(([day, slots]) => (
+                          <div key={day}>
+                            <h4 className="text-sm font-semibold text-slate-700 mb-2">{day}</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              {slots.map(slot => (
+                                <label
+                                  key={slot.id}
+                                  className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-start gap-3 cursor-pointer select-none"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedHours.includes(slot.id)}
+                                    onChange={(e) => {
+                                      setSelectedHours(prev =>
+                                        e.target.checked
+                                          ? [...prev, slot.id]
+                                          : prev.filter(id => id !== slot.id)
+                                      );
+                                    }}
+                                    className="mt-0.5"
+                                  />
+                                  <div className="text-sm">
+                                    <div className="font-semibold text-slate-900">{slot.subject}</div>
+                                    <div className="text-slate-500 mt-0.5">{slot.hour}</div>
+                                    <div className="text-slate-500">{slot.faculty_name || 'Faculty TBC'}</div>
+                                  </div>
+                                </label>
+                              ))}
+                            </div>
                           </div>
-                        </label>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-1.5">
@@ -489,10 +642,10 @@ export const ClaimsDashboard: React.FC = () => {
                                 clickAction={() => approveClaim(claim.id)}
                               />
                               <Button
-                                label="Revise"
+                                label="Revise or Reject"
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => setRevisingClaimId(revisingClaimId === claim.id ? null : claim.id)}
+                                clickAction={() => setRevisingClaimId(revisingClaimId === claim.id ? null : claim.id)}
                               />
                             </td>
                           </tr>
@@ -517,23 +670,41 @@ export const ClaimsDashboard: React.FC = () => {
                             <tr>
                               <td colSpan={6} className="px-6 py-4 bg-slate-50">
                                 <div className="flex flex-col gap-3 max-w-md">
-                                  <label className="text-[10px] font-semibold text-slate-500">
-                                    Reason for revision (required, visible to the student)
+                                  <label
+                                    htmlFor={`review-reason-${claim.id}`}
+                                    className="text-sm font-semibold text-slate-600"
+                                  >
+                                    Reason (required, visible to the student)
                                   </label>
                                   <textarea
+                                    id={`review-reason-${claim.id}`}
                                     rows={2}
                                     value={reviseReason}
                                     onChange={(e) => setReviseReason(e.target.value)}
-                                    className="px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg"
+                                    className="px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg"
                                   />
-                                  <div>
+                                  <div className="flex gap-2">
                                     <Button
                                       label="Send Back to Student"
-                                      variant="destructive"
+                                      variant="secondary"
                                       size="sm"
                                       clickAction={() => submitRevision(claim.id)}
                                     />
+                                    {/* Reject was absent from the UI entirely,
+                                        though the backend has supported it at
+                                        every stage. Without it a reviewer could
+                                        only bounce a claim back forever. */}
+                                    <Button
+                                      label="Reject Claim"
+                                      variant="destructive"
+                                      size="sm"
+                                      clickAction={() => rejectClaim(claim.id)}
+                                    />
                                   </div>
+                                  <p className="text-xs text-slate-500">
+                                    Sending back lets the student correct and resubmit.
+                                    Rejecting closes the claim permanently.
+                                  </p>
                                 </div>
                               </td>
                             </tr>

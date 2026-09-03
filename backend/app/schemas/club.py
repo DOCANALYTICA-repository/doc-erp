@@ -4,6 +4,13 @@ from pydantic import BaseModel
 class ClubBase(BaseModel):
     name: str
     category: str
+    # On ClubBase rather than ClubOut deliberately: it then flows through
+    # ClubOut, ClubDetailOut, GET /clubs and my-memberships alike. The column
+    # existed and was populated the whole time; only the schema omitted it,
+    # so the club header rendered a broken image on every tab, 100% of the
+    # time, against the real backend. The dev mock supplied `logo`, which is
+    # exactly why nobody caught it.
+    logo: Optional[str] = None
     description: Optional[str] = None
     brand_colors: Optional[str] = "#000000"
     contact_email: Optional[str] = None
@@ -17,6 +24,17 @@ class ClubOut(ClubBase):
 
     class Config:
         from_attributes = True
+
+class MyClubOut(ClubOut):
+    """A club in the user's own selector, plus WHY it is there.
+
+    The relationship drives the UI: a faculty_coordinator is not a member and
+    must not be shown member-only tabs or write actions, and a department-wide
+    reviewer is looking at a club they oversee rather than one they belong to.
+    Without this the selector could only say "here are some clubs".
+    """
+    relationship: str  # member | faculty_coordinator | reviewer | super_admin
+
 
 class ClubMemberOut(BaseModel):
     id: str
@@ -233,6 +251,14 @@ class AnnualPlanOut(AnnualPlanBase):
 
     class Config:
         from_attributes = True
+
+
+class AwaitingReviewPlanOut(AnnualPlanOut):
+    """One row of a reviewer's inbox.
+
+    Carries club_name so the inbox renders without a second fetch per row.
+    """
+    club_name: str = ""
 
 
 class ClubDocumentOut(BaseModel):

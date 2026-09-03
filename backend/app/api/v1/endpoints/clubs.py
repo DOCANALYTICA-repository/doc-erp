@@ -19,11 +19,12 @@ from app.schemas.club import (
     AnnualPlanOut, AnnualPlanCreate, AnnualPlanUpdate, AnnualPlanReviewAction,
     ClubDocumentOut, PermissionTemplateAssign,
     ClubSettingsUpdate, ClubHierarchyLevelOut, ClubHierarchyLevelCreate, ClubHierarchyLevelUpdate,
+    MyClubOut, AwaitingReviewPlanOut,
     ClubHierarchyMemberAssign, ClubTaskCreate, ClubTaskReviewAction,
 )
 from app.schemas.task import TaskOut
 from app.models.user import User
-from app.models.club import EventAttendance, ClubHierarchyLevel
+from app.models.club import AnnualPlan, Club, EventAttendance, ClubHierarchyLevel
 from app.models.faculty import Task
 from app.services.engines.reporting import reporting_engine
 from app.services.engines.storage import storage_engine
@@ -154,20 +155,109 @@ ANNUAL_PLAN_NEXT_STAGE = {
 def get_clubs(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return club_repo.get_multi(db)
 
-@router.get("/my-memberships", response_model=List[ClubOut])
+@router.get("/my-memberships", response_model=List[MyClubOut])
 def get_my_club_memberships(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Every club this user can open a workspace for, and in what capacity.
+
+    Three sources, unioned:
+      1. active student memberships,
+      2. faculty coordinator assignments — faculty_scope.get_club_coordinator_club_ids()
+         has existed since Phase 7 with ZERO call sites repo-wide, which is
+         precisely why a Faculty Coordinator's selector came back empty and he
+         could never reach the club whose plan he was supposed to approve,
+      3. department-wide reviewers (Cultural Coordinator, HOD), who oversee
+         every club.
+
+    Filtered in SQL rather than by post-filtering club_repo.get_multi(): that
+    call was LIMIT 100 with no ORDER BY, so a user whose only membership was
+    club #101 got an empty selector and no error at all.
     """
-    Powers the frontend club selector (Phase 4) — replaces the previous
-    hardcoding to a single club_commerce with no way to switch. super_admin
-    sees every club (platform oversight); everyone else sees only clubs
-    they actually belong to, supporting the PRD's multi-club-membership
-    requirement.
-    """
+    def _with_relationship(clubs, relationship: str) -> List[MyClubOut]:
+        return [
+            MyClubOut(**ClubOut.model_validate(c).model_dump(), relationship=relationship)
+            for c in clubs
+        ]
+
     if current_user.primary_role == "super_admin":
-        return club_repo.get_multi(db)
+        return _with_relationship(
+            db.query(Club).order_by(Club.name).all(), "super_admin"
+        )
+
+    if _is_department_wide_reviewer(current_user):
+        return _with_relationship(
+            db.query(Club).order_by(Club.name).all(), "reviewer"
+        )
+
     memberships = member_repo.get_student_memberships(db, student_id=current_user.id)
-    club_ids = {m.club_id for m in memberships if m.status == "active"}
-    return [c for c in club_repo.get_multi(db) if c.id in club_ids]
+    member_club_ids = {m.club_id for m in memberships if m.status == "active"}
+    coordinator_club_ids = set(
+        faculty_scope.get_club_coordinator_club_ids(db, current_user.id)
+    )
+
+    club_ids = member_club_ids | coordinator_club_ids
+    if not club_ids:
+        return []
+
+    clubs = db.query(Club).filter(Club.id.in_(club_ids)).order_by(Club.name).all()
+    return [
+        MyClubOut(
+            **ClubOut.model_validate(c).model_dump(),
+            # Membership wins when someone is somehow both: it is the strictly
+            # more capable relationship.
+            relationship="member" if c.id in member_club_ids else "faculty_coordinator",
+        )
+        for c in clubs
+    ]
+
+
+@router.get("/annual-plans/awaiting-my-review", response_model=List[AwaitingReviewPlanOut])
+def list_plans_awaiting_my_review(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
+):
+    """The reviewer's inbox.
+
+    MUST stay above the /{club_id} catch-all below, or "annual-plans" is
+    matched as a club id and this route never runs.
+
+    No route anywhere listed plans by status or by reviewer, so a reviewer's
+    only route to a pending plan was to already know which club it was in and
+    navigate there — which is the real reason BLK-01 was invisible. Nothing
+    ever told the coordinator there was a plan waiting.
+    """
+    perms = get_resolved_permissions(current_user)
+    is_admin = "*" in perms
+
+    # Invert ANNUAL_PLAN_STAGE_PERMISSIONS: which statuses may THIS user act on?
+    actionable_statuses = [
+        status for status, permission in ANNUAL_PLAN_STAGE_PERMISSIONS.items()
+        if is_admin or permission in perms
+    ]
+    if not actionable_statuses:
+        return []
+
+    query = (
+        db.query(AnnualPlan, Club.name)
+        .join(Club, Club.id == AnnualPlan.club_id)
+        .filter(AnnualPlan.status.in_(actionable_statuses))
+    )
+
+    # The faculty-coordinator stage is club-scoped; the later stages are
+    # department-wide. Scope in SQL so the inbox count is honest — a reviewer
+    # must not see a row they will be refused on.
+    if not is_admin:
+        coordinator_club_ids = faculty_scope.get_club_coordinator_club_ids(db, current_user.id)
+        query = query.filter(
+            (AnnualPlan.status != "faculty_coordinator_review")
+            | (AnnualPlan.club_id.in_(coordinator_club_ids) if coordinator_club_ids else False)
+        )
+
+    rows = query.order_by(AnnualPlan.academic_year.desc()).all()
+    return [
+        AwaitingReviewPlanOut(
+            **AnnualPlanOut.model_validate(plan).model_dump(), club_name=club_name
+        )
+        for plan, club_name in rows
+    ]
 
 def _viewer_capabilities(db: Session, current_user: User, club_id: str) -> dict:
     def check(fn) -> bool:
@@ -736,7 +826,7 @@ def assign_permission_template(
 # 16. Club Settings — official contact email (no endpoint updated any Club
 # field before this; Club.contact_email already existed in the schema but
 # had no write path or UI).
-@router.put("/{club_id}/settings", response_model=ClubOut)
+@router.put("/{club_id}/settings", response_model=ClubDetailOut)
 def update_club_settings(
     club_id: str,
     settings_in: ClubSettingsUpdate,
@@ -747,7 +837,12 @@ def update_club_settings(
     club = club_repo.get(db, club_id)
     if not club:
         raise HTTPException(status_code=404, detail="Club not found")
-    return club_repo.update(db, db_obj=club, obj_in=settings_in.model_dump(exclude_unset=True))
+    updated = club_repo.update(db, db_obj=club, obj_in=settings_in.model_dump(exclude_unset=True))
+    # Returns the DETAIL shape, matching GET /clubs/{id}. Returning the
+    # narrower ClubOut meant the viewer_can_* capability flags vanished from
+    # client state the moment anyone saved settings.
+    caps = _viewer_capabilities(db, current_user, club_id)
+    return ClubDetailOut(**ClubOut.model_validate(updated).model_dump(), **caps)
 
 
 # 17. Configurable Club Hierarchy (org-chart / structure)

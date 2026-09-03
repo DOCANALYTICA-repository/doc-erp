@@ -1,5 +1,14 @@
+from pathlib import Path
 from typing import List, Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Anchored to backend/, not to the current working directory. A relative
+# ".env" silently found nothing whenever the app was started from the repo
+# root (uvicorn, docker, an IDE run config), and the first symptom was
+# "SECRET_KEY is not set" — which reads like a missing file rather than a
+# wrong cwd.
+BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -47,10 +56,30 @@ class Settings(BaseSettings):
     }
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=BACKEND_DIR / ".env",
         case_sensitive=True,
         extra="ignore",
     )
+
+
+def resolve_sqlite_path(url: str) -> str:
+    """Anchor a relative SQLite path to backend/, not to the caller's cwd.
+
+    `sqlite:///./doc_platform.db` means a DIFFERENT file depending on where
+    the process was started from, so running the app from the repo root and
+    seeding it from backend/ silently used two separate databases — and the
+    symptom was "no such column: users.programme", which reads like a missing
+    migration rather than a wrong file.
+    """
+    prefix = "sqlite:///"
+    if not url.startswith(prefix):
+        return url
+
+    path = url[len(prefix):]
+    if path.startswith("/") or path == ":memory:" or path.startswith("file:"):
+        return url  # already absolute, in-memory, or a URI
+
+    return f"{prefix}{(BACKEND_DIR / path).resolve()}"
 
 
 def validate_required_settings(s: "Settings") -> None:
@@ -69,4 +98,5 @@ def validate_required_settings(s: "Settings") -> None:
 
 
 settings = Settings()
+settings.DATABASE_URL = resolve_sqlite_path(settings.DATABASE_URL)
 validate_required_settings(settings)

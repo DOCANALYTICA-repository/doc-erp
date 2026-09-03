@@ -98,6 +98,12 @@ class TimetableSessionCreate(TimetableSessionBase):
 
 class TimetableSessionOut(TimetableSessionBase):
     id: str
+    # On Out only, NOT on TimetableSessionBase — that class is also
+    # TimetableSessionCreate, so putting it there would have clients POSTing a
+    # faculty name. Without this the claim form showed a subject and an hour
+    # and no way to tell whose class it was; the dev mock supplied the field
+    # under a different key ("faculty"), which is what hid the divergence.
+    faculty_name: str = ""
 
     class Config:
         from_attributes = True
