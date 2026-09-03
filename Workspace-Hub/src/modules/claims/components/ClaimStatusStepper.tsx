@@ -64,7 +64,7 @@ function StepperBody({ status, currentStage, submissionType = 'individual', refe
               {revisionReason || 'No reason was provided.'}
             </p>
           </div>
-          <p className="text-[10px] text-slate-400 leading-relaxed">
+          <p className="text-xs text-slate-400 leading-relaxed">
             The exact review stage that made this decision isn't tracked yet — only that the claim was returned/rejected after submission.
           </p>
         </div>

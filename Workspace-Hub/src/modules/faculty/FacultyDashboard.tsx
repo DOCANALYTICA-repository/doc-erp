@@ -433,11 +433,11 @@ export const FacultyDashboard: React.FC = () => {
                 {meetings.map(m => (
                   <div key={m.id} className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm flex flex-col justify-between">
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400">{m.type}</span>
+                      <span className="text-xs uppercase font-bold text-slate-400">{m.type}</span>
                       <h4 className="font-bold text-slate-900 mt-1 text-xs">{m.title}</h4>
-                      <p className="text-slate-500 mt-2 text-[10px] leading-relaxed">Location: {m.venue} | {m.time}</p>
+                      <p className="text-slate-500 mt-2 text-xs leading-relaxed">Location: {m.venue} | {m.time}</p>
                     </div>
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-[10px]">
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs">
                       <span className="text-slate-400">{m.date}</span>
                       <span className="font-bold text-sky-500 uppercase">{m.status}</span>
                     </div>
@@ -480,7 +480,7 @@ export const FacultyDashboard: React.FC = () => {
                       <h4 className="font-bold text-slate-900 text-xs">{note.title}</h4>
                       <p className="text-slate-500 mt-2 text-xs leading-relaxed">{note.content}</p>
                     </div>
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex gap-2 justify-end text-[10px] items-center">
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex gap-2 justify-end text-xs items-center">
                       <button onClick={() => togglePin(note)} title={note.is_pinned ? 'Unpin' : 'Pin'}>
                         <Pin className={`w-3.5 h-3.5 ${note.is_pinned ? 'text-yellow-500 fill-yellow-500' : 'text-slate-300'}`} />
                       </button>
@@ -518,10 +518,10 @@ export const FacultyDashboard: React.FC = () => {
                 {docs.map(doc => (
                   <div key={doc.id} className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm flex flex-col justify-between">
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400">{doc.folder_path}</span>
+                      <span className="text-xs uppercase font-bold text-slate-400">{doc.folder_path}</span>
                       <h4 className="font-bold text-slate-900 mt-1 text-xs">{doc.name}</h4>
                     </div>
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                       <button
                         onClick={() => navigator.clipboard.writeText(`${window.location.origin}/shared/${doc.shared_link}`)}
                         className="inline-flex items-center gap-1 text-indigo-600 hover:underline"
@@ -568,8 +568,8 @@ export const FacultyDashboard: React.FC = () => {
                   <h4 className="font-bold text-slate-900">{fct.name}</h4>
                   <div className="text-slate-500 font-semibold">{fct.designation || fct.role_tags_str || 'Faculty'}</div>
                   <div className="text-slate-400">{fct.email}</div>
-                  {fct.office_location && <div className="text-slate-400 text-[10px]">{fct.office_location}</div>}
-                  {fct.office_hours && <div className="text-slate-400 text-[10px]">Office hours: {fct.office_hours}</div>}
+                  {fct.office_location && <div className="text-slate-400 text-xs">{fct.office_location}</div>}
+                  {fct.office_hours && <div className="text-slate-400 text-xs">Office hours: {fct.office_hours}</div>}
                   <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-bold uppercase ${ fct.availability_status === 'available' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500' }`}>{fct.availability_status}</span>
                 </div>
               ))}

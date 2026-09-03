@@ -69,7 +69,7 @@ export const AuthenticatedLayout: React.FC = () => {
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
               <TopNavHeading heading="DOC Unified Digital ERP" />
-              <span className="text-[10px] bg-slate-105 text-slate-400 font-bold px-2 py-0.5 rounded border border-slate-200/50 uppercase ml-2">
+              <span className="text-xs bg-slate-100 text-slate-400 font-bold px-2 py-0.5 rounded border border-slate-200/50 uppercase ml-2">
                 {activeModule}
               </span>
             </div>
@@ -115,7 +115,7 @@ export const AuthenticatedLayout: React.FC = () => {
                   <div className="absolute right-0 mt-2 w-48 rounded-xl border border-slate-200/50 bg-white p-2 shadow-lg text-xs space-y-1 animate-fade-in z-50">
                     <div className="px-3 py-2 border-b border-slate-100">
                       <div className="font-bold text-slate-900 truncate">{user.name}</div>
-                      <div className="text-[10px] text-slate-400 truncate mt-0.5">{user.email}</div>
+                      <div className="text-xs text-slate-400 truncate mt-0.5">{user.email}</div>
                     </div>
                     <button onClick={() => { setUserDropdownOpen(false); navigate('/app'); }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 text-slate-700">
                       Workspace Switcher
@@ -141,7 +141,7 @@ export const AuthenticatedLayout: React.FC = () => {
 
       {isSearchOpen && searchQuery && (
         <div className="fixed inset-0 z-50 bg-slate-950/20 backdrop-blur-sm flex justify-center p-4 pt-20">
-          <div className="w-full max-w-2xl bg-white border border-slate-250 rounded-2xl shadow-2xl p-6 flex flex-col max-h-[70vh] animate-slide-up">
+          <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 flex flex-col max-h-[70vh] animate-slide-up">
             <div className="flex justify-between items-center pb-4 border-b border-slate-100">
               <h3 className="font-bold text-slate-900 text-sm">Global Search results for "{searchQuery}"</h3>
               <button onClick={() => setSearchOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-lg">
@@ -156,7 +156,7 @@ export const AuthenticatedLayout: React.FC = () => {
                     {searchResults.users.map((u: any) => (
                       <div key={u.id} className="p-3 rounded-lg border border-slate-100 bg-slate-50 text-xs">
                         <div className="font-bold text-slate-900">{u.name}</div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">{u.role}</div>
+                        <div className="text-xs text-slate-400 mt-0.5">{u.role}</div>
                       </div>
                     ))}
                   </div>
@@ -169,7 +169,7 @@ export const AuthenticatedLayout: React.FC = () => {
                     {searchResults.clubs.map((c: any) => (
                       <div key={c.id} className="p-3 rounded-lg border border-slate-100 bg-slate-50 text-xs cursor-pointer" onClick={() => { navigate('/app/clubs'); setSearchOpen(false); }}>
                         <div className="font-bold text-slate-900">{c.name}</div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">{c.category} Club</div>
+                        <div className="text-xs text-slate-400 mt-0.5">{c.category} Club</div>
                       </div>
                     ))}
                   </div>
@@ -198,7 +198,7 @@ export const AuthenticatedLayout: React.FC = () => {
                 <div key={notif.id} className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-xs">
                   <div className="font-bold text-slate-950">{notif.title}</div>
                   <p className="text-slate-500 mt-1.5 leading-relaxed">{notif.content}</p>
-                  <div className="mt-3 pt-2 border-t border-slate-100 flex justify-between items-center text-[10px]">
+                  <div className="mt-3 pt-2 border-t border-slate-100 flex justify-between items-center text-xs">
                     <span className="text-slate-400 uppercase font-medium">{notif.source_module}</span>
                     {!notif.is_read && (
                       <Button

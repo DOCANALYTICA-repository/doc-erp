@@ -119,7 +119,7 @@ export const ClubHierarchyChart: React.FC<ClubHierarchyChartProps> = ({
                     ) : (
                       <div className="font-bold text-slate-900 text-xs">{level.title}</div>
                     )}
-                    <div className="text-[10px] text-slate-400 mt-1">{memberCountByLevel(level.id)} member(s)</div>
+                    <div className="text-xs text-slate-400 mt-1">{memberCountByLevel(level.id)} member(s)</div>
                     {canEdit && (
                       <button
                         onClick={() => deleteLevel(level.id)}
@@ -137,7 +137,7 @@ export const ClubHierarchyChart: React.FC<ClubHierarchyChartProps> = ({
                       placeholder="+ position"
                       value={newTitleByRank[rank] || ''}
                       onChange={e => setNewTitleByRank(prev => ({ ...prev, [rank]: e.target.value }))}
-                      className="w-24 px-2 py-1 text-[10px] bg-white border border-dashed border-slate-300 rounded-lg"
+                      className="w-24 px-2 py-1 text-xs bg-white border border-dashed border-slate-300 rounded-lg"
                     />
                     <Button label="Add" size="sm" variant="secondary" onClick={() => addSibling(rank)} />
                   </div>

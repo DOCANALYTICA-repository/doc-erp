@@ -80,7 +80,7 @@ export const LoginPage: React.FC = () => {
               className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-950"
             />
           </div>
-          {loginError && <span className="text-[10px] text-rose-500 block">{loginError}</span>}
+          {loginError && <span className="text-xs text-rose-500 block">{loginError}</span>}
           <button
             type="submit"
             className="w-full py-2.5 bg-slate-900 text-white rounded-lg font-semibold hover:bg-slate-800 transition-colors text-xs"

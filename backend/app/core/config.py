@@ -33,6 +33,15 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_STORAGE_BUCKET: str = "doc-portal-files"
 
+    # --- Claims policy -----------------------------------------------------
+    # ONE definition of the submission SLA. The engines module documented a
+    # 5-day limit in two places while the endpoint enforced 7 — two business
+    # rules for one policy, and no way to tell which was intended.
+    #
+    # Informational only: per the Claims PRD a late claim stays fully
+    # eligible for review and is never auto-rejected.
+    CLAIM_SUBMISSION_SLA_DAYS: int = 7
+
     # --- Uploads -----------------------------------------------------------
     # Four upload paths existed with no size cap, no MIME allow-list and no
     # check that the store actually accepted the bytes.

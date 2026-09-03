@@ -220,7 +220,7 @@ export const ClubsDashboard: React.FC = () => {
       {/* Club Selector */}
       {myClubs.length > 1 && (
         <div className="w-full border-b border-slate-200/40 bg-white px-6 py-2 flex gap-2 items-center">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Club:</span>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Club:</span>
           <select
             value={selectedClubId ?? ''}
             onChange={(e) => setSelectedClubId(e.target.value)}
@@ -326,7 +326,7 @@ export const ClubsDashboard: React.FC = () => {
                       <div className={`w-2.5 h-2.5 rounded-full ${evt.status === 'approved' ? 'bg-emerald-500' : 'bg-yellow-500'}`} />
                       <div>
                         <span className="font-semibold text-slate-800">{evt.title}</span>
-                        <span className="text-[10px] text-slate-400 ml-2">({evt.date})</span>
+                        <span className="text-xs text-slate-400 ml-2">({evt.date})</span>
                       </div>
                     </div>
                     <span className="font-medium text-slate-500">{evt.venue}</span>
@@ -423,13 +423,13 @@ export const ClubsDashboard: React.FC = () => {
                 <div key={evt.id} className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${ evt.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600' }`}>{evt.status}</span>
-                      <span className="text-[10px] text-slate-400">{evt.date}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${ evt.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600' }`}>{evt.status}</span>
+                      <span className="text-xs text-slate-400">{evt.date}</span>
                     </div>
                     <h4 className="font-bold text-slate-900 text-sm">{evt.title}</h4>
                     <p className="text-xs text-slate-500 mt-2 leading-relaxed">{evt.description}</p>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-[10px] text-slate-400">
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-400">
                     <span>Venue: {evt.venue}</span>
                     <span>Budget: Rs {evt.budget.toLocaleString()}</span>
                   </div>
@@ -533,7 +533,7 @@ export const ClubsDashboard: React.FC = () => {
                   <div key={sp.id} className="p-4 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
                     <div>
                       <h4 className="font-bold text-slate-900">{sp.sponsor_name}</h4>
-                      <span className="text-[10px] text-slate-400 mt-1 block uppercase font-medium">{sp.status}</span>
+                      <span className="text-xs text-slate-400 mt-1 block uppercase font-medium">{sp.status}</span>
                     </div>
                     <span className="font-bold text-slate-800">Rs {sp.amount.toLocaleString()}</span>
                   </div>
@@ -551,12 +551,12 @@ export const ClubsDashboard: React.FC = () => {
               {recruitmentDrives.map(drive => (
                 <div key={drive.id} className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm">
                   <div className="flex items-center justify-between mb-2">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${ drive.status === 'open' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600' }`}>{drive.status}</span>
-                    <span className="text-[10px] text-slate-400">{drive.recruitment_period}</span>
+                    <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${ drive.status === 'open' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600' }`}>{drive.status}</span>
+                    <span className="text-xs text-slate-400">{drive.recruitment_period}</span>
                   </div>
                   <h4 className="font-bold text-slate-900 text-sm">{drive.title}</h4>
                   <p className="text-xs text-slate-500 mt-2 leading-relaxed">{drive.eligibility}</p>
-                  <div className="mt-3 text-[10px] text-slate-400">Positions available: {drive.positions_available}</div>
+                  <div className="mt-3 text-xs text-slate-400">Positions available: {drive.positions_available}</div>
                 </div>
               ))}
               {recruitmentDrives.length === 0 && (
@@ -607,7 +607,7 @@ export const ClubsDashboard: React.FC = () => {
                 <div key={a.id} className="p-4 rounded-xl bg-white border border-slate-200/60 shadow-sm text-xs">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-slate-900">{a.title}</span>
-                    <span className="text-[10px] uppercase text-slate-400">{a.announcement_type}</span>
+                    <span className="text-xs uppercase text-slate-400">{a.announcement_type}</span>
                   </div>
                   <p className="text-slate-500 mt-2 leading-relaxed">{a.body}</p>
                 </div>
@@ -657,7 +657,7 @@ export const ClubsDashboard: React.FC = () => {
                   <div key={plan.id} className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm">
                     <div className="flex items-center justify-between mb-3">
                       <span className="font-bold text-slate-900 text-sm">Academic Year {plan.academic_year}</span>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-50 text-sky-600">
+                      <span className="px-2 py-0.5 rounded text-xs font-bold uppercase bg-sky-50 text-sky-600">
                         {plan.status.replace(/_/g, ' ')}
                       </span>
                     </div>
@@ -669,11 +669,11 @@ export const ClubsDashboard: React.FC = () => {
                     </div>
                     <p className="text-xs text-slate-500 leading-relaxed">{plan.vision}</p>
                     {plan.review_comments && (
-                      <div className="mt-3 p-3 rounded-lg bg-amber-50 text-amber-700 text-[11px]">
+                      <div className="mt-3 p-3 rounded-lg bg-amber-50 text-amber-700 text-xs">
                         Review comment: {plan.review_comments}
                       </div>
                     )}
-                    <div className="mt-4 flex flex-wrap gap-2 text-[11px]">
+                    <div className="mt-4 flex flex-wrap gap-2 text-xs">
                       {plan.status === 'draft' && (
                         <button
                           onClick={async () => { await api.post(`/clubs/annual-plans/${plan.id}/submit`, {}); setReloadTick(t => t + 1); }}
@@ -800,7 +800,7 @@ export const ClubsDashboard: React.FC = () => {
               ))}
             </div>
             <div className="p-6 rounded-2xl bg-white border border-slate-200/60 shadow-sm">
-              <pre className="text-[11px] whitespace-pre-wrap text-slate-600 leading-relaxed">
+              <pre className="text-xs whitespace-pre-wrap text-slate-600 leading-relaxed">
                 {reportData ? JSON.stringify(reportData, null, 2) : 'Loading report…'}
               </pre>
             </div>
@@ -813,7 +813,7 @@ export const ClubsDashboard: React.FC = () => {
             {analytics?.widgets?.map((w: any) => (
               <div key={w.key} className="p-5 rounded-2xl bg-white border border-slate-200/60 shadow-sm">
                 <h4 className="font-bold text-slate-900 text-sm mb-3">{w.title}</h4>
-                <pre className="text-[11px] whitespace-pre-wrap text-slate-600 leading-relaxed">
+                <pre className="text-xs whitespace-pre-wrap text-slate-600 leading-relaxed">
                   {JSON.stringify(w.data, null, 2)}
                 </pre>
               </div>

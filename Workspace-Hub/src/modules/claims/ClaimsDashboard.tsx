@@ -378,7 +378,7 @@ export const ClaimsDashboard: React.FC = () => {
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-slate-950">{claim.reference_number}</span>
-                            <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-[10px] uppercase font-bold">{claim.category}</span>
+                            <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 text-xs uppercase font-bold">{claim.category}</span>
                           </div>
                           <p className="text-slate-500 mt-1">Duration: {claim.date_range}</p>
                         </div>
@@ -657,7 +657,7 @@ export const ClaimsDashboard: React.FC = () => {
                                     <button
                                       key={doc.id}
                                       onClick={() => openDocument(claim.id, doc.id)}
-                                      className="text-[10px] px-2 py-1 rounded bg-white border border-slate-200 text-slate-600 hover:text-slate-900"
+                                      className="text-xs px-2 py-1 rounded bg-white border border-slate-200 text-slate-600 hover:text-slate-900"
                                     >
                                       {doc.document_type}
                                     </button>

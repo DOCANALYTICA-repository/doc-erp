@@ -1,70 +1,49 @@
-import os
+"""Claim-reason condensing.
+
+WHAT WAS DELETED HERE, AND WHY
+-------------------------------
+This module used to contain two more methods, both with zero callers:
+
+  * draft_meeting_minutes() returned a FIXED dict of invented minutes,
+    invented decisions and an invented "Rs 15,000" allocation, assigned to
+    user ids that do not exist in the seed — regardless of the transcript
+    passed in. It was labelled a "local mock implementation reproducing
+    high-quality summaries".
+
+  * detect_claim_anomalies() was two if-statements behind an AI-sounding name.
+
+The Master PRD's own rule is that AI must never modify institutional records.
+Fabricated minutes presented as a record of what a committee decided would be
+considerably worse than having no feature at all, and leaving the method in
+the tree was a liability the moment somebody wired it up by mistake. Neither
+was ever reachable, so deleting them removes no capability.
+
+What remains is honest about itself: it is a truncator, not a summarizer.
+"""
 import logging
 
 logger = logging.getLogger(__name__)
 
-class AIEngine:
-    def __init__(self):
-        self.api_key = os.getenv("GEMINI_API_KEY", "")
-        # In production, we would initialize the Google GenAI client here:
-        # from google import genai
-        # self.client = genai.Client() if self.api_key else None
-        self.client = None
+MAX_PREVIEW_WORDS = 8
+
+
+class ClaimReasonPreview:
+    """Shortens a long claim explanation for list and card views.
+
+    Deliberately NOT called a summarizer: it takes the first few words and
+    appends an ellipsis. It never paraphrases, never infers and never
+    invents — a reviewer reading a preview is reading the student's own
+    opening words, not a machine's characterisation of them.
+    """
 
     def summarize_claim_reason(self, reason: str) -> str:
-        """
-        Summarizes a student's lengthy claim explanation into a concise sentence.
-        """
         if not reason:
             return "No explanation provided."
-            
-        if self.client:
-            try:
-                # response = self.client.models.generate_content(
-                #     model='gemini-2.5-flash',
-                #     contents=f"Summarize this student claim reason: {reason}"
-                # )
-                # return response.text
-                pass
-            except Exception as e:
-                logger.error(f"Gemini API Error: {e}")
-                
-        # Elegant fallback / local mockup
+
         words = reason.split()
-        if len(words) <= 10:
+        if len(words) <= MAX_PREVIEW_WORDS + 2:
             return reason
-        return " ".join(words[:8]) + "..."
+        return " ".join(words[:MAX_PREVIEW_WORDS]) + "..."
 
-    def draft_meeting_minutes(self, transcript: str) -> dict:
-        """
-        Drafts meeting minutes, key decisions, and action items from a discussion transcript.
-        """
-        # Local mock implementation reproducing high-quality summaries
-        return {
-            "minutes": "The committee discussed upcoming cultural events and finalized the budget allocations. Membership guidelines were updated to include semester audits.",
-            "decisions": [
-                "Approved allocation of Rs 15,000 for the Commerce Club recruitment drive.",
-                "Mandated all students submit claims within 5 days of returning from event."
-            ],
-            "action_items": [
-                {"title": "Coordinate recruitment desks in block A", "assignee_id": "fac_1", "due_date": "2026-07-15"},
-                {"title": "Draft feedback form for events", "assignee_id": "std_1", "due_date": "2026-07-20"}
-            ]
-        }
 
-    def detect_claim_anomalies(self, claim_details: dict) -> list[str]:
-        """
-        Scans claim details for duplicates, late submissions, or certificate discrepancies.
-        """
-        anomalies = []
-        # Business logic checks
-        if claim_details.get("late_submission_flag"):
-            anomalies.append("Claim submitted after the 5-day regulatory SLA limit.")
-            
-        reason_lower = claim_details.get("reason", "").lower()
-        if "medical" in reason_lower and not claim_details.get("has_documents"):
-            anomalies.append("Category listed as Medical but no medical certificate was uploaded.")
-            
-        return anomalies
-
-ai_engine = AIEngine()
+ai_engine = ClaimReasonPreview()

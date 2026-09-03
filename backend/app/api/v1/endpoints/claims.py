@@ -1,6 +1,7 @@
 from typing import List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.rbac import PermissionChecker, get_current_user, get_resolved_permissions
 from app.core import faculty_scope
@@ -130,14 +131,17 @@ def submit_attendance_claim(
     claim_id = f"cl_{uuid.uuid4().hex[:12]}"
     ref_num = f"ACP-{datetime.now().year}-{uuid.uuid4().hex[:6].upper()}"
 
-    # Late-submission flag: >7 calendar days after the LAST date covered by
-    # the claim. Per the PRD this is informational only — late claims remain
-    # fully eligible for review, never auto-rejected.
+    # Late-submission flag: more than CLAIM_SUBMISSION_SLA_DAYS calendar days
+    # after the LAST date covered by the claim. Per the PRD this is
+    # informational only — late claims remain fully eligible for review and
+    # are never auto-rejected.
     late_flag = False
     try:
         last_date_str = claim_in.date_range.split("to")[-1].strip()
         last_date = datetime.strptime(last_date_str, "%Y-%m-%d")
-        late_flag = (datetime.now(timezone.utc).replace(tzinfo=None) - last_date).days > 7
+        late_flag = (
+            datetime.now(timezone.utc).replace(tzinfo=None) - last_date
+        ).days > settings.CLAIM_SUBMISSION_SLA_DAYS
     except (ValueError, IndexError):
         pass  # Unparseable date_range format — leave flag False rather than guess
 

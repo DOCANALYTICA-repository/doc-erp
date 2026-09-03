@@ -379,7 +379,7 @@ export const LandingHome: React.FC = () => {
                     <div className="mt-5 space-y-4 animate-fade-in">
                       <div>
                         <h4 className="text-xs font-semibold text-slate-800">Learning Outcomes:</h4>
-                        <ul className="mt-1.5 list-disc list-inside text-[11px] text-slate-600 space-y-1">
+                        <ul className="mt-1.5 list-disc list-inside text-xs text-slate-600 space-y-1">
                           {course.outcomes.map((out, idx) => <li key={idx}>{out}</li>)}
                         </ul>
                       </div>
@@ -387,7 +387,7 @@ export const LandingHome: React.FC = () => {
                         <h4 className="text-xs font-semibold text-slate-800">Career Roles:</h4>
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
                           {course.careers.map((car, idx) => (
-                            <span key={idx} className="px-2 py-0.5 rounded bg-slate-100 text-[10px] text-slate-600 font-medium">
+                            <span key={idx} className="px-2 py-0.5 rounded bg-slate-100 text-xs text-slate-600 font-medium">
                               {car}
                             </span>
                           ))}
@@ -419,13 +419,13 @@ export const LandingHome: React.FC = () => {
           {clubs.map((club) => (
             <div key={club.id} className="club-card p-6 rounded-2xl border border-slate-200/60 bg-white shadow-sm flex flex-col justify-between">
               <div>
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wider">
                   {club.category}
                 </span>
                 <h3 className="text-lg font-bold text-slate-900 mt-4">{club.name}</h3>
                 <p className="text-xs text-slate-500 mt-2 leading-relaxed">{club.description}</p>
               </div>
-              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+              <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
                 <span>Inquiries:</span>
                 <a href={`mailto:${club.contact_email}`} className="text-indigo-500 hover:underline">{club.contact_email}</a>
               </div>
