@@ -71,6 +71,7 @@ function settleEntrances(scope: HTMLElement | null) {
 // (Phase 3), not hardcoded, per the Landing PRD's "presentation layer only,
 // owns no content" architecture rule.
 import docDeptImg from '../../../assets/images/doc_department.jpg';
+import docDeptImgWebp from '../../../assets/images/doc_department.webp';
 
 interface Course {
   id: string;
@@ -101,7 +102,10 @@ interface Stats {
 export const LandingHome: React.FC = () => {
   const navigate = useNavigate();
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
-  const [activeLightboxImg, setActiveLightboxImg] = useState<string | null>(null);
+  // The whole image, not just its URL — the lightbox needs the title for its
+  // accessible name, and an <img> with alt="Lightbox" tells a screen-reader
+  // user nothing about what they are looking at.
+  const [activeLightbox, setActiveLightbox] = useState<GalleryImage | null>(null);
 
   const [stats, setStats] = useState<Stats | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -114,6 +118,16 @@ export const LandingHome: React.FC = () => {
     api.get<ClubCard[]>('/content/clubs-showcase').then(setClubs).catch(console.error);
     api.get<GalleryImage[]>('/content/gallery').then(setGallery).catch(console.error);
   }, []);
+
+  // Escape closes the lightbox.
+  useEffect(() => {
+    if (!activeLightbox) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setActiveLightbox(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [activeLightbox]);
 
   const heroContainerRef = useRef<HTMLDivElement>(null);
   const svgPathRef = useRef<SVGPathElement>(null);
@@ -327,7 +341,22 @@ export const LandingHome: React.FC = () => {
             </div>
           </div>
           <div className="hero-image relative aspect-video rounded-2xl overflow-hidden shadow-lg border border-slate-200 bg-slate-100">
-            <img src={docDeptImg} className="w-full h-full object-cover" alt="Department of Commerce" />
+            {/* 829 kB of JPEG for one below-the-fold image. Now 122 kB of
+                WebP with a 190 kB JPEG fallback, lazy-loaded, with explicit
+                dimensions so it reserves its space instead of shifting the
+                layout when it arrives. */}
+            <picture>
+              <source srcSet={docDeptImgWebp} type="image/webp" />
+              <img
+                src={docDeptImg}
+                width={1264}
+                height={848}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover"
+                alt="Students and faculty at the Department of Commerce"
+              />
+            </picture>
           </div>
         </div>
       </section>
@@ -414,16 +443,27 @@ export const LandingHome: React.FC = () => {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {gallery.map((img) => (
-              <div
+              // A clickable <div> is invisible to the keyboard and announces
+              // nothing. A <button> is focusable, activates on Enter and
+              // Space, and carries its own role for free.
+              <button
                 key={img.id}
-                onClick={() => setActiveLightboxImg(img.url)}
-                className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer border border-slate-200 shadow-sm bg-slate-200"
+                type="button"
+                onClick={() => setActiveLightbox(img)}
+                aria-label={`View ${img.title} full size`}
+                className="group relative aspect-square rounded-xl overflow-hidden cursor-pointer border border-slate-200 shadow-sm bg-slate-200 text-left"
               >
-                <img src={img.url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" alt={img.title} />
+                <img
+                  src={img.url}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  alt={img.title}
+                />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                  <Eye className="w-6 h-6 text-white" />
+                  <Eye className="w-6 h-6 text-white" aria-hidden="true" />
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -469,12 +509,30 @@ export const LandingHome: React.FC = () => {
       </footer>
 
       {/* Lightbox Modal */}
-      {activeLightboxImg ? (
+      {activeLightbox ? (
         <div
-          onClick={() => setActiveLightboxImg(null)}
-          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-label={activeLightbox.title}
+          onClick={() => setActiveLightbox(null)}
+          className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-4 animate-fade-in"
         >
-          <img src={activeLightboxImg} className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain" alt="Lightbox" />
+          <img
+            src={activeLightbox.url}
+            decoding="async"
+            className="max-w-full max-h-[85vh] rounded-lg shadow-2xl object-contain"
+            alt={activeLightbox.title}
+          />
+          <p className="mt-4 text-sm text-white/80">{activeLightbox.title}</p>
+          {/* Escape closes it too — see the effect above. A modal that can only
+              be dismissed by clicking a backdrop is a trap for keyboard users. */}
+          <button
+            type="button"
+            onClick={() => setActiveLightbox(null)}
+            className="absolute top-4 right-4 rounded-full bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20"
+          >
+            Close
+          </button>
         </div>
       ) : null}
     </div>
