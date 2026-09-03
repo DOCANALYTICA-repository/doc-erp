@@ -9,6 +9,7 @@ from app.models.content import GalleryImage, Programme
 from app.models.user import User
 from app.schemas.content import (
     GalleryImageIn, GalleryImageOut, ProgrammeIn, ProgrammeOut,
+    PublicGalleryImageOut, PublicProgrammeOut, PublicStatisticsOut, ShowcaseClubOut,
 )
 from app.services.engines.content import content_engine
 
@@ -22,22 +23,22 @@ router = APIRouter()
 # routes carry no operational or personal data.
 # ---------------------------------------------------------------------------
 
-@router.get("/statistics")
+@router.get("/statistics", response_model=PublicStatisticsOut)
 def get_public_statistics(db: Session = Depends(get_db_readonly)):
     return content_engine.get_public_statistics(db)
 
 
-@router.get("/courses")
+@router.get("/courses", response_model=List[PublicProgrammeOut])
 def get_courses(db: Session = Depends(get_db_readonly)):
     return content_engine.get_courses(db)
 
 
-@router.get("/gallery")
+@router.get("/gallery", response_model=List[PublicGalleryImageOut])
 def get_gallery_images(db: Session = Depends(get_db_readonly)):
     return content_engine.get_gallery_images(db)
 
 
-@router.get("/clubs-showcase")
+@router.get("/clubs-showcase", response_model=List[ShowcaseClubOut])
 def get_clubs_showcase(db: Session = Depends(get_db_readonly)):
     return content_engine.get_club_showcase(db)
 

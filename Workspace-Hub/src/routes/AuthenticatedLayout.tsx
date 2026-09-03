@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../context/useStore';
-import { api } from '../services/api';
 import { AppShell } from '@astryxdesign/core/AppShell';
 import { TopNav, TopNavHeading } from '@astryxdesign/core/TopNav';
-import { Button } from '@astryxdesign/core/Button';
-import { Skeleton } from '@astryxdesign/core/Skeleton';
-import { Sparkles, Search, Bell, X, ChevronDown } from 'lucide-react';
+import { Kbd } from '@astryxdesign/core/Kbd';
+import { Sparkles, Search, Bell, ChevronDown } from 'lucide-react';
+import { useNotifications } from '../api/hooks';
 import { PageLoader } from '../components/ui/PageLoader';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
-import { EMPTY_SEARCH_RESULTS, type Notification, type SearchResults } from '../api/types';
+import { AppSideNav } from './AppSideNav';
+import { CommandBar } from './CommandBar';
+import { NotificationTray } from './NotificationTray';
 
 /**
  * Shared authenticated shell — replaces the big conditionally-rendered
@@ -27,32 +28,31 @@ export const AuthenticatedLayout: React.FC = () => {
   const location = useLocation();
 
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchResults>(EMPTY_SEARCH_RESULTS);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
 
   const activeModule = location.pathname.split('/')[2] || '';
 
-  useEffect(() => {
-    if (user) {
-      setIsLoadingNotifications(true);
-      api.get<Notification[]>('/notifications')
-        .then(setNotifications)
-        .catch(console.error)
-        .finally(() => setIsLoadingNotifications(false));
-    }
-  }, [user, location.pathname]);
+  /**
+   * The unread badge, from the server's own filtered list.
+   *
+   * This used to be `notifications.filter(n => !n.is_read).length` on a list
+   * the endpoint had ALREADY filtered to unread — tautological, and it drifted
+   * the moment anything was marked read without a refetch. The query also
+   * re-ran on every route change; it now polls on a timer instead.
+   */
+  const { data: notifications } = useNotifications();
+  const unreadCount = notifications?.length ?? 0;
 
+  // ⌘K / Ctrl-K opens the command palette from anywhere.
   useEffect(() => {
-    if (searchQuery.trim().length > 1) {
-      api.get<SearchResults>(`/search?q=${encodeURIComponent(searchQuery)}`)
-        .then(setSearchResults)
-        .catch(() => setSearchResults(EMPTY_SEARCH_RESULTS));
-    } else {
-      setSearchResults(EMPTY_SEARCH_RESULTS);
-    }
-  }, [searchQuery]);
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [setSearchOpen]);
 
   if (!user) return <PageLoader label="Loading..." />;
 
@@ -61,50 +61,70 @@ export const AuthenticatedLayout: React.FC = () => {
       variant="elevated"
       contentPadding={0}
       style={{ height: '100dvh', width: '100%' }}
+      // Filling this slot is what gives the app a mobile menu. AppShell gates
+      // its hamburger on `sideNav` being present and this was passing nothing,
+      // so below the breakpoint there was NO navigation at all.
+      sideNav={<AppSideNav />}
+      mobileNav={{ breakpoint: 'md' }}
       topNav={
         <TopNav
           label="Main navigation"
           heading={
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/app')}>
+            <button
+              type="button"
+              className="flex cursor-pointer items-center gap-3 text-left"
+              onClick={() => navigate('/app')}
+              aria-label="Go to your inbox"
+            >
               <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center shadow-sm">
                 <Sparkles className="w-4 h-4 text-white" />
               </div>
               <TopNavHeading heading="DOC Unified Digital ERP" />
-              <span className="text-xs bg-slate-100 text-slate-400 font-bold px-2 py-0.5 rounded border border-slate-200/50 uppercase ml-2">
-                {activeModule}
-              </span>
-            </div>
+              {activeModule ? (
+                <span className="ml-2 rounded border border-slate-200/50 bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-500">
+                  {activeModule}
+                </span>
+              ) : null}
+            </button>
           }
           endContent={
             <div className="flex items-center gap-4">
-              <div className="relative hidden md:block">
-                <input
-                  type="text"
-                  placeholder="Search people, clubs, tasks..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setSearchOpen(true);
-                  }}
-                  className="w-64 pl-9 pr-4 py-1.5 bg-slate-100 border-none rounded-lg text-xs focus:ring-2 focus:ring-slate-900 transition-all text-slate-950"
-                />
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2" />
-              </div>
+              {/* Opens the command palette rather than being a search box
+                  that fired a request per keystroke. */}
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                aria-label="Search and commands"
+                className="hidden items-center gap-2 rounded-lg bg-slate-100 py-1.5 pl-3 pr-2 text-sm text-slate-500 hover:bg-slate-200 md:flex"
+              >
+                <Search className="h-4 w-4" aria-hidden="true" />
+                <span>Search or jump to…</span>
+                <Kbd keys="mod+k" />
+              </button>
 
               <button
+                type="button"
                 onClick={() => setNotificationsOpen(!isNotificationsOpen)}
-                className="p-2 text-slate-500 hover:text-slate-900 relative rounded-lg"
+                aria-label={
+                  unreadCount > 0
+                    ? `Notifications, ${unreadCount} unread`
+                    : 'Notifications'
+                }
+                aria-expanded={isNotificationsOpen}
+                className="relative rounded-lg p-2 text-slate-500 hover:text-slate-900"
               >
-                <Bell className="w-4 h-4" />
-                {notifications.filter(n => !n.is_read).length > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full" />
-                )}
+                <Bell className="h-4 w-4" aria-hidden="true" />
+                {unreadCount > 0 ? (
+                  <span className="absolute right-1 top-1 min-w-[1rem] rounded-full bg-rose-500 px-1 text-[10px] font-semibold leading-4 text-white">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                ) : null}
               </button>
 
               <div className="relative">
                 <button
                   onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  className="flex items-center gap-2 hover:opacity-80 transition-opacity focus:outline-none"
+                  className="flex items-center gap-2 rounded-lg transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
                 >
                   <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs text-slate-600">
                     {user.name[0]}
@@ -140,85 +160,11 @@ export const AuthenticatedLayout: React.FC = () => {
         </ErrorBoundary>
       </div>
 
-      {isSearchOpen && searchQuery && (
-        <div className="fixed inset-0 z-50 bg-slate-950/20 backdrop-blur-sm flex justify-center p-4 pt-20">
-          <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 flex flex-col max-h-[70vh] animate-slide-up">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-100">
-              <h3 className="font-bold text-slate-900 text-sm">Global Search results for "{searchQuery}"</h3>
-              <button onClick={() => setSearchOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-lg">
-                <X className="w-4 h-4 text-slate-400" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto py-4 space-y-6">
-              {searchResults.users?.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Faculty & Students</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {searchResults.users.map(u => (
-                      <div key={u.id} className="p-3 rounded-lg border border-slate-100 bg-slate-50 text-xs">
-                        <div className="font-bold text-slate-900">{u.name}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">{u.role}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {searchResults.clubs?.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Clubs</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {searchResults.clubs.map(c => (
-                      <div key={c.id} className="p-3 rounded-lg border border-slate-100 bg-slate-50 text-xs cursor-pointer" onClick={() => { navigate('/app/clubs'); setSearchOpen(false); }}>
-                        <div className="font-bold text-slate-900">{c.name}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">{c.category} Club</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <CommandBar isOpen={isSearchOpen} onOpenChange={setSearchOpen} />
 
-      {isNotificationsOpen && (
-        <div className="fixed inset-y-0 right-0 z-50 w-80 bg-white border-l border-slate-200 shadow-2xl p-6 flex flex-col animate-slide-up">
-          <div className="flex justify-between items-center pb-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-900 text-sm">Notifications Tray</h3>
-            <button onClick={() => setNotificationsOpen(false)} className="p-1 rounded-lg hover:bg-slate-100">
-              <X className="w-4 h-4 text-slate-400" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto py-4 space-y-4">
-            {isLoadingNotifications ? (
-              <div className="space-y-3">
-                {[0, 1, 2].map(i => <Skeleton key={i} height={64} index={i} />)}
-              </div>
-            ) : (
-              notifications.map(notif => (
-                <div key={notif.id} className="p-4 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-                  <div className="font-bold text-slate-950">{notif.title}</div>
-                  <p className="text-slate-500 mt-1.5 leading-relaxed">{notif.content}</p>
-                  <div className="mt-3 pt-2 border-t border-slate-100 flex justify-between items-center text-xs">
-                    <span className="text-slate-400 uppercase font-medium">{notif.source_module}</span>
-                    {!notif.is_read && (
-                      <Button
-                        label="Mark read"
-                        variant="ghost"
-                        size="sm"
-                        clickAction={async () => {
-                          await api.post(`/notifications/${notif.id}/read`, {});
-                          setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+      {isNotificationsOpen ? (
+        <NotificationTray onClose={() => setNotificationsOpen(false)} />
+      ) : null}
     </AppShell>
   );
 };

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Sparkles, ArrowRight, BookOpen, Compass, Eye, Mail, MapPin } from 'lucide-react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { api } from '../../services/api';
 
 // Register GSAP plugins
 gsap.registerPlugin(ScrollTrigger);
@@ -72,33 +71,14 @@ function settleEntrances(scope: HTMLElement | null) {
 // owns no content" architecture rule.
 import docDeptImg from '../../../assets/images/doc_department.jpg';
 import docDeptImgWebp from '../../../assets/images/doc_department.webp';
+import { useClubShowcase, useGallery, useProgrammes, usePublicStatistics } from '../../api/hooks';
+import type { GalleryImage } from '../../api/types';
 
-interface Course {
-  id: string;
-  name: string;
-  description: string;
-  outcomes: string[];
-  careers: string[];
-}
-interface ClubCard {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
-  contact_email: string;
-}
-interface GalleryImage {
-  id: string;
-  title: string;
-  url: string;
-}
-interface Stats {
-  total_students: number;
-  faculty_count: number;
-  number_of_clubs: number;
-  years_established: number;
-}
-
+/*
+ * Types come from src/api/types.ts, which is generated from the backend's own
+ * OpenAPI schema. These four shapes used to be re-declared by hand here, which
+ * is how the page ended up rendering fields the API had stopped sending.
+ */
 export const LandingHome: React.FC = () => {
   const navigate = useNavigate();
   const [activeCourseId, setActiveCourseId] = useState<string | null>(null);
@@ -107,17 +87,11 @@ export const LandingHome: React.FC = () => {
   // user nothing about what they are looking at.
   const [activeLightbox, setActiveLightbox] = useState<GalleryImage | null>(null);
 
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [clubs, setClubs] = useState<ClubCard[]>([]);
-  const [gallery, setGallery] = useState<GalleryImage[]>([]);
-
-  useEffect(() => {
-    api.get<Stats>('/content/statistics').then(setStats).catch(console.error);
-    api.get<Course[]>('/content/courses').then(setCourses).catch(console.error);
-    api.get<ClubCard[]>('/content/clubs-showcase').then(setClubs).catch(console.error);
-    api.get<GalleryImage[]>('/content/gallery').then(setGallery).catch(console.error);
-  }, []);
+  // All four are cached and deduped; the public page is the most-hit route.
+  const { data: stats } = usePublicStatistics();
+  const { data: courses = [] } = useProgrammes();
+  const { data: clubs = [] } = useClubShowcase();
+  const { data: gallery = [] } = useGallery();
 
   // Escape closes the lightbox.
   useEffect(() => {

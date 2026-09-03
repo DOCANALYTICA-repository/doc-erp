@@ -60,38 +60,20 @@ export type ActionKind = ActionItem['kind'];
 export type Urgency = ActionItem['urgency'];
 
 // --- Public content --------------------------------------------------------
-export type Programme = Schemas['ProgrammeOut'];
+/** The PUBLIC shape: outcomes/careers as real lists, not the storage strings. */
+export type Programme = Schemas['PublicProgrammeOut'];
+/** The admin/storage shape, where those two are comma-joined. */
+export type ProgrammeRecord = Schemas['ProgrammeOut'];
+
+export type PublicStatistics = Schemas['PublicStatisticsOut'];
+export type GalleryImage = Schemas['PublicGalleryImageOut'];
+export type ShowcaseClub = Schemas['ShowcaseClubOut'];
 
 /**
- * The few endpoints FastAPI types as a bare dict, so there is no generated
- * schema to alias. Declared by hand and kept deliberately small — if one of
- * these grows, give it a response_model on the server instead of widening it
- * here.
+ * The remaining endpoint FastAPI types as a bare dict. Declared by hand and
+ * kept deliberately small — if it grows, give it a response_model on the
+ * server instead of widening it here.
  */
-export interface PublicStatistics {
-  total_students: number;
-  faculty_count: number;
-  number_of_clubs: number;
-  years_established: number;
-  founded_year: number;
-}
-
-export interface GalleryImage {
-  id: string;
-  title: string;
-  url: string;
-  caption?: string | null;
-}
-
-export interface ShowcaseClub {
-  id: string;
-  name: string;
-  category: string;
-  logo: string | null;
-  description: string | null;
-  contact_email: string | null;
-}
-
 export interface CalendarEvent {
   id: string;
   title: string;

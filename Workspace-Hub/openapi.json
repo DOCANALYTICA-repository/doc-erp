@@ -4689,7 +4689,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/PublicStatisticsOut"
+                }
               }
             }
           }
@@ -4708,7 +4710,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicProgrammeOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Courses Api V1 Content Courses Get"
+                }
               }
             }
           }
@@ -4727,7 +4735,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicGalleryImageOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Gallery Images Api V1 Content Gallery Get"
+                }
               }
             }
           }
@@ -4746,7 +4760,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ShowcaseClubOut"
+                  },
+                  "type": "array",
+                  "title": "Response Get Clubs Showcase Api V1 Content Clubs Showcase Get"
+                }
               }
             }
           }
@@ -8393,6 +8413,130 @@
         ],
         "title": "ProgrammeOut"
       },
+      "PublicGalleryImageOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "caption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "url"
+        ],
+        "title": "PublicGalleryImageOut"
+      },
+      "PublicProgrammeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "brochure_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brochure Url"
+          },
+          "outcomes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Outcomes",
+            "default": []
+          },
+          "careers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Careers",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "PublicProgrammeOut",
+        "description": "What the PUBLIC /content/courses returns.\n\nDistinct from ProgrammeOut, which is the admin/storage shape: outcomes and\ncareers are comma-joined strings in the database and real lists on the\nwire. Without a response_model the generated OpenAPI schema described the\nstorage shape, and the frontend was typed against strings it then called\n.map() on."
+      },
+      "PublicStatisticsOut": {
+        "properties": {
+          "total_students": {
+            "type": "integer",
+            "title": "Total Students"
+          },
+          "faculty_count": {
+            "type": "integer",
+            "title": "Faculty Count"
+          },
+          "number_of_clubs": {
+            "type": "integer",
+            "title": "Number Of Clubs"
+          },
+          "years_established": {
+            "type": "integer",
+            "title": "Years Established"
+          },
+          "founded_year": {
+            "type": "integer",
+            "title": "Founded Year"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_students",
+          "faculty_count",
+          "number_of_clubs",
+          "years_established",
+          "founded_year"
+        ],
+        "title": "PublicStatisticsOut"
+      },
       "RecruitmentApplicationCreate": {
         "properties": {
           "motivation_statement": {
@@ -8808,6 +8952,62 @@
         },
         "type": "object",
         "title": "ReminderUpdate"
+      },
+      "ShowcaseClubOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "logo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logo"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "contact_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "category"
+        ],
+        "title": "ShowcaseClubOut"
       },
       "SponsorshipCreate": {
         "properties": {

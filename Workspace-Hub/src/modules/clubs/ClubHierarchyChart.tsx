@@ -117,7 +117,7 @@ export const ClubHierarchyChart: React.FC<ClubHierarchyChartProps> = ({
                       <input
                         defaultValue={level.title}
                         onBlur={(e) => { if (e.target.value.trim() && e.target.value !== level.title) renameLevel(level.id, e.target.value.trim()); }}
-                        className="w-full bg-transparent text-center font-bold text-slate-900 text-xs focus:outline-none focus:ring-1 focus:ring-slate-300 rounded"
+                        className="w-full bg-transparent text-center font-bold text-slate-900 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded"
                       />
                     ) : (
                       <div className="font-bold text-slate-900 text-xs">{level.title}</div>

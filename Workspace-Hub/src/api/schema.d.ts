@@ -2834,6 +2834,60 @@ export interface components {
              */
             is_published: boolean;
         };
+        /** PublicGalleryImageOut */
+        PublicGalleryImageOut: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+            /** Caption */
+            caption?: string | null;
+        };
+        /**
+         * PublicProgrammeOut
+         * @description What the PUBLIC /content/courses returns.
+         *
+         *     Distinct from ProgrammeOut, which is the admin/storage shape: outcomes and
+         *     careers are comma-joined strings in the database and real lists on the
+         *     wire. Without a response_model the generated OpenAPI schema described the
+         *     storage shape, and the frontend was typed against strings it then called
+         *     .map() on.
+         */
+        PublicProgrammeOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Brochure Url */
+            brochure_url?: string | null;
+            /**
+             * Outcomes
+             * @default []
+             */
+            outcomes: string[];
+            /**
+             * Careers
+             * @default []
+             */
+            careers: string[];
+        };
+        /** PublicStatisticsOut */
+        PublicStatisticsOut: {
+            /** Total Students */
+            total_students: number;
+            /** Faculty Count */
+            faculty_count: number;
+            /** Number Of Clubs */
+            number_of_clubs: number;
+            /** Years Established */
+            years_established: number;
+            /** Founded Year */
+            founded_year: number;
+        };
         /** RecruitmentApplicationCreate */
         RecruitmentApplicationCreate: {
             /** Motivation Statement */
@@ -2967,6 +3021,21 @@ export interface components {
             due_date?: string | null;
             /** Status */
             status?: string | null;
+        };
+        /** ShowcaseClubOut */
+        ShowcaseClubOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Category */
+            category: string;
+            /** Logo */
+            logo?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Contact Email */
+            contact_email?: string | null;
         };
         /** SponsorshipCreate */
         SponsorshipCreate: {
@@ -6214,7 +6283,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PublicStatisticsOut"];
                 };
             };
         };
@@ -6234,7 +6303,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PublicProgrammeOut"][];
                 };
             };
         };
@@ -6254,7 +6323,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["PublicGalleryImageOut"][];
                 };
             };
         };
@@ -6274,7 +6343,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ShowcaseClubOut"][];
                 };
             };
         };
