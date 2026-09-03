@@ -2,14 +2,14 @@ from .conftest import auth_headers
 
 
 def _titles(client, headers):
-    r = client.get("/api/v1/notifications/", headers=headers)
+    r = client.get("/api/v1/notifications", headers=headers)
     assert r.status_code == 200
     return [n["title"] for n in r.json()]
 
 
 def test_claim_submission_and_stage_progress_notify_the_student(client):
     student_h = auth_headers(client, "student.regular2@christuniversity.in", "student123")
-    r = client.post("/api/v1/claims/", json={
+    r = client.post("/api/v1/claims", json={
         "category": "medical", "academic_year": "2025-2026", "semester": "5",
         "programme": "B.Com (Hons)", "section": "A", "submission_type": "individual",
         "date_range": "2026-07-10 to 2026-07-10", "reason": "Fever.",

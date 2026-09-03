@@ -8,7 +8,7 @@ from app.services.engines.calendar import calendar_engine
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("")
 def get_unified_calendar(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

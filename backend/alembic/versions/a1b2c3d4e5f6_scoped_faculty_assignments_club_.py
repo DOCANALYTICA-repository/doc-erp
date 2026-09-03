@@ -51,15 +51,25 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_club_hierarchy_levels_id'), 'club_hierarchy_levels', ['id'], unique=False)
 
-    op.add_column('club_members', sa.Column('hierarchy_level_id', sa.String(), nullable=True))
-    op.create_foreign_key('fk_club_members_hierarchy_level', 'club_members', 'club_hierarchy_levels', ['hierarchy_level_id'], ['id'])
+    # SQLite has no ALTER TABLE ... ADD CONSTRAINT, so every add_column that
+    # carries a foreign key has to go through batch mode (which recreates the
+    # table). Postgres executes the same statements natively.
+    with op.batch_alter_table('club_members') as batch_op:
+        batch_op.add_column(sa.Column('hierarchy_level_id', sa.String(), nullable=True))
+        batch_op.create_foreign_key(
+            'fk_club_members_hierarchy_level', 'club_hierarchy_levels',
+            ['hierarchy_level_id'], ['id'],
+        )
 
-    op.add_column('claims', sa.Column('club_id', sa.String(), nullable=True))
-    op.create_foreign_key('fk_claims_club', 'claims', 'clubs', ['club_id'], ['id'])
-    op.add_column('claims', sa.Column('revision_reason', sa.String(), nullable=True))
-    op.add_column('claims', sa.Column('last_revised_by', sa.String(), nullable=True))
-    op.create_foreign_key('fk_claims_last_revised_by', 'claims', 'users', ['last_revised_by'], ['id'])
-    op.add_column('claims', sa.Column('last_revised_stage', sa.String(), nullable=True))
+    with op.batch_alter_table('claims') as batch_op:
+        batch_op.add_column(sa.Column('club_id', sa.String(), nullable=True))
+        batch_op.add_column(sa.Column('revision_reason', sa.String(), nullable=True))
+        batch_op.add_column(sa.Column('last_revised_by', sa.String(), nullable=True))
+        batch_op.add_column(sa.Column('last_revised_stage', sa.String(), nullable=True))
+        batch_op.create_foreign_key('fk_claims_club', 'clubs', ['club_id'], ['id'])
+        batch_op.create_foreign_key(
+            'fk_claims_last_revised_by', 'users', ['last_revised_by'], ['id'],
+        )
 
     # --- Data backfill: every existing club gets a default 4-level
     # hierarchy, and every existing membership's hierarchy_level_id is set
@@ -103,15 +113,17 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Downgrade schema."""
-    op.drop_constraint('fk_claims_last_revised_by', 'claims', type_='foreignkey')
-    op.drop_column('claims', 'last_revised_stage')
-    op.drop_column('claims', 'last_revised_by')
-    op.drop_column('claims', 'revision_reason')
-    op.drop_constraint('fk_claims_club', 'claims', type_='foreignkey')
-    op.drop_column('claims', 'club_id')
+    with op.batch_alter_table('claims') as batch_op:
+        batch_op.drop_constraint('fk_claims_last_revised_by', type_='foreignkey')
+        batch_op.drop_constraint('fk_claims_club', type_='foreignkey')
+        batch_op.drop_column('last_revised_stage')
+        batch_op.drop_column('last_revised_by')
+        batch_op.drop_column('revision_reason')
+        batch_op.drop_column('club_id')
 
-    op.drop_constraint('fk_club_members_hierarchy_level', 'club_members', type_='foreignkey')
-    op.drop_column('club_members', 'hierarchy_level_id')
+    with op.batch_alter_table('club_members') as batch_op:
+        batch_op.drop_constraint('fk_club_members_hierarchy_level', type_='foreignkey')
+        batch_op.drop_column('hierarchy_level_id')
 
     op.drop_index(op.f('ix_club_hierarchy_levels_id'), table_name='club_hierarchy_levels')
     op.drop_table('club_hierarchy_levels')

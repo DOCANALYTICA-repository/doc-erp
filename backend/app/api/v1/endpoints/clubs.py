@@ -104,7 +104,7 @@ ANNUAL_PLAN_NEXT_STAGE = {
 
 
 # 1. Club Profiles
-@router.get("/", response_model=List[ClubOut])
+@router.get("", response_model=List[ClubOut])
 def get_clubs(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return club_repo.get_multi(db)
 

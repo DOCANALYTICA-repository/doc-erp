@@ -6,6 +6,7 @@ from datetime import datetime, timezone, timedelta
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from sqlalchemy.orm import Session
+from app.core.config import settings
 from app.core.database import SessionLocal, engine
 from app.models import Base
 from app.models.user import User
@@ -16,11 +17,47 @@ from app.models.notification import Notification
 from app.models.faculty_assignment import FacultyAssignment
 from app.core.security import get_password_hash
 
-def seed_database():
-    print("Initializing Database Schemas...")
+DESTRUCTIVE_ENV_FLAG = "ALLOW_DESTRUCTIVE_SEED"
+DESTRUCTIVE_ENV_VALUE = "yes-destroy-this-database"
+
+
+def _describe_target() -> str:
+    """Human-readable target host, with any password stripped out."""
+    url = settings.DATABASE_URL
+    return url.rsplit("@", 1)[-1] if "@" in url else url
+
+
+def reset_schema() -> None:
+    """DROP and re-CREATE every table.
+
+    This is destructive and irreversible. It refuses to run against anything
+    that is not SQLite unless the caller has explicitly opted in through the
+    environment, so that a bare `python app/db/seed.py` can never take out a
+    remote database.
+    """
+    is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+    opted_in = os.environ.get(DESTRUCTIVE_ENV_FLAG) == DESTRUCTIVE_ENV_VALUE
+
+    if not is_sqlite and not opted_in:
+        raise RuntimeError(
+            f"Refusing to drop every table on '{_describe_target()}'. "
+            f"This is not a SQLite database. If you really mean it, set "
+            f"{DESTRUCTIVE_ENV_FLAG}={DESTRUCTIVE_ENV_VALUE} and run again."
+        )
+
+    print(f"Resetting database schema on {_describe_target()} ...")
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    
+
+
+def seed_database():
+    """Insert the demo dataset. Non-destructive and safe against a migrated DB.
+
+    Call reset_schema() first if you want a clean slate.
+    """
+    print("Seeding database...")
+    Base.metadata.create_all(bind=engine)
+
     db: Session = SessionLocal()
     try:
         print("Generating mock users...")
@@ -465,4 +502,5 @@ def seed_database():
         db.close()
 
 if __name__ == "__main__":
+    reset_schema()
     seed_database()

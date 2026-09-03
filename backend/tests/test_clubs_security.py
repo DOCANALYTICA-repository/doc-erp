@@ -2,13 +2,13 @@ from .conftest import auth_headers
 
 
 def test_clubs_list_requires_auth(client):
-    r = client.get("/api/v1/clubs/")
+    r = client.get("/api/v1/clubs")
     assert r.status_code == 401
 
 
 def test_clubs_list_works_when_authenticated(client):
     h = auth_headers(client, "student.regular@christuniversity.in", "student123")
-    r = client.get("/api/v1/clubs/", headers=h)
+    r = client.get("/api/v1/clubs", headers=h)
     assert r.status_code == 200
     assert len(r.json()) >= 1
 

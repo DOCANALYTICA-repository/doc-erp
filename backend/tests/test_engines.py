@@ -20,25 +20,25 @@ def test_content_clubs_showcase_exposes_only_public_safe_fields(client):
 
 
 def test_search_requires_auth(client):
-    r = client.get("/api/v1/search/?q=commerce")
+    r = client.get("/api/v1/search?q=commerce")
     assert r.status_code == 401
 
 
 def test_search_finds_seeded_club(client):
     h = auth_headers(client, "student.regular@christuniversity.in", "student123")
-    r = client.get("/api/v1/search/?q=Commerce", headers=h)
+    r = client.get("/api/v1/search?q=Commerce", headers=h)
     assert r.status_code == 200
     assert any(c["name"] == "Commerce Club" for c in r.json()["clubs"])
 
 
 def test_calendar_requires_auth(client):
-    r = client.get("/api/v1/calendar/")
+    r = client.get("/api/v1/calendar")
     assert r.status_code == 401
 
 
 def test_calendar_returns_events_for_student_with_academic_profile(client):
     h = auth_headers(client, "student.regular@christuniversity.in", "student123")
-    r = client.get("/api/v1/calendar/", headers=h)
+    r = client.get("/api/v1/calendar", headers=h)
     assert r.status_code == 200
     types = {e["type"] for e in r.json()}
     assert "timetable" in types  # student has programme/semester/section seeded

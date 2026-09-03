@@ -34,6 +34,7 @@ doc_platform.db
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # OS Files
 .DS_Store

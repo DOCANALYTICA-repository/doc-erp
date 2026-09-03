@@ -91,7 +91,7 @@ def check_duplicate_claim(
 
 
 # 2. Submit Claim
-@router.post("/", response_model=ClaimOut)
+@router.post("", response_model=ClaimOut)
 def submit_attendance_claim(
     claim_in: ClaimCreate,
     db: Session = Depends(get_db),
@@ -201,7 +201,7 @@ def _claims_pending_for_subject_faculty(db: Session, faculty_id: str) -> List[Cl
 
 
 # 3. Retrieve Claims — scoped to what THIS user is actually allowed/expected to see
-@router.get("/", response_model=List[ClaimOut])
+@router.get("", response_model=List[ClaimOut])
 def list_claims(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if current_user.primary_role == "super_admin":
         return [_to_claim_out(c) for c in claim_repo.get_multi(db)]

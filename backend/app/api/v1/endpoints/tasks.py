@@ -10,11 +10,11 @@ import uuid
 
 router = APIRouter()
 
-@router.get("/", response_model=List[TaskOut])
+@router.get("", response_model=List[TaskOut])
 def get_user_tasks(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return task_repo.get_by_assignee(db, assignee_id=current_user.id)
 
-@router.post("/", response_model=TaskOut)
+@router.post("", response_model=TaskOut)
 def create_task(task_in: TaskCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     task_dict = task_in.dict()
     task_dict["id"] = f"task_{uuid.uuid4().hex[:12]}"

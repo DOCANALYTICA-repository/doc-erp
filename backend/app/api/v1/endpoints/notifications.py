@@ -9,7 +9,7 @@ from app.services.engines.notification import notification_engine
 
 router = APIRouter()
 
-@router.get("/", response_model=List[NotificationOut])
+@router.get("", response_model=List[NotificationOut])
 def get_user_notifications(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return notification_engine.get_unread_for_user(db, user_id=current_user.id)
 

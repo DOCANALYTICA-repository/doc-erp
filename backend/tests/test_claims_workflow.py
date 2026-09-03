@@ -43,7 +43,7 @@ def test_full_submit_and_approval_chain(client):
             for s in tt[:1]
         ],
     }
-    r = client.post("/api/v1/claims/", json=payload, headers=student_h)
+    r = client.post("/api/v1/claims", json=payload, headers=student_h)
     assert r.status_code == 200
     claim = r.json()
     cid = claim["id"]

@@ -21,9 +21,9 @@ import pytest  # noqa: E402
 def _setup_schema_and_seed():
     from app.core.database import engine
     from app.models import Base
-    from app.db.seed import seed_database
+    from app.db.seed import reset_schema, seed_database
 
-    Base.metadata.create_all(bind=engine)
+    reset_schema()
     seed_database()
     yield
     Base.metadata.drop_all(bind=engine)
@@ -35,7 +35,10 @@ def _setup_schema_and_seed():
 def client():
     from fastapi.testclient import TestClient
     from app.main import app
-    return TestClient(app)
+    # Redirects are NOT followed: a 307 from a slash-mismatched route is a real
+    # defect that the frontend pays four round trips for. Tests that genuinely
+    # want to follow a redirect should pass follow_redirects=True per call.
+    return TestClient(app, follow_redirects=False)
 
 
 def auth_headers(client, username: str, password: str) -> dict:
