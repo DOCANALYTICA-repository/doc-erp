@@ -37,6 +37,111 @@ import uuid
 
 router = APIRouter()
 
+#: Sentinel for "not looked up yet", distinct from a legitimate None.
+_UNSET = object()
+
+
+class ClubViewerFacts:
+    """The handful of facts every club authorization rule is built from.
+
+    Each is fetched AT MOST ONCE and only if something actually asks for it.
+
+    This exists because resolving the seven capability flags used to re-run the
+    same two lookups five and six times over — the membership row and the
+    club's hierarchy levels — so simply opening a workspace cost 25 queries,
+    most of them identical. A route that needs only the membership still pays
+    for only the membership.
+
+    Deliberately NOT cached across requests: it is built per call, so a write
+    earlier in the same request is never masked by a stale read.
+    """
+
+    def __init__(self, db: Session, user: User, club_id: str):
+        self._db = db
+        self._user = user
+        self._club_id = club_id
+        self._membership = _UNSET
+        self._levels = _UNSET
+        self._permissions = _UNSET
+        self._is_coordinator = _UNSET
+
+    @property
+    def is_super_admin(self) -> bool:
+        return self._user.primary_role == "super_admin"
+
+    @property
+    def is_faculty(self) -> bool:
+        return self._user.primary_role == "faculty"
+
+    @property
+    def permissions(self) -> set:
+        if self._permissions is _UNSET:
+            self._permissions = get_resolved_permissions(self._user)
+        return self._permissions
+
+    @property
+    def membership(self):
+        if self._membership is _UNSET:
+            self._membership = member_repo.get_by_student_and_club(
+                self._db, student_id=self._user.id, club_id=self._club_id
+            )
+        return self._membership
+
+    @property
+    def is_active_member(self) -> bool:
+        return self.membership is not None and self.membership.status == "active"
+
+    @property
+    def levels(self) -> list:
+        if self._levels is _UNSET:
+            self._levels = hierarchy_repo.get_by_club(self._db, club_id=self._club_id)
+        return self._levels
+
+    @property
+    def is_club_coordinator(self) -> bool:
+        if self._is_coordinator is _UNSET:
+            self._is_coordinator = faculty_scope.is_club_faculty_coordinator_for(
+                self._db, self._user.id, self._club_id
+            )
+        return self._is_coordinator
+
+    @property
+    def is_department_reviewer(self) -> bool:
+        return "*" in self.permissions or any(
+            p in self.permissions for p in DEPARTMENT_WIDE_REVIEW_PERMISSIONS
+        )
+
+    def rank(self) -> Optional[int]:
+        """The member's level_order.
+
+        A LOWER level_order is a HIGHER rank (10 = President, 40 = Member),
+        which is why is_top_rank uses min() and is_bottom_rank uses max().
+
+        A member with no level assigned is treated as bottom rank — the most
+        restrictive default, matching club_hierarchy_engine.
+        """
+        membership = self.membership
+        if membership is None:
+            return None
+        if membership.hierarchy_level and membership.hierarchy_level.level_order is not None:
+            return membership.hierarchy_level.level_order
+        orders = [l.level_order for l in self.levels if l.level_order is not None]
+        return max(orders) if orders else None
+
+    @property
+    def is_top_rank(self) -> bool:
+        orders = [l.level_order for l in self.levels if l.level_order is not None]
+        if not orders:
+            return False
+        return self.rank() == min(orders)
+
+    @property
+    def is_bottom_rank(self) -> bool:
+        orders = [l.level_order for l in self.levels if l.level_order is not None]
+        if not orders:
+            return True
+        return self.rank() == max(orders)
+
 
 def _require_active_club_member(db: Session, current_user: User, club_id: str) -> None:
     """
@@ -292,22 +397,40 @@ ALL_CLUB_TABS = [
 
 
 def _club_capabilities(db: Session, current_user: User, club_id: str) -> ClubCapabilities:
-    def allowed(fn) -> bool:
-        try:
-            fn(db, current_user, club_id)
-            return True
-        except HTTPException:
-            return False
+    """Resolve all seven flags from ONE shared set of facts.
 
-    can_write = allowed(_require_active_club_member)
+    This used to call the seven _require_* gates and catch their exceptions,
+    which meant re-running the same membership and hierarchy lookups five and
+    six times each — 25 queries to open a workspace, most of them identical.
+    """
+    facts = ClubViewerFacts(db, current_user, club_id)
+
+    is_head = (
+        facts.is_super_admin
+        or (facts.is_faculty and "clubs:approve_plan" in facts.permissions)
+        or (
+            facts.is_active_member
+            and (facts.is_top_rank or facts.membership.permission_template == "Club Head")
+        )
+    )
+
+    can_read = (
+        facts.is_super_admin
+        or facts.is_active_member
+        or facts.is_club_coordinator
+        or facts.is_department_reviewer
+    )
+
     return ClubCapabilities(
-        can_read=allowed(_require_club_reader),
-        can_write=can_write,
-        can_edit_hierarchy=allowed(_require_club_faculty_coordinator_or_admin),
-        can_manage_settings=allowed(_require_club_head_or_admin),
-        can_assign_tasks=allowed(_require_task_assigner),
+        can_read=can_read,
+        can_write=facts.is_super_admin or facts.is_active_member,
+        can_edit_hierarchy=facts.is_super_admin or facts.is_club_coordinator,
+        can_manage_settings=is_head,
+        can_assign_tasks=(
+            facts.is_super_admin or (facts.is_active_member and not facts.is_bottom_rank)
+        ),
         can_approve_plan=_can_approve_any_plan_stage(db, current_user, club_id),
-        can_manage_members=allowed(_require_club_head_or_admin),
+        can_manage_members=is_head,
     )
 
 

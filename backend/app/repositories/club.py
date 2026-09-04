@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from app.models.club import (
     Club, ClubMember, Event, Budget, Reimbursement, Sponsorship, RecruitmentDrive, RecruitmentApplication,
     Announcement, AnnualPlan, ClubDocument, EventAttendance, ClubHierarchyLevel,
@@ -18,10 +18,24 @@ class ClubMemberRepository(BaseRepository[ClubMember]):
         ).first()
 
     def get_club_members(self, db: Session, *, club_id: str) -> List[ClubMember]:
-        return db.query(ClubMember).filter(ClubMember.club_id == club_id).all()
+        # ClubMemberOut.student_name reads the `student` relationship, so
+        # without this eager load a roster of N members costs N+1 queries.
+        # Ordered by rank then name so the roster does not reshuffle.
+        return (
+            db.query(ClubMember)
+            .options(selectinload(ClubMember.student), selectinload(ClubMember.hierarchy_level))
+            .filter(ClubMember.club_id == club_id)
+            .order_by(ClubMember.id)
+            .all()
+        )
 
     def get_student_memberships(self, db: Session, *, student_id: str) -> List[ClubMember]:
-        return db.query(ClubMember).filter(ClubMember.student_id == student_id).all()
+        return (
+            db.query(ClubMember)
+            .options(selectinload(ClubMember.club))
+            .filter(ClubMember.student_id == student_id)
+            .all()
+        )
 
 class EventRepository(BaseRepository[Event]):
     def get_upcoming_club_events(self, db: Session, *, club_id: str) -> List[Event]:
