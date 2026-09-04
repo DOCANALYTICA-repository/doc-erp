@@ -15,6 +15,12 @@ class Token(BaseModel):
 class RefreshRequest(BaseModel):
     refresh_token: str
 
+
+class NotificationPreferences(BaseModel):
+    """What this person wants to hear about outside the app."""
+    email_on_action_required: bool = True
+    email_daily_digest: bool = False
+
 class TokenPayload(BaseModel):
     sub: Optional[str] = None
 

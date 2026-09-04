@@ -1,6 +1,34 @@
+"""In-app notifications, and delivering the ones that need acting on by email."""
+import logging
 import uuid
+
 from sqlalchemy.orm import Session
+
 from app.models.notification import Notification
+from app.models.user import User
+from app.services.engines.email import OutboundEmail, email_engine
+
+logger = logging.getLogger("doc_portal.notifications")
+
+
+def notification_link_path(notification: Notification) -> str | None:
+    """Where this notification's subject actually lives in the app.
+
+    Mirrors the client's destinationFor(). Both exist because a notification
+    that names a reference number in prose and stops there leaves the reader
+    to go hunting.
+    """
+    entity_type, entity_id = notification.entity_type, notification.entity_id
+    if not entity_type or not entity_id:
+        return None
+    return {
+        "claim": f"/app/claims/my_claims?claim={entity_id}",
+        "annual_plan": "/app/clubs/annual-plan",
+        "club": f"/app/clubs/dashboard?club={entity_id}",
+        "task": "/app/faculty/tasks",
+        "meeting": "/app/faculty/meetings",
+    }.get(entity_type)
+
 
 class NotificationEngine:
     def send_notification(
@@ -14,6 +42,10 @@ class NotificationEngine:
         task_id: str = None,
         entity_type: str = None,
         entity_id: str = None,
+        #: Whether this warrants reaching the person outside the app. False
+        #: for purely informational updates, which would otherwise train
+        #: people to filter the ones that matter.
+        email_recipient: bool = False,
     ) -> Notification:
         """
         Dispatches a system or workspace-level notification to a user.
@@ -35,7 +67,34 @@ class NotificationEngine:
         db.add(db_notif)
         db.commit()
         db.refresh(db_notif)
+
+        if email_recipient:
+            self._email_if_wanted(db, db_notif)
+
         return db_notif
+
+    def _email_if_wanted(self, db: Session, notification: Notification) -> None:
+        """Deliver outside the app, if this user wants that.
+
+        Wrapped end to end: a notification row that was written successfully
+        must not be undone because a mail server was unreachable. The engine
+        already swallows its own failures; this guards the lookup too.
+        """
+        try:
+            user = db.query(User).filter(User.id == notification.user_id).first()
+            if user is None or not user.email:
+                return
+            if not user.email_on_action_required:
+                return
+
+            email_engine.send(OutboundEmail(
+                to=user.email,
+                subject=notification.title,
+                body=notification.content or notification.title,
+                link_path=notification_link_path(notification),
+            ))
+        except Exception:  # noqa: BLE001 — delivery must never fail the caller
+            logger.exception("notification_email_failed notification=%s", notification.id)
 
     def mark_as_read(self, db: Session, *, notification_id: str, user_id: str) -> bool:
         """Mark one notification read. user_id is REQUIRED and is part of the

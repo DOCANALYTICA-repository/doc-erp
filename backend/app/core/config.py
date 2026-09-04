@@ -47,6 +47,23 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_STORAGE_BUCKET: str = "doc-portal-files"
 
+    # --- Email delivery ----------------------------------------------------
+    # Unset on a developer machine and in CI, where the engine logs what it
+    # would have sent instead. That keeps the code path exercised everywhere
+    # rather than only in production, which is how mail code normally rots.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
+    SMTP_TIMEOUT_SECONDS: int = 10
+    EMAIL_FROM: str = ""
+
+    # Where a link in an email should point. A relative path in an email is
+    # useless, so a notification carries no link at all unless this is set.
+    PUBLIC_APP_URL: str = ""
+
     # --- Department facts --------------------------------------------------
     # The one number on the public site that cannot be counted from the
     # database. Everything else (students, faculty, clubs) is now a real

@@ -1723,6 +1723,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/notification-preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Notification Preferences */
+        get: operations["get_notification_preferences_api_v1_me_notification_preferences_get"];
+        /**
+         * Update Notification Preferences
+         * @description Let people turn email off.
+         *
+         *     A system that emails you about things you did not ask to hear about, with
+         *     no way to stop it, gets filtered wholesale — including the messages that
+         *     actually needed you.
+         */
+        put: operations["update_notification_preferences_api_v1_me_notification_preferences_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/send-daily-digests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger Daily Digests
+         * @description Run the digest.
+         *
+         *     An endpoint rather than an in-process timer: a timer inside a web worker
+         *     fires once PER WORKER, so a three-worker deployment sends three copies of
+         *     every digest. Point a scheduler at this instead.
+         */
+        post: operations["trigger_daily_digests_api_v1_me_send_daily_digests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -2939,6 +2988,22 @@ export interface components {
             entity_id?: string | null;
             /** Created At */
             created_at?: string | null;
+        };
+        /**
+         * NotificationPreferences
+         * @description What this person wants to hear about outside the app.
+         */
+        NotificationPreferences: {
+            /**
+             * Email On Action Required
+             * @default true
+             */
+            email_on_action_required: boolean;
+            /**
+             * Email Daily Digest
+             * @default false
+             */
+            email_daily_digest: boolean;
         };
         /** PermissionTemplateAssign */
         PermissionTemplateAssign: {
@@ -6890,6 +6955,79 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionQueue"];
+                };
+            };
+        };
+    };
+    get_notification_preferences_api_v1_me_notification_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferences"];
+                };
+            };
+        };
+    };
+    update_notification_preferences_api_v1_me_notification_preferences_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationPreferences"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferences"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    trigger_daily_digests_api_v1_me_send_daily_digests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

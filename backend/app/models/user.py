@@ -30,6 +30,16 @@ class User(Base, TimestampMixin):
     bio = Column(String, nullable=True)
     availability_status = Column(String, default="available", nullable=False)  # available, busy, on_leave
 
+    # --- Notification delivery preferences ---------------------------------
+    # Default ON for action-required mail: the whole point is that approval
+    # workflows depend on people noticing, and an opt-in default would leave
+    # exactly the problem this was built to solve.
+    #
+    # The digest defaults OFF — an unasked-for daily email is how a system
+    # teaches people to filter it.
+    email_on_action_required = Column(Boolean, default=True, nullable=False)
+    email_daily_digest = Column(Boolean, default=False, nullable=False)
+
     # Relationships
     memberships = relationship("ClubMember", back_populates="student", cascade="all, delete-orphan")
     assigned_tasks = relationship("Task", foreign_keys="[Task.assignee_id]", back_populates="assignee")

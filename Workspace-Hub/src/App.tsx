@@ -39,6 +39,7 @@ import { CLAIMS_DEFAULT_TAB } from './modules/claims/tabs';
 import { FACULTY_DEFAULT_TAB } from './modules/faculty/tabs';
 import { clearSession, readSession, setSessionEndedHandler } from './services/session';
 import { queryClient } from './lib/queryClient';
+import { NotificationSettings } from './routes/NotificationSettings';
 
 export default function App() {
   const login = useStore((state) => state.login);
@@ -116,6 +117,7 @@ export default function App() {
             */}
           <Route index element={<Inbox />} />
           <Route path="modules" element={<ModuleLauncher />} />
+          <Route path="settings/notifications" element={<NotificationSettings />} />
 
           <Route path="clubs">
             <Route index element={<Navigate to={CLUBS_DEFAULT_TAB} replace />} />

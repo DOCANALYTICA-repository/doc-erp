@@ -587,6 +587,8 @@ def create_club_event(
             db, user_id=assignment.faculty_id, title="New event proposal",
             content=f"{club.name if club else club_id} proposed a new event: {created.title}.",
             source_module="clubs", entity_type="club", entity_id=club_id,
+            # The coordinator has to approve this before the event can run.
+            email_recipient=True,
         )
     return created
 
@@ -773,6 +775,53 @@ def _notify_club_leadership(db: Session, *, club_id: str, title: str, content: s
     club_hierarchy_engine.notify_club_leadership(db, club_id=club_id, title=title, content=content)
 
 
+def _notify_plan_reviewers(db: Session, *, plan, stage: str) -> None:
+    """Tell the people who must ACT on a plan that it is now theirs.
+
+    Nothing did this. Submitting a plan notified the CLUB — the people who had
+    just submitted it — and the reviewer was told nothing at all. That is the
+    root cause the field audit found behind BLK-01: the Faculty Coordinator's
+    problem was never that he could not navigate to the plan, it was that
+    nothing ever told him it existed.
+
+    Scoped the same way the review endpoint authorizes, so nobody is emailed
+    about a plan they would be refused on.
+    """
+    required = ANNUAL_PLAN_STAGE_PERMISSIONS.get(stage)
+    if not required:
+        return
+
+    club = club_repo.get(db, plan.club_id)
+    club_name = club.name if club else plan.club_id
+
+    if stage == "faculty_coordinator_review":
+        # One specific person: the club's assigned coordinator.
+        assignments = faculty_assignment_repo.get_active_by_club_and_tag(
+            db, club_id=plan.club_id, role_tag=faculty_scope.CLUB_FACULTY_COORDINATOR,
+        )
+        recipient_ids = [a.faculty_id for a in assignments]
+    else:
+        # Department-wide stages: everyone holding the stage's permission.
+        recipient_ids = [
+            u.id for u in db.query(User).filter(User.primary_role == "faculty").all()
+            if required in get_resolved_permissions(u)
+        ]
+
+    for user_id in dict.fromkeys(recipient_ids):
+        notification_engine.send_notification(
+            db, user_id=user_id,
+            title=f"{club_name} annual plan needs your approval",
+            content=(
+                f"The {plan.academic_year} annual plan for {club_name} has reached "
+                f"{stage.replace('_', ' ')} and is waiting on you."
+            ),
+            source_module="clubs",
+            entity_type="annual_plan",
+            entity_id=plan.id,
+            email_recipient=True,
+        )
+
+
 @router.post("/annual-plans/{plan_id}/submit", response_model=AnnualPlanOut)
 def submit_annual_plan(
     plan_id: str,
@@ -792,6 +841,7 @@ def submit_annual_plan(
         db, club_id=plan.club_id, title="Annual Plan submitted for review",
         content="The annual plan has moved to Faculty Coordinator review.",
     )
+    _notify_plan_reviewers(db, plan=updated, stage="faculty_coordinator_review")
     return updated
 
 
@@ -849,6 +899,8 @@ def review_annual_plan(
         db, club_id=plan.club_id, title=f"Annual Plan advanced to {next_stage.replace('_', ' ').title()}",
         content=review_in.comments or "The annual plan moved to the next review stage.",
     )
+    # The NEXT reviewer has to be told too, or the plan simply stops here.
+    _notify_plan_reviewers(db, plan=updated, stage=next_stage)
     return updated
 
 

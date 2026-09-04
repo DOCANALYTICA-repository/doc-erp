@@ -466,6 +466,9 @@ def approve_claim_stage(
                 db, user_id=f_id, title="Claim pending your review",
                 content=f"Claim {claim.reference_number} has attendance entries awaiting your approval.",
                 source_module="claims", entity_type="claim", entity_id=claim.id,
+                # A reviewer being asked to act is exactly the case email
+                # exists for — the workflow stalls until they notice.
+                email_recipient=True,
             )
 
     return {"status": "success", "new_stage": claim.current_workflow_stage, "claim_status": claim.status}
@@ -589,6 +592,7 @@ def resubmit_claim(
             db, user_id=uid, title=f"Claim {claim.reference_number} resubmitted",
             content=f"The claim was resubmitted after being sent back at the {reviewer_stage or 'review'} stage. Changes: {diff_summary}.",
             source_module="claims", entity_type="claim", entity_id=claim.id,
+            email_recipient=True,
         )
 
     return _to_claim_out(claim)

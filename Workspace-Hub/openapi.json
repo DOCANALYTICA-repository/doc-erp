@@ -5324,6 +5324,102 @@
         ]
       }
     },
+    "/api/v1/me/notification-preferences": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Get Notification Preferences",
+        "operationId": "get_notification_preferences_api_v1_me_notification_preferences_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferences"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Update Notification Preferences",
+        "description": "Let people turn email off.\n\nA system that emails you about things you did not ask to hear about, with\nno way to stop it, gets filtered wholesale \u2014 including the messages that\nactually needed you.",
+        "operationId": "update_notification_preferences_api_v1_me_notification_preferences_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationPreferences"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferences"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/send-daily-digests": {
+      "post": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Trigger Daily Digests",
+        "description": "Run the digest.\n\nAn endpoint rather than an in-process timer: a timer inside a web worker\nfires once PER WORKER, so a three-worker deployment sends three copies of\nevery digest. Point a scheduler at this instead.",
+        "operationId": "trigger_daily_digests_api_v1_me_send_daily_digests_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/": {
       "get": {
         "summary": "Root Endpoint",
@@ -8432,6 +8528,23 @@
           "source_module"
         ],
         "title": "NotificationOut"
+      },
+      "NotificationPreferences": {
+        "properties": {
+          "email_on_action_required": {
+            "type": "boolean",
+            "title": "Email On Action Required",
+            "default": true
+          },
+          "email_daily_digest": {
+            "type": "boolean",
+            "title": "Email Daily Digest",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "NotificationPreferences",
+        "description": "What this person wants to hear about outside the app."
       },
       "PermissionTemplateAssign": {
         "properties": {
