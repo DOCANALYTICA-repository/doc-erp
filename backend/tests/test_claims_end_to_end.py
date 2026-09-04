@@ -87,7 +87,7 @@ def test_claim_walks_all_the_way_to_closed(client):
 
     # THE terminal bug: at this point the claim used to be invisible to every
     # reviewer, so it could never be closed by anyone.
-    hod_queue = client.get("/api/v1/claims", headers=auth_headers(client, *HOD)).json()
+    hod_queue = client.get("/api/v1/claims", headers=auth_headers(client, *HOD)).json()["items"]
     assert cid in {c["id"] for c in hod_queue}, (
         "an approved claim is invisible to every review queue — it can never close"
     )

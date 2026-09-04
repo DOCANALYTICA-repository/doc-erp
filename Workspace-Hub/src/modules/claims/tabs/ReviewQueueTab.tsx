@@ -10,9 +10,10 @@ import { SectionHeader } from '../../../components/ui/SectionHeader';
 import type { SupportingDocument } from '../../../api/types';
 import { ClaimStatusStepper } from '../components/ClaimStatusStepper';
 import { useClaimsWorkspace } from '../ClaimsContext';
+import { PagedFooter } from '../../../components/ui/PagedFooter';
 
 export const ReviewQueueTab: React.FC = () => {
-  const { claims, invalidate } = useClaimsWorkspace();
+  const { claims, totalClaims, page, pageSize, setPage, invalidate } = useClaimsWorkspace();
   const showToast = useToast();
 
   const [reviewingId, setReviewingId] = React.useState<string | null>(null);
@@ -217,6 +218,14 @@ export const ReviewQueueTab: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      <PagedFooter
+        page={page}
+        pageSize={pageSize}
+        total={totalClaims}
+        onChange={setPage}
+        label="Review queue pages"
+      />
     </div>
   );
 };

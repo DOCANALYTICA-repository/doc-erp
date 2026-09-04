@@ -7,6 +7,11 @@ import { useStore } from '../../context/useStore';
 
 interface ClaimsWorkspace {
   claims: Claim[];
+  /** Total across ALL pages, so the control can size itself honestly. */
+  totalClaims: number;
+  page: number;
+  pageSize: number;
+  setPage: (page: number) => void;
   timetable: TimetableSession[];
   isLoading: boolean;
   isError: boolean;
@@ -42,13 +47,22 @@ export const ClaimsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     section: user?.section || '',
   };
 
-  const claimsQuery = useClaims();
+  // Page lives here rather than in a tab, so switching between "All claims"
+  // and the review queue does not silently reset the reader's position.
+  const [page, setPage] = React.useState(1);
+  const pageSize = 25;
+
+  const claimsQuery = useClaims(page, pageSize);
   const timetableQuery = useTimetable(
     academicContext.programme, academicContext.semester, academicContext.section,
   );
 
   const value: ClaimsWorkspace = {
-    claims: claimsQuery.data ?? [],
+    claims: claimsQuery.data?.items ?? [],
+    totalClaims: claimsQuery.data?.total ?? 0,
+    page,
+    pageSize,
+    setPage,
     timetable: timetableQuery.data ?? [],
     isLoading: claimsQuery.isLoading,
     isError: claimsQuery.isError,

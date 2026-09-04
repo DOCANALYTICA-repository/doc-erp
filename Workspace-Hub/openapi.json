@@ -3180,49 +3180,26 @@
       }
     },
     "/api/v1/claims": {
-      "get": {
-        "tags": [
-          "claims"
-        ],
-        "summary": "List Claims",
-        "operationId": "list_claims_api_v1_claims_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ClaimOut"
-                  },
-                  "type": "array",
-                  "title": "Response List Claims Api V1 Claims Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
-      },
       "post": {
         "tags": [
           "claims"
         ],
         "summary": "Submit Attendance Claim",
         "operationId": "submit_attendance_claim_api_v1_claims_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ClaimCreate"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -3245,12 +3222,67 @@
               }
             }
           }
-        },
+        }
+      },
+      "get": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "List Claims",
+        "description": "Claims scoped to what this caller may see, one page at a time.\n\nReturns an envelope with a TOTAL rather than a bare array. The previous\n100-row cap was invisible: a super_admin with 300 claims saw 100 and no\nindication the rest existed. An explicit page with a total is the opposite\nfailure mode \u2014 the user can see there is more.\n\nScoping happens first and pagination second, on purpose: paging a list and\nthen filtering it would produce short pages and a meaningless total.",
+        "operationId": "list_claims_api_v1_claims_get",
         "security": [
           {
             "OAuth2PasswordBearer": []
           }
-        ]
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 25,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ClaimOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/claims/workflow": {
@@ -8572,6 +8604,37 @@
         "type": "object",
         "title": "NotificationPreferences",
         "description": "What this person wants to hear about outside the app."
+      },
+      "Page_ClaimOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[ClaimOut]"
       },
       "PermissionTemplateAssign": {
         "properties": {

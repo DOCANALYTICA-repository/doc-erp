@@ -11,11 +11,11 @@ import {
   claimKeys, clubKeys, contentKeys, facultyKeys, platformKeys,
 } from '../lib/queryKeys';
 import type {
-  ActionQueue, Announcement, AwaitingReviewPlan, AnnualPlan, Budget, CalendarEvent, Claim,
+  ActionQueue, Announcement, AwaitingReviewPlan, AnnualPlan, Budget, CalendarEvent,
   ClubBootstrap, ClubDocument, ClubEvent, ClubMember, DirectoryEntry, FacultyDocument,
   GalleryImage, HierarchyLevel, Meeting, MyClub, Note, Notification, Programme,
   PublicStatistics, RecruitmentDrive, Reimbursement, Reminder, ShowcaseClub, Sponsorship,
-  SupportingDocument, Task, TimetableSession, ClaimWorkflow, Pipeline,
+  SupportingDocument, Task, TimetableSession, ClaimWorkflow, Pipeline, ClaimPage,
 } from './types';
 
 type Options<T> = Omit<UseQueryOptions<T, Error, T>, 'queryKey' | 'queryFn'>;
@@ -106,8 +106,14 @@ export function usePlansAwaitingMyReview() {
 // Claims
 // ---------------------------------------------------------------------------
 
-export function useClaims() {
-  return useQuery({ queryKey: claimKeys.list(), queryFn: () => api.get<Claim[]>('/claims') });
+export function useClaims(page = 1, pageSize = 25) {
+  return useQuery({
+    queryKey: claimKeys.list(page, pageSize),
+    queryFn: () => api.get<ClaimPage>(`/claims?page=${page}&page_size=${pageSize}`),
+    // Keep the current page on screen while the next one loads, rather than
+    // flashing an empty table between pages.
+    placeholderData: previous => previous,
+  });
 }
 
 export function useTimetable(programme?: string | null, semester?: string | null, section?: string | null) {

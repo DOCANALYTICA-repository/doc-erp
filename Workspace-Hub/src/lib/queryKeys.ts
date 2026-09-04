@@ -26,7 +26,7 @@ export const clubKeys = {
 
 export const claimKeys = {
   all: ['claims'] as const,
-  list: () => [...claimKeys.all, 'list'] as const,
+  list: (page = 1, pageSize = 25) => [...claimKeys.all, 'list', page, pageSize] as const,
   detail: (claimId: string) => [...claimKeys.all, claimId] as const,
   documents: (claimId: string) => [...claimKeys.detail(claimId), 'documents'] as const,
   workflow: () => [...claimKeys.all, 'workflow'] as const,

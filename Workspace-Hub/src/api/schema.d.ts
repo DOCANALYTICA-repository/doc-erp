@@ -992,7 +992,18 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Claims */
+        /**
+         * List Claims
+         * @description Claims scoped to what this caller may see, one page at a time.
+         *
+         *     Returns an envelope with a TOTAL rather than a bare array. The previous
+         *     100-row cap was invisible: a super_admin with 300 claims saw 100 and no
+         *     indication the rest existed. An explicit page with a total is the opposite
+         *     failure mode — the user can see there is more.
+         *
+         *     Scoping happens first and pagination second, on purpose: paging a list and
+         *     then filtering it would produce short pages and a meaningless total.
+         */
         get: operations["list_claims_api_v1_claims_get"];
         put?: never;
         /** Submit Attendance Claim */
@@ -3033,6 +3044,17 @@ export interface components {
              * @default false
              */
             email_daily_digest: boolean;
+        };
+        /** Page[ClaimOut] */
+        Page_ClaimOut_: {
+            /** Items */
+            items: components["schemas"]["ClaimOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
         };
         /** PermissionTemplateAssign */
         PermissionTemplateAssign: {
@@ -5620,7 +5642,10 @@ export interface operations {
     };
     list_claims_api_v1_claims_get: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: number;
+                page_size?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5633,7 +5658,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ClaimOut"][];
+                    "application/json": components["schemas"]["Page_ClaimOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

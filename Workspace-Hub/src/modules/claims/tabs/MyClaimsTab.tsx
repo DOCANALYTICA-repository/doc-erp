@@ -11,11 +11,12 @@ import { SectionHeader } from '../../../components/ui/SectionHeader';
 import type { IsoDate } from '../../../lib/date';
 import { ClaimStatusStepper } from '../components/ClaimStatusStepper';
 import { useClaimsWorkspace } from '../ClaimsContext';
+import { PagedFooter } from '../../../components/ui/PagedFooter';
 
 type DateRange = { start: IsoDate; end: IsoDate };
 
 export const MyClaimsTab: React.FC = () => {
-  const { claims, invalidate } = useClaimsWorkspace();
+  const { claims, totalClaims, page, pageSize, setPage, invalidate } = useClaimsWorkspace();
   const showToast = useToast();
 
   const [resubmittingId, setResubmittingId] = React.useState<string | null>(null);
@@ -137,6 +138,14 @@ export const MyClaimsTab: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      <PagedFooter
+        page={page}
+        pageSize={pageSize}
+        total={totalClaims}
+        onChange={setPage}
+        label="Your claims pages"
+      />
     </div>
   );
 };

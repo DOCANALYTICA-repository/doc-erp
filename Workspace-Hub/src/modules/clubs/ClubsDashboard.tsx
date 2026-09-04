@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, Navigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useClubBootstrap, useClubPrefetch, useMyClubs } from '../../api/hooks';
@@ -26,6 +26,7 @@ import { SettingsTab } from './tabs/SettingsTab';
 import { SponsorshipsTab } from './tabs/SponsorshipsTab';
 import { StructureTab } from './tabs/StructureTab';
 import { TasksTab } from './tabs/TasksTab';
+import { TabStrip } from '../../components/ui/TabStrip';
 
 /**
  * The Clubs workspace shell.
@@ -162,32 +163,16 @@ export const ClubsDashboard: React.FC = () => {
         </div>
       ) : null}
 
-      <nav
-        aria-label="Club workspace sections"
-        className="scrollbar-none z-10 flex w-full gap-1 overflow-x-auto border-b border-slate-200 bg-white px-6 py-2.5 shadow-sm"
-      >
-        {tabsForViewer.map(item => (
-          // A real <Link> to a real URL: Back and Forward traverse tabs,
-          // cmd-click opens one in a new browser tab, and the address can be
-          // pasted to a colleague. None of that was possible when the tab
-          // lived in useState.
-          <Link
-            key={item.id}
-            to={{ pathname: `/app/clubs/${item.id}`, search: searchParams.toString() }}
-            aria-current={tab === item.id ? 'page' : undefined}
-            // Hover-prefetch, so by the time the click lands the data is
-            // already cached and the tab paints immediately.
-            onMouseEnter={() => (TAB_RESOURCES[item.id] ?? []).forEach(prefetch)}
-            className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              tab === item.id
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-500 hover:text-slate-900'
-            }`}
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
+      <TabStrip
+        label="Club workspace sections"
+        activeId={tab}
+        items={tabsForViewer.map(item => ({
+          id: item.id,
+          label: item.label,
+          to: `/app/clubs/${item.id}?${searchParams.toString()}`,
+          onHover: () => (TAB_RESOURCES[item.id] ?? []).forEach(prefetch),
+        }))}
+      />
 
       <main className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto p-6 md:p-8">
         <header className="mb-8 flex items-center gap-4">

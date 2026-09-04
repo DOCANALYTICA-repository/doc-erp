@@ -39,6 +39,8 @@ export type EventAttendance = Schemas['EventAttendanceOut'];
 
 // --- Claims ----------------------------------------------------------------
 export type Claim = Schemas['ClaimOut'];
+/** GET /claims returns an envelope with a total, not a bare array. */
+export type ClaimPage = Schemas['Page_ClaimOut_'];
 export type ClaimParticipant = Schemas['ClaimParticipantOut'];
 export type AttendanceEntry = Schemas['AttendanceEntryOut'];
 export type TimetableSession = Schemas['TimetableSessionOut'];

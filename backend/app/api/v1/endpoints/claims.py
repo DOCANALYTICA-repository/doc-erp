@@ -1,8 +1,9 @@
 from typing import List, Literal, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
+from app.schemas.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, Page
 from app.core.rbac import PermissionChecker, get_current_user, get_resolved_permissions
 from app.core import claim_workflow, faculty_scope
 from app.repositories.claim import claim_repo, claim_participant_repo, attendance_entry_repo, timetable_repo, doc_repo
@@ -232,10 +233,43 @@ def _claims_pending_for_subject_faculty(db: Session, faculty_id: str) -> List[Cl
 
 
 # 3. Retrieve Claims — scoped to what THIS user is actually allowed/expected to see
-@router.get("", response_model=List[ClaimOut])
-def list_claims(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def _paginate(items: List[ClaimOut], page: int, page_size: int) -> Page[ClaimOut]:
+    """Slice an already-scoped list.
+
+    In memory rather than in SQL because the reviewer's list is assembled from
+    four differently-scoped queries and then de-duplicated — there is no single
+    SQL statement to LIMIT. The set is bounded by a department's claim volume,
+    and cutting it at the database would mean either four separate paginations
+    or a UNION that re-derives every scope rule in SQL.
+    """
+    start = (page - 1) * page_size
+    return Page[ClaimOut](
+        items=items[start:start + page_size],
+        total=len(items),
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("", response_model=Page[ClaimOut])
+def list_claims(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Claims scoped to what this caller may see, one page at a time.
+
+    Returns an envelope with a TOTAL rather than a bare array. The previous
+    100-row cap was invisible: a super_admin with 300 claims saw 100 and no
+    indication the rest existed. An explicit page with a total is the opposite
+    failure mode — the user can see there is more.
+
+    Scoping happens first and pagination second, on purpose: paging a list and
+    then filtering it would produce short pages and a meaningless total.
+    """
     if current_user.primary_role == "super_admin":
-        return [_to_claim_out(c) for c in claim_repo.get_multi(db)]
+        return _paginate([_to_claim_out(c) for c in claim_repo.get_multi(db)], page, page_size)
 
     if current_user.primary_role == "faculty":
         permissions = get_resolved_permissions(current_user)
@@ -275,10 +309,13 @@ def list_claims(db: Session = Depends(get_db), current_user: User = Depends(get_
                 if "HOD" in tags or faculty_scope.is_course_coordinator_for(db, current_user.id, c.programme):
                     results[c.id] = c
 
-        return [_to_claim_out(c) for c in results.values()]
+        return _paginate([_to_claim_out(c) for c in results.values()], page, page_size)
 
     # Students (and club accounts, once modeled) see their own submitted claims
-    return [_to_claim_out(c) for c in claim_repo.get_by_submitter(db, user_id=current_user.id)]
+    return _paginate(
+        [_to_claim_out(c) for c in claim_repo.get_by_submitter(db, user_id=current_user.id)],
+        page, page_size,
+    )
 
 
 @router.get("/workflow")
