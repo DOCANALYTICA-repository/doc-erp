@@ -1,8 +1,12 @@
+import hashlib
+import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Union
-from jose import jwt
+
 import bcrypt
+from jose import jwt
+
 from app.core.config import settings
 
 ALGORITHM = "HS256"
@@ -45,3 +49,39 @@ def create_access_token(
     }
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+
+def create_refresh_token() -> tuple[str, str, datetime]:
+    """Mint a refresh token.
+
+    Deliberately NOT a JWT. A refresh token's whole job is to be checked
+    against server-side state on every use, so a self-describing signed blob
+    buys nothing and only creates the temptation to trust it without the
+    lookup. It is opaque randomness, and the database stores its HASH.
+
+    Returns (token, jti, expires_at). The token is shown to the caller once
+    and never stored anywhere in recoverable form.
+    """
+    jti = uuid.uuid4().hex
+    secret = secrets.token_urlsafe(48)
+    token = f"{jti}.{secret}"
+    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    return token, jti, expires_at
+
+
+def hash_refresh_token(token: str) -> str:
+    """SHA-256, not bcrypt.
+
+    bcrypt is deliberately slow to defend a LOW-ENTROPY secret against
+    offline cracking. This token is 48 bytes of CSPRNG output, so there is
+    nothing to crack; the only requirement is that a database leak does not
+    hand out working sessions. A fast hash also keeps the refresh path cheap.
+    """
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def split_refresh_token(token: str) -> tuple[str, str]:
+    """Pull the jti out of a presented token so it can be looked up directly
+    rather than by scanning every row."""
+    jti, _, secret = token.partition(".")
+    return jti, secret

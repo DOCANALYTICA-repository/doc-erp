@@ -1,4 +1,21 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+
+/**
+ * A realistic successful Response.
+ *
+ * The previous mocks omitted `headers`, which a real Response always has —
+ * so they passed while the wrapper was reading response.headers, and broke
+ * the moment it did. A partial mock that cannot fail the way production can
+ * is not testing much.
+ */
+function okResponse(body: unknown, status = 200) {
+  return {
+    ok: true,
+    status,
+    headers: new Headers({ 'content-type': 'application/json' }),
+    json: async () => body,
+  } as unknown as Response;
+}
 import { ApiError } from './api';
 
 // Re-import request indirectly via the public api object; api.ts doesn't
@@ -17,6 +34,7 @@ describe('api.ts request() — the mock-fallback security fix', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 400,
+      headers: new Headers(),
       json: async () => ({ detail: 'Incorrect email or password' }),
     } as any);
 
@@ -27,6 +45,7 @@ describe('api.ts request() — the mock-fallback security fix', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 403,
+      headers: new Headers(),
       json: async () => ({ detail: 'Not enough permissions' }),
     } as any);
 
@@ -66,7 +85,7 @@ describe('api.ts request() — the mock-fallback security fix', () => {
   });
 
   it('strips a trailing slash so no call site can reintroduce a 307', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] } as any);
+    const fetchMock = vi.fn().mockResolvedValue(okResponse([]));
     global.fetch = fetchMock;
 
     await api.get('/clubs/');
@@ -74,7 +93,7 @@ describe('api.ts request() — the mock-fallback security fix', () => {
   });
 
   it('normalizes the path without eating the query string', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] } as any);
+    const fetchMock = vi.fn().mockResolvedValue(okResponse([]));
     global.fetch = fetchMock;
 
     // '/search/?q=x' does not end in a slash, which is exactly why a naive

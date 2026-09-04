@@ -99,6 +99,8 @@ COMPOSITE_INDEXES = [
     ('ix_annual_plans_status', 'annual_plans', ['status']),
     # notification -> entity lookups (migration c8d2e3f4a5b6)
     ('ix_notifications_entity_type_entity_id', 'notifications', ['entity_type', 'entity_id']),
+    # "every live session for this user" — logout-everywhere (migration e1f2a3b4c5d6)
+    ('ix_refresh_tokens_user_id_is_revoked', 'refresh_tokens', ['user_id', 'is_revoked']),
 ]
 
 ALL_INDEXES = FK_INDEXES + COMPOSITE_INDEXES

@@ -18,3 +18,8 @@ _TESTING = "PYTEST_CURRENT_TEST" in os.environ or os.environ.get("DISABLE_RATE_L
 limiter = Limiter(key_func=get_remote_address, enabled=not _TESTING)
 
 LOGIN_RATE_LIMIT = "5/minute"
+
+# Looser than login: a legitimate client refreshes roughly twice an hour, but
+# several tabs may refresh at once after a laptop wakes. Still bounded, so a
+# stolen token cannot be used to mint access tokens in a tight loop.
+REFRESH_RATE_LIMIT = "30/minute"

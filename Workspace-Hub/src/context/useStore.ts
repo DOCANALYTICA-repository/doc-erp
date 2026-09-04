@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { api } from '../services/api';
+import { clearSession, getRefreshToken, writeSession } from '../services/session';
 
 export interface UserState {
   id: string;
@@ -37,7 +39,12 @@ interface PlatformStore {
 
   // Actions. Navigation itself now lives in React Router (Phase 1C) — this
   // store only holds session/identity state, never "which screen am I on."
-  login: (user: UserState, token: string, capabilities?: Record<string, string>) => void;
+  login: (
+    user: UserState,
+    token: string,
+    capabilities?: Record<string, string>,
+    refreshToken?: string | null,
+  ) => void;
   logout: () => void;
   setSearchOpen: (open: boolean) => void;
   setNotificationsOpen: (open: boolean) => void;
@@ -56,15 +63,25 @@ export const useStore = create<PlatformStore>((set, get) => ({
   isNotificationsOpen: false,
   isSessionRestoring: true,
 
-  login: (user, token, capabilities = {}) => {
-    localStorage.setItem('doc_user_session', JSON.stringify({ user, token, capabilities }));
+  login: (user, token, capabilities = {}, refreshToken = null) => {
+    // The refresh token is what keeps the 30-minute access token from being a
+    // 30-minute session. Persisting it is the whole point.
+    writeSession({ user: user as never, token, refreshToken, capabilities });
     set({ user, token, capabilities });
   },
 
   finishSessionRestore: () => set({ isSessionRestoring: false }),
 
   logout: () => {
-    localStorage.removeItem('doc_user_session');
+    // Tell the server first, so the refresh token stops working immediately
+    // rather than living on for a fortnight. Fire-and-forget: a failed
+    // request must not prevent a local sign-out, and the access token
+    // expires in half an hour regardless.
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      void api.post('/auth/logout', { refresh_token: refreshToken }).catch(() => {});
+    }
+    clearSession();
     set({ user: null, token: null, capabilities: {} });
   },
 

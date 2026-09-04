@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useStore } from './context/useStore';
 import { PageLoader } from './components/ui/PageLoader';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -37,27 +37,46 @@ import { RequireAuth } from './routes/RequireAuth';
 import { CLUBS_DEFAULT_TAB } from './modules/clubs/tabs';
 import { CLAIMS_DEFAULT_TAB } from './modules/claims/tabs';
 import { FACULTY_DEFAULT_TAB } from './modules/faculty/tabs';
+import { clearSession, readSession, setSessionEndedHandler } from './services/session';
+import { queryClient } from './lib/queryClient';
 
 export default function App() {
   const login = useStore((state) => state.login);
+  const logout = useStore((state) => state.logout);
   const finishSessionRestore = useStore((state) => state.finishSessionRestore);
+  const navigate = useNavigate();
 
   // Restore session on load — real routes now mean this no longer needs to
   // decide "which screen to show," only "am I logged in." RequireAuth waits
   // on isSessionRestoring before redirecting, so a hard refresh on a valid
   // session doesn't get bounced to /login before this effect runs.
   useEffect(() => {
-    const saved = localStorage.getItem('doc_user_session');
-    if (saved) {
-      try {
-        const { user, token, capabilities } = JSON.parse(saved);
-        if (user) login(user, token, capabilities || {});
-      } catch (e) {
-        localStorage.removeItem('doc_user_session');
-      }
+    const saved = readSession();
+    if (saved?.user && saved.token) {
+      login(saved.user as never, saved.token, saved.capabilities ?? {}, saved.refreshToken ?? null);
+    } else if (saved) {
+      clearSession();
     }
     finishSessionRestore();
   }, []);
+
+  /**
+   * What "your session ended" means to the app.
+   *
+   * services/session.ts cannot navigate or clear caches on its own, so it
+   * calls back here when a refresh is definitively refused — expired, revoked,
+   * or reuse detected. Anything less than that (a network blip) is NOT a
+   * sign-out.
+   */
+  useEffect(() => {
+    setSessionEndedHandler(() => {
+      logout();
+      // Drop every cached response: the next user of this browser must not
+      // see the previous one's data flash on screen before the redirect.
+      queryClient.clear();
+      navigate('/login', { replace: true });
+    });
+  }, [logout, navigate]);
 
   return (
     <Suspense fallback={<PageLoader />}>

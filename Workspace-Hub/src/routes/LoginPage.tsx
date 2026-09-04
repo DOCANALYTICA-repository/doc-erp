@@ -5,6 +5,7 @@ import { api, ApiError } from '../services/api';
 import { Sparkles } from 'lucide-react';
 import type { LoginResponse, UserProfile } from '../api/types';
 import { parseUserProfile } from '../api/contracts';
+import { clearSession, writeSession } from '../services/session';
 
 export const LoginPage: React.FC = () => {
   const login = useStore((state) => state.login);
@@ -28,21 +29,24 @@ export const LoginPage: React.FC = () => {
       let userProfile = res.user_profile;
       let capabilities = res.capabilities || {};
       const accessToken = res.access_token;
+      const refreshToken = res.refresh_token ?? null;
 
       if (!userProfile) {
-        // Real backend: save token temporarily so client headers include it
-        localStorage.setItem('doc_user_session', JSON.stringify({ user: null, token: accessToken, capabilities: {} }));
+        // Store the pair before calling /auth/me, so that request carries the
+        // Authorization header — and so a token expiring mid-hydrate can
+        // refresh rather than bouncing the user back to this page.
+        writeSession({ user: null, token: accessToken, refreshToken, capabilities: {} });
         const profile = parseUserProfile(await api.get<UserProfile>('/auth/me')) as UserProfile;
         capabilities = profile.capabilities || {};
         userProfile = profile;
       }
 
-      login(userProfile as UserState, accessToken, capabilities);
+      login(userProfile as UserState, accessToken, capabilities, refreshToken);
       const from =
         (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/app';
       navigate(from, { replace: true });
     } catch (err) {
-      localStorage.removeItem('doc_user_session');
+      clearSession();
       setLoginError(
         err instanceof ApiError ? err.message : 'Authentication failed. Check email or password.'
       );

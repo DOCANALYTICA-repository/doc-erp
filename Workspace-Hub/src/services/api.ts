@@ -1,3 +1,5 @@
+import { getAccessToken, refreshAccessToken } from './session';
+
 // The API base URL is configuration, not a constant. It was hardcoded to
 // http://localhost:8000/api/v1, which meant no deployed build could ever reach
 // a backend. Defaulting to a relative path means a same-origin reverse proxy
@@ -53,8 +55,10 @@ export class ApiError extends Error {
 // reachable backend, including auth failures and validation errors.
 // Confusing "wrong password" with "backend is down" was a real, shipped bug:
 // both used to fall through to the same mock-success path.
-async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const tokenObj = localStorage.getItem('doc_user_session');
+/** Endpoints that must never trigger a refresh-and-retry. */
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/refresh', '/auth/logout'];
+
+async function request<T>(endpoint: string, options?: RequestInit, isRetry = false): Promise<T> {
   let headers: HeadersInit = {};
 
   // FormData must NOT get an explicit Content-Type — the browser sets the
@@ -63,11 +67,9 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     headers['Content-Type'] = 'application/json';
   }
 
-  if (tokenObj) {
-    try {
-      const parsed = JSON.parse(tokenObj);
-      headers['Authorization'] = `Bearer ${parsed.token}`;
-    } catch (_) {}
+  const accessToken = getAccessToken();
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
   }
 
   let response: Response;
@@ -106,6 +108,31 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     });
   }
 
+  /*
+   * A 401 on a normal request means the 30-minute access token has expired.
+   * Refresh once, transparently, and replay — the user should never see this.
+   *
+   * Three guards, each for a real failure mode:
+   *
+   *  - isRetry, so a genuinely-rejected request cannot loop forever.
+   *  - AUTH_ENDPOINTS, so a wrong password (a 401 from /auth/login) is not
+   *    mistaken for an expired session.
+   *  - FormData bodies are NOT replayed. A ReadableStream body is consumed by
+   *    the first fetch, so a retry would silently upload nothing; the caller
+   *    gets the 401 and can retry the whole upload itself.
+   */
+  if (
+    response.status === 401 &&
+    !isRetry &&
+    !AUTH_ENDPOINTS.some(path => endpoint.startsWith(path)) &&
+    !(options?.body instanceof FormData)
+  ) {
+    const refreshed = await refreshAccessToken(BASE_URL);
+    if (refreshed) {
+      return request<T>(endpoint, options, true);
+    }
+  }
+
   if (!response.ok) {
     let body: any = null;
     try {
@@ -114,6 +141,12 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
       /* non-JSON error body */
     }
     throw new ApiError(response.status, body);
+  }
+
+  // 204 and friends have no body; response.json() would throw on the empty
+  // string. Endpoints like /auth/logout legitimately return nothing.
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return undefined as T;
   }
 
   return await response.json();

@@ -19,7 +19,21 @@ class Settings(BaseSettings):
     # error (see validate_required_settings() below), not a silently-accepted
     # default, since this key signs every JWT issued by the platform.
     SECRET_KEY: str = ""
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
+
+    # --- Session lifetimes -------------------------------------------------
+    # The access token used to live for EIGHT DAYS, which meant a leaked one
+    # was a week-long session that nothing could end — a JWT is valid until it
+    # expires and there was no jti to revoke it by.
+    #
+    # 30 minutes is only safe because there is now a refresh path. Shortening
+    # the lifetime WITHOUT one would log everyone out mid-task, which is why
+    # the two shipped together.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # Refresh tokens are stored server-side by hash and rotate on every use,
+    # so this is a "how long may I be away before signing in again" window,
+    # not an unrevokable credential lifetime.
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
 
     # Database
     DATABASE_URL: str = "sqlite:///./doc_platform.db"

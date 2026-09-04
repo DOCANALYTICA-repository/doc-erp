@@ -5,6 +5,16 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+    # Optional so any caller still reading only access_token keeps working.
+    # The access token now lives 30 minutes rather than 8 days, so a client
+    # that ignores this will be signed out on the half hour.
+    refresh_token: Optional[str] = None
+    expires_in: Optional[int] = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
 class TokenPayload(BaseModel):
     sub: Optional[str] = None
 
