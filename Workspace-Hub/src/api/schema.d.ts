@@ -1772,6 +1772,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/pipeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workflow Pipeline
+         * @description Where every item in both workflows is stuck, and for how long.
+         *
+         *     The claim state machine and the annual-plan state machine both worked and
+         *     neither was visible in aggregate: you could ask how ONE claim was doing,
+         *     and nothing could tell you that six had been sitting at subject-faculty
+         *     review for a fortnight.
+         *
+         *     SLA days are per STAGE, because that is where work stalls — and the stage
+         *     that stalls is the one with many possible reviewers and therefore nobody
+         *     who feels responsible.
+         */
+        get: operations["get_workflow_pipeline_api_v1_me_pipeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -3009,6 +3038,80 @@ export interface components {
         PermissionTemplateAssign: {
             /** Permission Template */
             permission_template?: string | null;
+        };
+        /** Pipeline */
+        Pipeline: {
+            /**
+             * Stages
+             * @default []
+             */
+            stages: components["schemas"]["PipelineStage"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Total Breaching
+             * @default 0
+             */
+            total_breaching: number;
+            /**
+             * Escalations
+             * @default []
+             */
+            escalations: components["schemas"]["PipelineItem"][];
+        };
+        /**
+         * PipelineItem
+         * @description One thing sitting at one stage.
+         */
+        PipelineItem: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Reference */
+            reference: string;
+            /** Title */
+            title: string;
+            /** Stage */
+            stage: string;
+            /** Stage Label */
+            stage_label: string;
+            /** Waiting On */
+            waiting_on: string;
+            /** Days Waiting */
+            days_waiting: number;
+            /** Is Breaching Sla */
+            is_breaching_sla: boolean;
+            /** Sla Days */
+            sla_days: number;
+            /** Href */
+            href: string;
+            /** Owner */
+            owner?: string | null;
+        };
+        /** PipelineStage */
+        PipelineStage: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+            /** Breaching */
+            breaching: number;
+            /**
+             * Oldest Days
+             * @default 0
+             */
+            oldest_days: number;
+            /**
+             * Items
+             * @default []
+             */
+            items: components["schemas"]["PipelineItem"][];
         };
         /** ProgrammeIn */
         ProgrammeIn: {
@@ -7028,6 +7131,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_workflow_pipeline_api_v1_me_pipeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pipeline"];
                 };
             };
         };

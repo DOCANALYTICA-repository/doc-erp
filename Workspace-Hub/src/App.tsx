@@ -40,6 +40,7 @@ import { FACULTY_DEFAULT_TAB } from './modules/faculty/tabs';
 import { clearSession, readSession, setSessionEndedHandler } from './services/session';
 import { queryClient } from './lib/queryClient';
 import { NotificationSettings } from './routes/NotificationSettings';
+import { PipelineBoard } from './modules/pipeline/PipelineBoard';
 
 export default function App() {
   const login = useStore((state) => state.login);
@@ -118,6 +119,7 @@ export default function App() {
           <Route index element={<Inbox />} />
           <Route path="modules" element={<ModuleLauncher />} />
           <Route path="settings/notifications" element={<NotificationSettings />} />
+          <Route path="pipeline" element={<PipelineBoard />} />
 
           <Route path="clubs">
             <Route index element={<Navigate to={CLUBS_DEFAULT_TAB} replace />} />

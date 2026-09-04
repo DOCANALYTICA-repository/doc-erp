@@ -57,6 +57,9 @@ export type Task = Schemas['TaskOut'];
 export type Notification = Schemas['NotificationOut'];
 export type ActionItem = Schemas['ActionItem'];
 export type ActionQueue = Schemas['ActionQueue'];
+export type Pipeline = Schemas['Pipeline'];
+export type PipelineStage = Schemas['PipelineStage'];
+export type PipelineItem = Schemas['PipelineItem'];
 export type ActionKind = ActionItem['kind'];
 export type Urgency = ActionItem['urgency'];
 

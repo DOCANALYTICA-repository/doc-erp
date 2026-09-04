@@ -15,7 +15,7 @@ import type {
   ClubBootstrap, ClubDocument, ClubEvent, ClubMember, DirectoryEntry, FacultyDocument,
   GalleryImage, HierarchyLevel, Meeting, MyClub, Note, Notification, Programme,
   PublicStatistics, RecruitmentDrive, Reimbursement, Reminder, ShowcaseClub, Sponsorship,
-  SupportingDocument, Task, TimetableSession, ClaimWorkflow,
+  SupportingDocument, Task, TimetableSession, ClaimWorkflow, Pipeline,
 } from './types';
 
 type Options<T> = Omit<UseQueryOptions<T, Error, T>, 'queryKey' | 'queryFn'>;
@@ -201,6 +201,19 @@ export const useActionQueue = () =>
   useQuery({
     queryKey: platformKeys.actionQueue,
     queryFn: async () => parseActionQueue(await api.get<ActionQueue>('/me/action-queue')) as ActionQueue,
+  });
+
+/**
+ * Where every item in both workflows is stuck.
+ *
+ * Short staleTime: this is an operational view, and someone watching it wants
+ * to see an approval land.
+ */
+export const usePipeline = () =>
+  useQuery({
+    queryKey: platformKeys.pipeline,
+    queryFn: () => api.get<Pipeline>('/me/pipeline'),
+    staleTime: 15_000,
   });
 
 export function useGlobalSearch(query: string) {

@@ -49,6 +49,7 @@ export const platformKeys = {
   notifications: ['notifications'] as const,
   unreadCount: ['notifications', 'unread-count'] as const,
   actionQueue: ['me', 'action-queue'] as const,
+  pipeline: ['me', 'pipeline'] as const,
   search: (q: string) => ['search', q] as const,
 };
 

@@ -5420,6 +5420,33 @@
         ]
       }
     },
+    "/api/v1/me/pipeline": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Get Workflow Pipeline",
+        "description": "Where every item in both workflows is stuck, and for how long.\n\nThe claim state machine and the annual-plan state machine both worked and\nneither was visible in aggregate: you could ask how ONE claim was doing,\nand nothing could tell you that six had been sitting at subject-faculty\nreview for a fortnight.\n\nSLA days are per STAGE, because that is where work stalls \u2014 and the stage\nthat stalls is the one with many possible reviewers and therefore nobody\nwho feels responsible.",
+        "operationId": "get_workflow_pipeline_api_v1_me_pipeline_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pipeline"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/": {
       "get": {
         "summary": "Root Endpoint",
@@ -8562,6 +8589,154 @@
         },
         "type": "object",
         "title": "PermissionTemplateAssign"
+      },
+      "Pipeline": {
+        "properties": {
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineStage"
+            },
+            "type": "array",
+            "title": "Stages",
+            "default": []
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "total_breaching": {
+            "type": "integer",
+            "title": "Total Breaching",
+            "default": 0
+          },
+          "escalations": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineItem"
+            },
+            "type": "array",
+            "title": "Escalations",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "Pipeline"
+      },
+      "PipelineItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "reference": {
+            "type": "string",
+            "title": "Reference"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "stage_label": {
+            "type": "string",
+            "title": "Stage Label"
+          },
+          "waiting_on": {
+            "type": "string",
+            "title": "Waiting On"
+          },
+          "days_waiting": {
+            "type": "integer",
+            "title": "Days Waiting"
+          },
+          "is_breaching_sla": {
+            "type": "boolean",
+            "title": "Is Breaching Sla"
+          },
+          "sla_days": {
+            "type": "integer",
+            "title": "Sla Days"
+          },
+          "href": {
+            "type": "string",
+            "title": "Href"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "reference",
+          "title",
+          "stage",
+          "stage_label",
+          "waiting_on",
+          "days_waiting",
+          "is_breaching_sla",
+          "sla_days",
+          "href"
+        ],
+        "title": "PipelineItem",
+        "description": "One thing sitting at one stage."
+      },
+      "PipelineStage": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "breaching": {
+            "type": "integer",
+            "title": "Breaching"
+          },
+          "oldest_days": {
+            "type": "integer",
+            "title": "Oldest Days",
+            "default": 0
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "count",
+          "breaching"
+        ],
+        "title": "PipelineStage"
       },
       "ProgrammeIn": {
         "properties": {

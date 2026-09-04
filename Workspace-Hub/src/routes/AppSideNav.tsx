@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SideNav, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
-import { Award, Compass, FolderOpen, Inbox } from 'lucide-react';
+import { Award, Compass, FolderOpen, GitBranch, Inbox } from 'lucide-react';
 
 import { useActionQueue } from '../api/hooks';
 import { useStore } from '../context/useStore';
@@ -32,6 +32,12 @@ export const AppSideNav: React.FC = () => {
   const { data: queue } = useActionQueue();
 
   const activeModule = location.pathname.split('/')[2] ?? '';
+
+  // Mirrors the server's PermissionChecker(require_all=False) on /me/pipeline.
+  const canSeePipeline =
+    hasPermission('claims:approve_coordinator') ||
+    hasPermission('clubs:approve_plan') ||
+    hasPermission('rbac:assign_roles');
   const waiting = queue?.total ?? 0;
 
   return (
@@ -57,6 +63,20 @@ export const AppSideNav: React.FC = () => {
           }
         />
       </SideNavSection>
+
+      {/* Department oversight. Shown only to people who can actually open it,
+          rather than rendering a link that 403s — the server gates the
+          endpoint on any one of these permissions. */}
+      {canSeePipeline ? (
+        <SideNavSection title="Oversight">
+          <SideNavItem
+            label="Pipeline"
+            icon={<GitBranch className="h-4 w-4" aria-hidden="true" />}
+            isSelected={location.pathname.startsWith('/app/pipeline')}
+            onClick={() => navigate('/app/pipeline')}
+          />
+        </SideNavSection>
+      ) : null}
 
       <SideNavSection title="Workspaces">
         {MODULES.filter(m => hasPermission(m.perm)).map(m => (

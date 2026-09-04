@@ -152,8 +152,17 @@ def get_resolved_permissions(user: User) -> Set[str]:
 
 
 class PermissionChecker:
-    def __init__(self, required_permissions: List[str]):
+    """Gate a route on permissions.
+
+    require_all defaults to True — the existing behaviour for every current
+    caller, and the safer default. Pass False for a route that several
+    different roles may reach by different routes (department oversight, for
+    instance, where holding ANY of a set is enough).
+    """
+
+    def __init__(self, required_permissions: List[str], require_all: bool = True):
         self.required_permissions = required_permissions
+        self.require_all = require_all
 
     def __call__(self, current_user: User = Depends(get_current_user)) -> User:
         user_permissions = get_resolved_permissions(current_user)
@@ -161,11 +170,22 @@ class PermissionChecker:
         if "*" in user_permissions:
             return current_user
 
-        for perm in self.required_permissions:
-            if perm not in user_permissions:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Not enough permissions. Missing: {perm}"
-                )
+        if self.require_all:
+            for perm in self.required_permissions:
+                if perm not in user_permissions:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Not enough permissions. Missing: {perm}",
+                    )
+            return current_user
+
+        if not any(perm in user_permissions for perm in self.required_permissions):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    "Not enough permissions. Requires one of: "
+                    + ", ".join(self.required_permissions)
+                ),
+            )
 
         return current_user

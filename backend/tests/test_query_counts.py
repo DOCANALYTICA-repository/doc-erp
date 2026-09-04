@@ -97,6 +97,9 @@ BUDGETS = [
     ("notifications", "GET", "/api/v1/notifications", PRESIDENT, 6),
     ("my clubs", "GET", "/api/v1/clubs/my-memberships", PRESIDENT, 8),
     ("reviewer inbox", "GET", "/api/v1/clubs/annual-plans/awaiting-my-review", COORDINATOR, 8),
+    # Both workflows, every stage, in one view. It aggregates a lot, which is
+    # exactly why it needs a ceiling.
+    ("pipeline", "GET", "/api/v1/me/pipeline", HOD, 12),
     ("faculty directory", "GET", "/api/v1/users/directory", HOD, 5),
     ("public statistics", "GET", "/api/v1/content/statistics", None, 5),
     ("public courses", "GET", "/api/v1/content/courses", None, 4),

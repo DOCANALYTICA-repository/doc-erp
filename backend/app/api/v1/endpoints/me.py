@@ -10,9 +10,11 @@ from app.core.database import get_db
 from app.core.rbac import PermissionChecker, get_current_user
 from app.models.user import User
 from app.schemas.action_queue import ActionQueue
+from app.schemas.pipeline import Pipeline
 from app.schemas.user import NotificationPreferences
 from app.services.digest import send_daily_digests
 from app.services.engines.action_queue import action_queue_engine
+from app.services.engines.pipeline import pipeline_engine
 
 router = APIRouter()
 
@@ -76,3 +78,27 @@ def trigger_daily_digests(
     every digest. Point a scheduler at this instead.
     """
     return send_daily_digests(db)
+
+
+@router.get("/pipeline", response_model=Pipeline)
+def get_workflow_pipeline(
+    db: Session = Depends(get_db),
+    # Department oversight, not personal work: whoever approves plans or
+    # coordinates a programme is who this is for.
+    current_user: User = Depends(PermissionChecker(
+        ["claims:approve_coordinator", "clubs:approve_plan", "rbac:assign_roles"],
+        require_all=False,
+    )),
+):
+    """Where every item in both workflows is stuck, and for how long.
+
+    The claim state machine and the annual-plan state machine both worked and
+    neither was visible in aggregate: you could ask how ONE claim was doing,
+    and nothing could tell you that six had been sitting at subject-faculty
+    review for a fortnight.
+
+    SLA days are per STAGE, because that is where work stalls — and the stage
+    that stalls is the one with many possible reviewers and therefore nobody
+    who feels responsible.
+    """
+    return pipeline_engine.build(db, current_user)
