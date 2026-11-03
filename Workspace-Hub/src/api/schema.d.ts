@@ -29,6 +29,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/demo-persona": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Demo Personas
+         * @description The accounts a developer may become. Development only; 404 when off.
+         *
+         *     This exists so the client does not have to keep its own copy of the
+         *     allow-list — the server owns it, and the UI renders whatever it is told.
+         *
+         *     It also solves a problem the POST cannot: that endpoint answers 404 both
+         *     when the flag is off AND when the address is not allow-listed, on purpose,
+         *     so a caller cannot enumerate the personas from it. Which means the POST is
+         *     useless for asking "is this feature available?". This is that question,
+         *     asked once.
+         *
+         *     Listing the fixtures when the flag is on is not a leak: they are seeded
+         *     test accounts, and anything that can read this can already mint tokens for
+         *     them.
+         */
+        get: operations["list_demo_personas_api_v1_auth_demo_persona_get"];
+        put?: never;
+        /**
+         * Demo Persona
+         * @description Sign in as a seeded demo account WITHOUT a password. Development only.
+         *
+         *     This is impersonation, so it is fenced in four ways:
+         *
+         *     1. `settings.ENABLE_DEMO_PERSONAS` defaults to False, and this returns
+         *        **404** when it is off rather than 401 or 403, with byte-identical
+         *        body to FastAPI's own 404 — so probing for the route learns nothing.
+         *
+         *        Two holes in that claim were found in review and closed here. The
+         *        detail string was "Not found" against FastAPI's "Not Found", which
+         *        distinguished a disabled route from an absent one on capitalisation
+         *        alone. And `include_in_schema` was left at its default, so
+         *        `/api/v1/openapi.json` — which this app serves unconditionally, in
+         *        every environment — published the route, its request model and its
+         *        response model regardless of the flag. Masking the response while
+         *        publishing the schema is not masking.
+         *
+         *        NOTE: `include_in_schema` is evaluated at import time, so flipping the
+         *        flag needs a restart to change what the schema shows. That is correct
+         *        for a deploy-time flag and would be wrong for a runtime one.
+         *     2. The target must appear in `settings.DEMO_PERSONA_EMAILS`, an explicit
+         *        allow-list of seeded fixtures. Even with the flag wrongly enabled, this
+         *        cannot mint a token for a real person's account.
+         *     3. The account must still exist and be active, so a disabled fixture stays
+         *        disabled.
+         *     4. Rate-limited on the same budget as /login, so it is no cheaper to abuse.
+         *
+         *     It issues a genuine token pair through `session_service.issue`, exactly as
+         *     /login does. That is deliberate: a parallel token path would be a second
+         *     thing to get wrong, and the resulting session must be revocable and
+         *     refreshable like any other.
+         */
+        post: operations["demo_persona_api_v1_auth_demo_persona_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/refresh": {
         parameters: {
             query?: never;
@@ -939,7 +1006,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Student Timetable */
+        /**
+         * Get Student Timetable
+         * @description The class's timetable, narrowed to the caller's batch by default.
+         *
+         *     A student is only ever shown slots they actually sit in: their own batch's,
+         *     plus every unbatched slot. Left unfiltered, the claim wizard offered the
+         *     other batch's hours, and a claim raised against one routed to a faculty
+         *     member who does not teach that student — which no reviewer could sensibly
+         *     approve or refuse.
+         *
+         *     Anyone who is not a student (Class Teacher, HOD, admin) gets the whole grid
+         *     unless they ask for a batch explicitly, since maintaining a timetable means
+         *     seeing all of it.
+         */
         get: operations["get_student_timetable_api_v1_claims_timetable_get"];
         put?: never;
         /** Create Timetable Session */
@@ -1003,6 +1083,10 @@ export interface paths {
          *
          *     Scoping happens first and pagination second, on purpose: paging a list and
          *     then filtering it would produce short pages and a meaningless total.
+         *
+         *     `view` splits a reviewer's claims into what still needs them and what they
+         *     have already decided. It does nothing for a student: their own claims are
+         *     their own claims whatever state they are in.
          */
         get: operations["list_claims_api_v1_claims_get"];
         put?: never;
@@ -1812,6 +1896,328 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/files/{file_path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Local File */
+        get: operations["get_local_file_api_v1_files__file_path__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/workflow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Yellow Form Workflow */
+        get: operations["get_yellow_form_workflow_api_v1_yellow_forms_workflow_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Review Queue
+         * @description What is waiting on the caller's decision right now, oldest first.
+         *
+         *     Scoped in SQL, the same way the review endpoints authorize, so the count is
+         *     honest: a Faculty Coordinator sees only their own clubs' forms, and a form
+         *     whose event has started is gone — nobody can act on it any more.
+         */
+        get: operations["get_review_queue_api_v1_yellow_forms_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/reviewed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Reviewed By Me
+         * @description Everything the caller has approved, sent back or rejected, newest first.
+         *
+         *     Only what they may still read: a reviewer who has lost the role, or a
+         *     Faculty Coordinator moved off the club, keeps no window onto the forms.
+         */
+        get: operations["get_reviewed_by_me_api_v1_yellow_forms_reviewed_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Yellow Forms
+         * @description Forms and claim sheets the caller is listed on, once the club has submitted them.
+         */
+        get: operations["get_my_yellow_forms_api_v1_yellow_forms_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/clubs/{club_id}/pre-approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Club Pre Approvals */
+        get: operations["list_club_pre_approvals_api_v1_yellow_forms_clubs__club_id__pre_approvals_get"];
+        put?: never;
+        /** Create Pre Approval */
+        post: operations["create_pre_approval_api_v1_yellow_forms_clubs__club_id__pre_approvals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/clubs/{club_id}/claim-sheets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Club Claim Sheets */
+        get: operations["list_club_claim_sheets_api_v1_yellow_forms_clubs__club_id__claim_sheets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/clubs/{club_id}/eligible-students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Eligible Students
+         * @description The club's active members, ready to drop onto a pre-approval.
+         */
+        get: operations["list_eligible_students_api_v1_yellow_forms_clubs__club_id__eligible_students_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/clubs/{club_id}/student-lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lookup Student */
+        get: operations["lookup_student_api_v1_yellow_forms_clubs__club_id__student_lookup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/pre-approvals/{form_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pre Approval */
+        get: operations["get_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__get"];
+        /** Update Pre Approval */
+        put: operations["update_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__put"];
+        post?: never;
+        /** Delete Pre Approval */
+        delete: operations["delete_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/pre-approvals/{form_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit Pre Approval
+         * @description Send to the Faculty Coordinator. A returned form restarts from the
+         *     Faculty Coordinator: both earlier approvals are cleared, because the form
+         *     they approved is not the form being resubmitted.
+         */
+        post: operations["submit_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/pre-approvals/{form_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Pre Approval */
+        post: operations["review_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/pre-approvals/{form_id}/claim-sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Claim Sheet */
+        post: operations["create_claim_sheet_api_v1_yellow_forms_pre_approvals__form_id__claim_sheet_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/claim-sheets/{sheet_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Claim Sheet */
+        get: operations["get_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__get"];
+        /** Update Claim Sheet */
+        put: operations["update_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__put"];
+        post?: never;
+        /** Delete Claim Sheet */
+        delete: operations["delete_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/claim-sheets/{sheet_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Claim Sheet */
+        post: operations["submit_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/claim-sheets/{sheet_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review Claim Sheet */
+        post: operations["review_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/yellow-forms/claim-sheets/{sheet_id}/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Claim Sheet
+         * @description The claim sheet as the department's template lays it out: one row per
+         *     student per date, a period column holding its own label when missed.
+         */
+        get: operations["export_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/": {
         parameters: {
             query?: never;
@@ -1866,7 +2272,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "claim_review" | "annual_plan_review" | "task_due" | "meeting_without_minutes" | "reimbursement_review";
+            kind: "claim_review" | "annual_plan_review" | "task_due" | "meeting_without_minutes" | "reimbursement_review" | "pre_approval_review" | "claim_sheet_review" | "claim_sheet_due" | "yellow_form_returned";
             /** Title */
             title: string;
             /**
@@ -2038,6 +2444,8 @@ export interface components {
         AttendanceEntryCreate: {
             /** Subject */
             subject: string;
+            /** Course Code */
+            course_code?: string | null;
             /** Date */
             date: string;
             /** Hour */
@@ -2049,6 +2457,8 @@ export interface components {
         AttendanceEntryOut: {
             /** Subject */
             subject: string;
+            /** Course Code */
+            course_code?: string | null;
             /** Date */
             date: string;
             /** Hour */
@@ -2063,6 +2473,15 @@ export interface components {
             status: string;
             /** Feedback */
             feedback?: string | null;
+            /**
+             * Subject Faculty Name
+             * @default
+             */
+            subject_faculty_name: string;
+            /** Co Faculty Id */
+            co_faculty_id?: string | null;
+            /** Co Faculty Name */
+            co_faculty_name?: string | null;
         };
         /**
          * AwaitingReviewPlanOut
@@ -2204,8 +2623,11 @@ export interface components {
         };
         /** ClaimCreate */
         ClaimCreate: {
-            /** Category */
-            category: string;
+            /**
+             * Category
+             * @enum {string}
+             */
+            category: "medical" | "co_curricular";
             /** Academic Year */
             academic_year: string;
             /** Semester */
@@ -2217,8 +2639,9 @@ export interface components {
             /**
              * Submission Type
              * @default individual
+             * @enum {string}
              */
-            submission_type: string;
+            submission_type: "individual" | "club";
             /** Club Id */
             club_id?: string | null;
             /** Date Range */
@@ -2283,6 +2706,11 @@ export interface components {
              * @default []
              */
             participants: components["schemas"]["ClaimParticipantOut"][];
+            /**
+             * Pending Approvals
+             * @default []
+             */
+            pending_approvals: components["schemas"]["PendingApprovalOut"][];
         };
         /** ClaimParticipantOut */
         ClaimParticipantOut: {
@@ -2314,6 +2742,165 @@ export interface components {
             missed_classes?: components["schemas"]["AttendanceEntryCreate"][] | null;
             /** Removed Document Ids */
             removed_document_ids?: string[] | null;
+        };
+        /** ClaimSheetEntryIn */
+        ClaimSheetEntryIn: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Periods */
+            periods: string[];
+        };
+        /** ClaimSheetEntryOut */
+        ClaimSheetEntryOut: {
+            /** Id */
+            id: string;
+            /** Date */
+            date: string;
+            /** Periods */
+            periods: string[];
+        };
+        /** ClaimSheetOut */
+        ClaimSheetOut: {
+            /** Id */
+            id: string;
+            /** Reference Number */
+            reference_number: string;
+            /** Pre Approval Id */
+            pre_approval_id: string;
+            /** Pre Approval Reference */
+            pre_approval_reference: string;
+            /** Club Id */
+            club_id: string;
+            /** Club Name */
+            club_name: string;
+            /** Event Name */
+            event_name: string;
+            /** Event Start Date */
+            event_start_date: string;
+            /** Event End Date */
+            event_end_date: string;
+            /** Status */
+            status: string;
+            /** Status Label */
+            status_label: string;
+            /** Created By */
+            created_by: string;
+            /** Created By Name */
+            created_by_name: string;
+            /** Submitted At */
+            submitted_at?: string | null;
+            /**
+             * Late Submission Flag
+             * @default false
+             */
+            late_submission_flag: boolean;
+            /** Reviewed By */
+            reviewed_by?: string | null;
+            /** Reviewed By Name */
+            reviewed_by_name?: string | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            /** Review Comments */
+            review_comments?: string | null;
+            /**
+             * Students
+             * @default []
+             */
+            students: components["schemas"]["ClaimSheetStudentOut"][];
+            /**
+             * Student Count
+             * @default 0
+             */
+            student_count: number;
+            /**
+             * Row Count
+             * @default 0
+             */
+            row_count: number;
+            pre_approval: components["schemas"]["PreApprovalSummary"];
+            /**
+             * Attendance Redacted
+             * @default false
+             */
+            attendance_redacted: boolean;
+            /**
+             * Viewer Can Edit
+             * @default false
+             */
+            viewer_can_edit: boolean;
+            /**
+             * Viewer Can Submit
+             * @default false
+             */
+            viewer_can_submit: boolean;
+            /**
+             * Viewer Can Delete
+             * @default false
+             */
+            viewer_can_delete: boolean;
+            /**
+             * Viewer Can Review
+             * @default false
+             */
+            viewer_can_review: boolean;
+            /**
+             * Viewer Can Export
+             * @default false
+             */
+            viewer_can_export: boolean;
+        };
+        /** ClaimSheetStudentIn */
+        ClaimSheetStudentIn: {
+            /** Pre Approval Student Id */
+            pre_approval_student_id: string;
+            /** Attendance With Claims */
+            attendance_with_claims?: number | null;
+            /** Attendance Without Claims */
+            attendance_without_claims?: number | null;
+            /** Role */
+            role?: string | null;
+            /**
+             * Entries
+             * @default []
+             */
+            entries: components["schemas"]["ClaimSheetEntryIn"][];
+        };
+        /** ClaimSheetStudentOut */
+        ClaimSheetStudentOut: {
+            /** Id */
+            id: string;
+            /** Pre Approval Student Id */
+            pre_approval_student_id: string;
+            /** Student Id */
+            student_id?: string | null;
+            /** Register Number */
+            register_number: string;
+            /** Student Name */
+            student_name: string;
+            /** Class Name */
+            class_name: string;
+            /** Role */
+            role: string;
+            /** Attendance With Claims */
+            attendance_with_claims?: number | null;
+            /** Attendance Without Claims */
+            attendance_without_claims?: number | null;
+            /**
+             * Entries
+             * @default []
+             */
+            entries: components["schemas"]["ClaimSheetEntryOut"][];
+        };
+        /** ClaimSheetUpsert */
+        ClaimSheetUpsert: {
+            /**
+             * Students
+             * @default []
+             */
+            students: components["schemas"]["ClaimSheetStudentIn"][];
         };
         /**
          * ClubBootstrap
@@ -2391,6 +2978,11 @@ export interface components {
              * @default false
              */
             can_manage_members: boolean;
+            /**
+             * Can File Yellow Forms
+             * @default false
+             */
+            can_file_yellow_forms: boolean;
         };
         /**
          * ClubCounters
@@ -2633,6 +3225,28 @@ export interface components {
             /** Owner Id */
             owner_id: string;
         };
+        /**
+         * DemoPersonaOut
+         * @description One account a developer may switch into.
+         */
+        DemoPersonaOut: {
+            /** Email */
+            email: string;
+            /** Name */
+            name: string;
+            /** Primary Role */
+            primary_role: string;
+            /** Role Tags Str */
+            role_tags_str: string;
+        };
+        /**
+         * DemoPersonaRequest
+         * @description Which seeded account to become.
+         */
+        DemoPersonaRequest: {
+            /** Email */
+            email: string;
+        };
         /** DocumentOut */
         DocumentOut: {
             /** Name */
@@ -2673,6 +3287,19 @@ export interface components {
             has_potential_duplicate: boolean;
             /** Message */
             message?: string | null;
+        };
+        /** EligibleStudentOut */
+        EligibleStudentOut: {
+            /** Student Id */
+            student_id: string;
+            /** Register Number */
+            register_number: string;
+            /** Student Name */
+            student_name: string;
+            /** Class Name Suggestion */
+            class_name_suggestion: string;
+            /** Default Role */
+            default_role: string;
         };
         /** EventAttendanceOut */
         EventAttendanceOut: {
@@ -3056,6 +3683,33 @@ export interface components {
             /** Page Size */
             page_size: number;
         };
+        /**
+         * PendingApprovalOut
+         * @description One decision a claim is still waiting on.
+         *
+         *     The stepper could say WHICH DESK a claim sat on but never WHO, and at the
+         *     subject-faculty stage that is the only useful question — the claim waits
+         *     on every subject faculty member independently, so "under review" could
+         *     mean one signature outstanding or four.
+         */
+        PendingApprovalOut: {
+            /** Stage */
+            stage: string;
+            /** Role */
+            role: string;
+            /** Faculty Id */
+            faculty_id?: string | null;
+            /** Faculty Name */
+            faculty_name?: string | null;
+            /** Co Faculty Id */
+            co_faculty_id?: string | null;
+            /** Co Faculty Name */
+            co_faculty_name?: string | null;
+            /** Subject */
+            subject?: string | null;
+            /** Course Code */
+            course_code?: string | null;
+        };
         /** PermissionTemplateAssign */
         PermissionTemplateAssign: {
             /** Permission Template */
@@ -3134,6 +3788,208 @@ export interface components {
              * @default []
              */
             items: components["schemas"]["PipelineItem"][];
+        };
+        /** PreApprovalCreate */
+        PreApprovalCreate: {
+            /** Event Name */
+            event_name: string;
+            /** Event Description */
+            event_description?: string | null;
+            /** Venue */
+            venue?: string | null;
+            /**
+             * Event Start Date
+             * Format: date
+             */
+            event_start_date: string;
+            /**
+             * Event End Date
+             * Format: date
+             */
+            event_end_date: string;
+            /** Academic Year */
+            academic_year?: string | null;
+            /**
+             * Students
+             * @default []
+             */
+            students: components["schemas"]["PreApprovalStudentIn"][];
+        };
+        /** PreApprovalOut */
+        PreApprovalOut: {
+            /** Id */
+            id: string;
+            /** Reference Number */
+            reference_number: string;
+            /** Club Id */
+            club_id: string;
+            /** Club Name */
+            club_name: string;
+            /** Academic Year */
+            academic_year: string;
+            /** Event Name */
+            event_name: string;
+            /** Event Description */
+            event_description?: string | null;
+            /** Venue */
+            venue?: string | null;
+            /** Event Start Date */
+            event_start_date: string;
+            /** Event End Date */
+            event_end_date: string;
+            /** Status */
+            status: string;
+            /** Status Label */
+            status_label: string;
+            /** Created By */
+            created_by: string;
+            /** Created By Name */
+            created_by_name: string;
+            /** Submitted At */
+            submitted_at?: string | null;
+            /** Faculty Coordinator Approved By */
+            faculty_coordinator_approved_by?: string | null;
+            /** Faculty Coordinator Approved By Name */
+            faculty_coordinator_approved_by_name?: string | null;
+            /** Faculty Coordinator Approved At */
+            faculty_coordinator_approved_at?: string | null;
+            /** Associate Hod Approved By */
+            associate_hod_approved_by?: string | null;
+            /** Associate Hod Approved By Name */
+            associate_hod_approved_by_name?: string | null;
+            /** Associate Hod Approved At */
+            associate_hod_approved_at?: string | null;
+            /** Review Comments */
+            review_comments?: string | null;
+            /** Last Reviewed By Name */
+            last_reviewed_by_name?: string | null;
+            /** Last Reviewed Stage */
+            last_reviewed_stage?: string | null;
+            /**
+             * Students
+             * @default []
+             */
+            students: components["schemas"]["PreApprovalStudentOut"][];
+            /**
+             * Student Count
+             * @default 0
+             */
+            student_count: number;
+            /** Approval Deadline */
+            approval_deadline: string;
+            /**
+             * Is Expired
+             * @default false
+             */
+            is_expired: boolean;
+            /**
+             * Event Completed
+             * @default false
+             */
+            event_completed: boolean;
+            /** Pending With */
+            pending_with?: string | null;
+            /** Claim Sheet Id */
+            claim_sheet_id?: string | null;
+            /** Claim Sheet Status */
+            claim_sheet_status?: string | null;
+            /** Claim Sheet Reference */
+            claim_sheet_reference?: string | null;
+            /**
+             * Viewer Can Edit
+             * @default false
+             */
+            viewer_can_edit: boolean;
+            /**
+             * Viewer Can Submit
+             * @default false
+             */
+            viewer_can_submit: boolean;
+            /** Submit Blocked Reason */
+            submit_blocked_reason?: string | null;
+            /**
+             * Viewer Can Delete
+             * @default false
+             */
+            viewer_can_delete: boolean;
+            /**
+             * Viewer Can Review
+             * @default false
+             */
+            viewer_can_review: boolean;
+            /**
+             * Viewer Can File Claim Sheet
+             * @default false
+             */
+            viewer_can_file_claim_sheet: boolean;
+        };
+        /** PreApprovalStudentIn */
+        PreApprovalStudentIn: {
+            /** Register Number */
+            register_number: string;
+            /** Student Name */
+            student_name: string;
+            /** Class Name */
+            class_name: string;
+            /** Role */
+            role: string;
+        };
+        /** PreApprovalStudentOut */
+        PreApprovalStudentOut: {
+            /** Id */
+            id: string;
+            /** Student Id */
+            student_id?: string | null;
+            /** Register Number */
+            register_number: string;
+            /** Student Name */
+            student_name: string;
+            /** Class Name */
+            class_name: string;
+            /** Role */
+            role: string;
+        };
+        /**
+         * PreApprovalSummary
+         * @description The pre-approved list a claim sheet is filed against.
+         */
+        PreApprovalSummary: {
+            /** Reference Number */
+            reference_number: string;
+            /** Faculty Coordinator Approved By Name */
+            faculty_coordinator_approved_by_name?: string | null;
+            /** Faculty Coordinator Approved At */
+            faculty_coordinator_approved_at?: string | null;
+            /** Associate Hod Approved By Name */
+            associate_hod_approved_by_name?: string | null;
+            /** Associate Hod Approved At */
+            associate_hod_approved_at?: string | null;
+            /**
+             * Students
+             * @default []
+             */
+            students: components["schemas"]["PreApprovalStudentOut"][];
+        };
+        /**
+         * PreApprovalUpdate
+         * @description Every field optional. The merged result is validated by the endpoint,
+         *     since a new end date alone can only be checked against the stored start.
+         */
+        PreApprovalUpdate: {
+            /** Event Name */
+            event_name?: string | null;
+            /** Event Description */
+            event_description?: string | null;
+            /** Venue */
+            venue?: string | null;
+            /** Event Start Date */
+            event_start_date?: string | null;
+            /** Event End Date */
+            event_end_date?: string | null;
+            /** Academic Year */
+            academic_year?: string | null;
+            /** Students */
+            students?: components["schemas"]["PreApprovalStudentIn"][] | null;
         };
         /** ProgrammeIn */
         ProgrammeIn: {
@@ -3376,6 +4232,16 @@ export interface components {
             /** Status */
             status?: string | null;
         };
+        /** ReviewAction */
+        ReviewAction: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "approve" | "revise" | "reject";
+            /** Comments */
+            comments?: string | null;
+        };
         /** ShowcaseClubOut */
         ShowcaseClubOut: {
             /** Id */
@@ -3418,6 +4284,19 @@ export interface components {
             id: string;
             /** Club Id */
             club_id: string;
+        };
+        /** StudentLookupOut */
+        StudentLookupOut: {
+            /** Found */
+            found: boolean;
+            /** Student Id */
+            student_id?: string | null;
+            /** Register Number */
+            register_number: string;
+            /** Student Name */
+            student_name?: string | null;
+            /** Class Name Suggestion */
+            class_name_suggestion?: string | null;
         };
         /** SupportingDocumentOut */
         SupportingDocumentOut: {
@@ -3503,10 +4382,16 @@ export interface components {
             day_of_week: string;
             /** Subject */
             subject: string;
+            /** Course Code */
+            course_code?: string | null;
             /** Hour */
             hour: string;
+            /** Batch */
+            batch?: string | null;
             /** Faculty Id */
             faculty_id: string;
+            /** Co Faculty Id */
+            co_faculty_id?: string | null;
             /** Programme */
             programme: string;
             /** Semester */
@@ -3520,10 +4405,16 @@ export interface components {
             day_of_week: string;
             /** Subject */
             subject: string;
+            /** Course Code */
+            course_code?: string | null;
             /** Hour */
             hour: string;
+            /** Batch */
+            batch?: string | null;
             /** Faculty Id */
             faculty_id: string;
+            /** Co Faculty Id */
+            co_faculty_id?: string | null;
             /** Programme */
             programme: string;
             /** Semester */
@@ -3537,6 +4428,8 @@ export interface components {
              * @default
              */
             faculty_name: string;
+            /** Co Faculty Name */
+            co_faculty_name?: string | null;
         };
         /** Token */
         Token: {
@@ -3614,6 +4507,8 @@ export interface components {
             semester?: string | null;
             /** Section */
             section?: string | null;
+            /** Batch */
+            batch?: string | null;
             /** Enrollment No */
             enrollment_no?: string | null;
             /** Designation */
@@ -3653,6 +4548,19 @@ export interface components {
             /** Context */
             ctx?: Record<string, never>;
         };
+        /** YellowFormBundle */
+        YellowFormBundle: {
+            /**
+             * Pre Approvals
+             * @default []
+             */
+            pre_approvals: components["schemas"]["PreApprovalOut"][];
+            /**
+             * Claim Sheets
+             * @default []
+             */
+            claim_sheets: components["schemas"]["ClaimSheetOut"][];
+        };
     };
     responses: never;
     parameters: never;
@@ -3672,6 +4580,59 @@ export interface operations {
         requestBody: {
             content: {
                 "application/x-www-form-urlencoded": components["schemas"]["Body_login_api_v1_auth_login_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Token"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_demo_personas_api_v1_auth_demo_persona_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DemoPersonaOut"][];
+                };
+            };
+        };
+    };
+    demo_persona_api_v1_auth_demo_persona_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DemoPersonaRequest"];
             };
         };
         responses: {
@@ -5483,6 +6444,7 @@ export interface operations {
                 programme: string;
                 semester: string;
                 section: string;
+                batch?: string | null;
             };
             header?: never;
             path?: never;
@@ -5645,6 +6607,7 @@ export interface operations {
             query?: {
                 page?: number;
                 page_size?: number;
+                view?: string;
             };
             header?: never;
             path?: never;
@@ -7185,6 +8148,673 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Pipeline"];
+                };
+            };
+        };
+    };
+    get_local_file_api_v1_files__file_path__get: {
+        parameters: {
+            query: {
+                expires: number;
+                signature: string;
+            };
+            header?: never;
+            path: {
+                file_path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_yellow_form_workflow_api_v1_yellow_forms_workflow_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_review_queue_api_v1_yellow_forms_queue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YellowFormBundle"];
+                };
+            };
+        };
+    };
+    get_reviewed_by_me_api_v1_yellow_forms_reviewed_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YellowFormBundle"];
+                };
+            };
+        };
+    };
+    get_my_yellow_forms_api_v1_yellow_forms_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YellowFormBundle"];
+                };
+            };
+        };
+    };
+    list_club_pre_approvals_api_v1_yellow_forms_clubs__club_id__pre_approvals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                club_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreApprovalOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_pre_approval_api_v1_yellow_forms_clubs__club_id__pre_approvals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                club_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreApprovalCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_club_claim_sheets_api_v1_yellow_forms_clubs__club_id__claim_sheets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                club_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimSheetOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_eligible_students_api_v1_yellow_forms_clubs__club_id__eligible_students_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                club_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EligibleStudentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lookup_student_api_v1_yellow_forms_clubs__club_id__student_lookup_get: {
+        parameters: {
+            query: {
+                register_number: string;
+            };
+            header?: never;
+            path: {
+                club_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentLookupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreApprovalUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_claim_sheet_api_v1_yellow_forms_pre_approvals__form_id__claim_sheet_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                form_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimSheetUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimSheetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sheet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimSheetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sheet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaimSheetUpsert"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimSheetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sheet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__submit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sheet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimSheetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sheet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaimSheetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__export_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sheet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The claim sheet in the department's column layout. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -39,7 +39,7 @@ export function ClubAvatar({
         style={box}
         role="img"
         aria-label={`${name} logo`}
-        className="shrink-0 grid place-items-center border border-slate-200 bg-sky-50 text-sky-700 font-semibold select-none"
+        className="shrink-0 grid place-items-center border border-border bg-accent-muted text-accent font-semibold select-none"
       >
         <span style={{ fontSize: size * 0.34 }}>{initials || '?'}</span>
       </div>
@@ -47,7 +47,7 @@ export function ClubAvatar({
   }
 
   return (
-    <div style={box} className="shrink-0 overflow-hidden border border-slate-200">
+    <div style={box} className="shrink-0 overflow-hidden border border-border">
       <img
         src={logo}
         alt={`${name} logo`}

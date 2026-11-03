@@ -10,12 +10,14 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "generate:api": "cd ../backend && ./.venv/bin/python -c \"import json;from app.main import app;open('../Workspace-Hub/openapi.json','w').write(json.dumps(app.openapi(), indent=2))\" && cd ../Workspace-Hub && openapi-typescript openapi.json -o src/api/schema.d.ts"
+    "generate:api": "cd ../backend && ./.venv/bin/python -c \"import json;from app.main import app;open('../Workspace-Hub/openapi.json','w').write(json.dumps(app.openapi(), indent=2))\" && cd ../Workspace-Hub && openapi-typescript openapi.json -o src/api/schema.d.ts",
+    "check:style": "node scripts/check-style-invariants.mjs"
   },
   "dependencies": {
-    "@astryxdesign/cli": "^0.1.4",
-    "@astryxdesign/core": "^0.1.4",
-    "@astryxdesign/theme-neutral": "^0.1.4",
+    "@astryxdesign/cli": "0.1.4",
+    "@astryxdesign/core": "0.1.4",
+    "@astryxdesign/theme-neutral": "0.1.4",
+    "@hookform/resolvers": "^5.9.1",
     "@tailwindcss/vite": "^4.1.14",
     "@tanstack/react-query": "^5.101.2",
     "@vitejs/plugin-react": "^5.0.4",
@@ -35,6 +37,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.6.7",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.2.18",

@@ -6,10 +6,10 @@ told him a plan was waiting.
 """
 from .conftest import auth_headers
 
-COORDINATOR = ("faculty.accounting@christuniversity.in", "faculty123")
-CLASS_TEACHER = ("teacher.class@christuniversity.in", "faculty123")
-STUDENT = ("student.regular@christuniversity.in", "student123")
-UNTAGGED = ("faculty.finance@christuniversity.in", "faculty123")
+COORDINATOR = ("faculty.accounting@christuniversity.in", "123")
+CLASS_TEACHER = ("teacher.class@christuniversity.in", "123")
+STUDENT = ("student.regular@christuniversity.in", "123")
+UNTAGGED = ("faculty.finance@christuniversity.in", "123")
 
 
 def _queue(client, creds):

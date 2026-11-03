@@ -11,8 +11,8 @@ import pytest
 
 from .conftest import auth_headers
 
-VICTIM = ("student.president@christuniversity.in", "student123")
-ATTACKER = ("teacher.class@christuniversity.in", "faculty123")
+VICTIM = ("student.president@christuniversity.in", "123")
+ATTACKER = ("teacher.class@christuniversity.in", "123")
 
 
 @pytest.fixture
@@ -72,7 +72,7 @@ def test_owner_can_still_mark_their_own_read(client, notify):
 def test_unread_count_is_server_supplied_and_read_all_works(client, notify):
     notify("std_vp")
     notify("std_vp")
-    h = auth_headers(client, "student.vp@christuniversity.in", "student123")
+    h = auth_headers(client, "student.vp@christuniversity.in", "123")
 
     count = client.get("/api/v1/notifications/unread-count", headers=h).json()["unread"]
     assert count >= 2

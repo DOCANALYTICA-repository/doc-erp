@@ -11,9 +11,9 @@ the backend will refuse.
 """
 from .conftest import auth_headers
 
-MEMBER = ("student.president@christuniversity.in", "student123")
-COORDINATOR = ("faculty.accounting@christuniversity.in", "faculty123")
-OUTSIDER = ("student.regular2@christuniversity.in", "student123")
+MEMBER = ("student.president@christuniversity.in", "123")
+COORDINATOR = ("faculty.accounting@christuniversity.in", "123")
+OUTSIDER = ("student.regular2@christuniversity.in", "123")
 
 
 def _bootstrap(client, creds, club_id="club_commerce"):
@@ -35,7 +35,7 @@ def test_member_gets_every_tab_and_write_capability(client):
     # The club President is not the Faculty Coordinator.
     assert body["capabilities"]["can_edit_hierarchy"] is False
     assert "reimbursements" in body["visible_tabs"]
-    assert len(body["visible_tabs"]) == 15
+    assert len(body["visible_tabs"]) == 16
 
 
 def test_coordinator_sees_oversight_tabs_but_not_member_only_ones(client):

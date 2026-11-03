@@ -27,6 +27,7 @@ FK_INDEXES = [
     ('ix_annual_plans_club_id', 'annual_plans', ['club_id']),
     ('ix_annual_plans_submitted_by', 'annual_plans', ['submitted_by']),
     ('ix_attendance_entries_claim_participant_id', 'attendance_entries', ['claim_participant_id']),
+    ('ix_attendance_entries_co_faculty_id', 'attendance_entries', ['co_faculty_id']),
     ('ix_attendance_entries_subject_faculty_id', 'attendance_entries', ['subject_faculty_id']),
     ('ix_budgets_club_id', 'budgets', ['club_id']),
     ('ix_claim_participants_claim_id', 'claim_participants', ['claim_id']),
@@ -64,6 +65,7 @@ FK_INDEXES = [
     ('ix_supporting_documents_claim_id', 'supporting_documents', ['claim_id']),
     ('ix_tasks_assignee_id', 'tasks', ['assignee_id']),
     ('ix_tasks_creator_id', 'tasks', ['creator_id']),
+    ('ix_timetable_sessions_co_faculty_id', 'timetable_sessions', ['co_faculty_id']),
     ('ix_timetable_sessions_faculty_id', 'timetable_sessions', ['faculty_id']),
 ]
 

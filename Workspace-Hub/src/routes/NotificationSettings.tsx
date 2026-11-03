@@ -5,8 +5,10 @@ import { useToast } from '@astryxdesign/core/Toast';
 import { api } from '../services/api';
 import { describeError } from '../services/errors';
 import { ErrorState } from '../components/ui/ErrorState';
-import { PageLoader } from '../components/ui/PageLoader';
-import { SectionHeader } from '../components/ui/SectionHeader';
+import { PageSkeleton } from '../components/ui/PageSkeleton';
+import { Switch } from '@astryxdesign/core/Switch';
+import { PageShell } from '../components/ui/PageShell';
+import { PageHeader } from '../components/ui/PageHeader';
 
 interface Preferences {
   email_on_action_required: boolean;
@@ -15,7 +17,24 @@ interface Preferences {
 
 const KEY = ['me', 'notification-preferences'] as const;
 
-const Toggle: React.FC<{
+/**
+ * One preference row.
+ *
+ * Was a file-local control built on a raw `<input type="checkbox"
+ * role="switch">`. That was honest markup — focusable, Space-toggleable,
+ * announces its own state — but it also meant this screen had its own switch
+ * that looked nothing like the design system's.
+ *
+ * Now Astryx `Switch`, with `labelSpacing="spread"` to keep the label left and
+ * the control right.
+ *
+ * Astryx `Switch` directly, not a react-hook-form-bound field: these
+ * preferences save the moment they are flipped rather than on a submit, so a
+ * form with no submit button would be the wrong abstraction — and worse, would
+ * imply unsaved state where there is none. See the note in
+ * src/components/ui/form/fields.tsx on why no `SwitchField` exists.
+ */
+const PreferenceRow: React.FC<{
   id: string;
   label: string;
   description: string;
@@ -23,21 +42,16 @@ const Toggle: React.FC<{
   disabled?: boolean;
   onChange: (next: boolean) => void;
 }> = ({ id, label, description, checked, disabled, onChange }) => (
-  <div className="flex items-start justify-between gap-6 border-b border-slate-100 py-4 last:border-b-0">
-    <div>
-      <label htmlFor={id} className="font-medium text-slate-900">{label}</label>
-      <p className="mt-1 max-w-prose text-sm text-slate-500">{description}</p>
-    </div>
-    {/* A real checkbox, so it is focusable, toggles with Space, and announces
-        its own state. A styled div would do none of those. */}
-    <input
+  <div className="border-b border-border py-5 last:border-b-0">
+    <Switch
       id={id}
-      type="checkbox"
-      role="switch"
-      checked={checked}
-      disabled={disabled}
-      onChange={e => onChange(e.target.checked)}
-      className="mt-1 h-5 w-5 shrink-0 accent-sky-600"
+      label={label}
+      description={description}
+      value={checked}
+      isDisabled={disabled}
+      labelPosition="start"
+      labelSpacing="spread"
+      onChange={next => onChange(next)}
     />
   </div>
 );
@@ -73,7 +87,7 @@ export const NotificationSettings: React.FC = () => {
     },
   });
 
-  if (isLoading) return <PageLoader label="Loading your preferences..." />;
+  if (isLoading) return <PageSkeleton variant="detail" label="Loading your preferences" />;
   if (isError || !data) {
     return (
       <div className="p-8">
@@ -85,14 +99,20 @@ export const NotificationSettings: React.FC = () => {
   const update = (patch: Partial<Preferences>) => save.mutate({ ...data, ...patch });
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-6 py-8">
-      <SectionHeader
+    <PageShell maxWidth="3xl">
+      {/*
+        * PageHeader, not SectionHeader: this is the screen's own name, so it
+        * has to be an h1. It was an h2 before, which meant this page had no
+        * level-1 heading at all and a screen-reader user got no announcement
+        * of where they had landed.
+        */}
+      <PageHeader
         title="Notifications"
         description="What reaches you outside the portal."
       />
 
-      <div className="mt-6 rounded-xl border border-slate-200 bg-white px-6 shadow-sm">
-        <Toggle
+      <div className="mt-6 rounded-lg border border-border bg-card px-6 shadow-sm">
+        <PreferenceRow
           id="pref-action-required"
           label="Email me when something needs my action"
           description="A claim routed to you for review, a plan awaiting your approval, an event proposal you have to sign off. Approval workflows stall until somebody notices, which is why this is on by default."
@@ -100,7 +120,7 @@ export const NotificationSettings: React.FC = () => {
           disabled={save.isPending}
           onChange={next => update({ email_on_action_required: next })}
         />
-        <Toggle
+        <PreferenceRow
           id="pref-daily-digest"
           label="Send me a daily digest"
           description="One morning email summarising everything waiting on you, most urgent first. Nothing is sent on days when your queue is empty."
@@ -110,9 +130,9 @@ export const NotificationSettings: React.FC = () => {
         />
       </div>
 
-      <p className="mt-4 text-sm text-slate-500">
+      <p className="mt-4 text-sm text-secondary">
         In-app notifications are always shown; these settings only control email.
       </p>
-    </div>
+    </PageShell>
   );
 };

@@ -35,6 +35,31 @@ FRONTEND_ROUTES = [
     ("GET", "/api/v1/faculty/reminders"),
     ("GET", "/api/v1/faculty/meetings"),
     ("GET", "/api/v1/faculty/documents"),
+    # Yellow forms. Real seeded ids, because a missing record is also a 404.
+    # The writes are chosen so the request is refused without changing
+    # anything: body-less POST/PUTs fail validation (422), and the body-less
+    # submit/delete calls target forms whose status forbids them (400).
+    ("GET", "/api/v1/yellow-forms/workflow"),
+    ("GET", "/api/v1/yellow-forms/queue"),
+    ("GET", "/api/v1/yellow-forms/reviewed"),
+    ("GET", "/api/v1/yellow-forms/mine"),
+    ("GET", "/api/v1/yellow-forms/clubs/club_doc_analytica/pre-approvals"),
+    ("POST", "/api/v1/yellow-forms/clubs/club_doc_analytica/pre-approvals"),
+    ("GET", "/api/v1/yellow-forms/clubs/club_doc_analytica/claim-sheets"),
+    ("GET", "/api/v1/yellow-forms/clubs/club_doc_analytica/eligible-students"),
+    ("GET", "/api/v1/yellow-forms/clubs/club_doc_analytica/student-lookup?register_number=2611507"),
+    ("GET", "/api/v1/yellow-forms/pre-approvals/paf_da_2"),
+    ("PUT", "/api/v1/yellow-forms/pre-approvals/paf_da_2"),
+    ("DELETE", "/api/v1/yellow-forms/pre-approvals/paf_da_2"),
+    ("POST", "/api/v1/yellow-forms/pre-approvals/paf_da_2/submit"),
+    ("POST", "/api/v1/yellow-forms/pre-approvals/paf_da_2/review"),
+    ("POST", "/api/v1/yellow-forms/pre-approvals/paf_da_7/claim-sheet"),
+    ("GET", "/api/v1/yellow-forms/claim-sheets/ccs_da_7"),
+    ("PUT", "/api/v1/yellow-forms/claim-sheets/ccs_da_7"),
+    ("DELETE", "/api/v1/yellow-forms/claim-sheets/ccs_da_7"),
+    ("POST", "/api/v1/yellow-forms/claim-sheets/ccs_da_7/submit"),
+    ("POST", "/api/v1/yellow-forms/claim-sheets/ccs_da_7/review"),
+    ("GET", "/api/v1/yellow-forms/claim-sheets/ccs_da_7/export.csv"),
 ]
 
 # Paths the frontend sends with a trailing slash today. They must resolve too —
@@ -48,7 +73,7 @@ LEGACY_SLASHED_ROUTES = [
 
 @pytest.fixture(scope="module")
 def headers(client_module):
-    return auth_headers(client_module, "admin@christuniversity.in", "admin123")
+    return auth_headers(client_module, "admin@christuniversity.in", "123")
 
 
 @pytest.fixture(scope="module")

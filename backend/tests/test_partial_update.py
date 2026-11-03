@@ -27,7 +27,7 @@ def _make_task(client, headers, assignee_id: str) -> dict:
 
 
 def test_single_field_update_leaves_other_columns_intact(client):
-    h = auth_headers(client, "student.president@christuniversity.in", "student123")
+    h = auth_headers(client, "student.president@christuniversity.in", "123")
     task = _make_task(client, h, "std_president")
 
     r = client.put(f"/api/v1/tasks/{task['id']}", headers=h, json={"status": "pending_review"})
@@ -43,7 +43,7 @@ def test_single_field_update_leaves_other_columns_intact(client):
 
 def test_explicit_null_is_still_honoured(client):
     """exclude_unset must not become exclude_none — clearing a field is real."""
-    h = auth_headers(client, "student.president@christuniversity.in", "student123")
+    h = auth_headers(client, "student.president@christuniversity.in", "123")
     task = _make_task(client, h, "std_president")
 
     r = client.put(f"/api/v1/tasks/{task['id']}", headers=h, json={"description": None})

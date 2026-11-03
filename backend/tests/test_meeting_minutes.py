@@ -11,8 +11,8 @@ item["assignee_id"] unguarded, so a malformed action item was a 500.
 """
 from .conftest import auth_headers
 
-HOD = ("hod.commerce@christuniversity.in", "faculty123")
-OTHER_FACULTY = ("faculty.finance@christuniversity.in", "faculty123")
+HOD = ("hod.commerce@christuniversity.in", "123")
+OTHER_FACULTY = ("faculty.finance@christuniversity.in", "123")
 
 
 def _create_meeting(client, headers):

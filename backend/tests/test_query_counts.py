@@ -19,10 +19,10 @@ from app.core.database import engine
 
 from .conftest import auth_headers
 
-PRESIDENT = ("student.president@christuniversity.in", "student123")
-COORDINATOR = ("faculty.accounting@christuniversity.in", "faculty123")
-STUDENT = ("student.regular@christuniversity.in", "student123")
-HOD = ("hod.commerce@christuniversity.in", "faculty123")
+PRESIDENT = ("student.president@christuniversity.in", "123")
+COORDINATOR = ("faculty.accounting@christuniversity.in", "123")
+STUDENT = ("student.regular@christuniversity.in", "123")
+HOD = ("hod.commerce@christuniversity.in", "123")
 
 
 class QueryCounter:

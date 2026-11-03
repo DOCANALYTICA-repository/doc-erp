@@ -1,28 +1,82 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { z } from 'zod';
+
 import { useStore, UserState } from '../context/useStore';
 import { api, ApiError } from '../services/api';
-import { Sparkles } from 'lucide-react';
 import type { LoginResponse, UserProfile } from '../api/types';
 import { parseUserProfile } from '../api/contracts';
 import { clearSession, writeSession } from '../services/session';
+import { useZodForm, withServerErrors } from '../lib/forms';
+import { NativeTextField } from '../components/ui/form/NativeTextField';
+import { FormError } from '../components/ui/form/FormError';
+import { rootServerError } from '../components/ui/form/fieldStatus';
+import { useDocumentMeta } from '../lib/meta';
+
+/**
+ * Credentials, validated before they reach the network.
+ *
+ * `.email()` is not gatekeeping — a typo in the address produced a round trip
+ * and a generic "Authentication failed. Check email or password." that pointed
+ * at the password just as much as at the address. Catching it here says which
+ * field is wrong, immediately.
+ *
+ * No maximum length, no character rules on the password: the server owns the
+ * password policy, and a client-side rule that disagrees with it locks people
+ * out of their own accounts.
+ */
+const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, 'Enter your CHRIST email address.')
+    .email('That does not look like an email address.'),
+  password: z.string().min(1, 'Enter your password.'),
+});
+
+type LoginValues = z.infer<typeof loginSchema>;
 
 export const LoginPage: React.FC = () => {
-  const login = useStore((state) => state.login);
+  /*
+   * No canonicalPath: /login is a door, not a destination. Declaring it
+   * canonical would invite a crawler to index a page whose only content is a
+   * form, and to compete with the landing page for the department's name.
+   */
+  useDocumentMeta({
+    title: 'Sign in',
+    description: 'Sign in to the DOC Portal with your CHRIST University account.',
+  });
+
+  const login = useStore(state => state.login);
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [emailInput, setEmailInput] = useState('');
-  const [passwordInput, setPasswordInput] = useState('');
-  const [loginError, setLoginError] = useState('');
+  const form = useZodForm(loginSchema, {
+    defaultValues: { email: '', password: '' },
+  });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = form;
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError('');
+  /**
+   * The OAuth2 password grant. Preserved exactly.
+   *
+   * Four things here are load-bearing and must survive any refactor:
+   *  - the body is `URLSearchParams` with `username`/`password`, not JSON —
+   *    that is the form encoding the grant type requires;
+   *  - `writeSession` runs BEFORE `/auth/me`, so that request carries the
+   *    Authorization header and a token expiring mid-hydrate can refresh
+   *    rather than bouncing the user back here;
+   *  - the redirect honours `location.state.from`, so a deep link that hit
+   *    `RequireAuth` resumes where it was going;
+   *  - `clearSession()` on failure, so a half-written session cannot linger.
+   */
+  const submit = withServerErrors<LoginValues>(form, async values => {
     try {
       const params = new URLSearchParams();
-      params.append('username', emailInput);
-      params.append('password', passwordInput);
+      params.append('username', values.email);
+      params.append('password', values.password);
 
       const res = await api.post<LoginResponse>('/auth/login', params);
 
@@ -32,9 +86,6 @@ export const LoginPage: React.FC = () => {
       const refreshToken = res.refresh_token ?? null;
 
       if (!userProfile) {
-        // Store the pair before calling /auth/me, so that request carries the
-        // Authorization header — and so a token expiring mid-hydrate can
-        // refresh rather than bouncing the user back to this page.
         writeSession({ user: null, token: accessToken, refreshToken, capabilities: {} });
         const profile = parseUserProfile(await api.get<UserProfile>('/auth/me')) as UserProfile;
         capabilities = profile.capabilities || {};
@@ -45,82 +96,108 @@ export const LoginPage: React.FC = () => {
       const from =
         (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/app';
       navigate(from, { replace: true });
-    } catch (err) {
+    } catch (error) {
       clearSession();
-      setLoginError(
-        err instanceof ApiError ? err.message : 'Authentication failed. Check email or password.'
-      );
+
+      /*
+       * A 401 means something different here than anywhere else in the app.
+       *
+       * `describeError` maps every 401 to "Your session has expired. Please
+       * sign in again." — correct when a token dies mid-session, nonsense on
+       * the sign-in page, where the user never had a session and the real
+       * cause is a wrong email or password. Left alone, a mistyped password
+       * told people to sign in again on the form they were already using.
+       *
+       * Rethrown as a plain Error carrying the server's own detail:
+       * `describeError` keys its session-expiry copy off `ApiError.status`, so
+       * preserving the ApiError — even with a different body — would keep
+       * producing the wrong sentence. A plain Error falls through to its
+       * message.
+       */
+      if (error instanceof ApiError && error.status === 401) {
+        throw new Error(
+          typeof error.body?.detail === 'string'
+            ? error.body.detail
+            : 'Incorrect email or password.'
+        );
+      }
+      throw error;
     }
-  };
+  });
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm p-8 rounded-2xl bg-white border border-slate-200/60 shadow-xl space-y-6">
-        <div className="flex flex-col items-center text-center gap-2">
-          <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-900">DOC Digital Identity</h2>
-          <p className="text-sm text-slate-500">Sign in with your university account.</p>
+    <div className="flex min-h-screen items-center justify-center bg-body p-4">
+      <div className="w-full max-w-sm space-y-6 rounded-lg border border-border bg-card p-8 shadow-lg">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <img
+            src="/icon-512.png"
+            alt=""
+            width={40}
+            height={40}
+            className="h-10 w-10 rounded-lg shadow-sm"
+          />
+          <h1 className="font-heading text-xl font-semibold text-primary">DOC Digital Identity</h1>
+          <p className="text-sm text-secondary">Sign in with your university account.</p>
         </div>
 
         {/*
-          * The labels here were not associated with their inputs (no htmlFor,
-          * no nesting), so a screen reader announced two unlabelled text
-          * fields — and the inputs carried no `name` or `autocomplete`, which
-          * is why no password manager ever offered to fill this form.
+          * Native inputs, deliberately — NOT the Astryx-backed `TextField`.
+          *
+          * Astryx input props extend React.HTMLAttributes rather than
+          * InputHTMLAttributes, so they accept no `name` and no
+          * `autoComplete`. A password manager decides whether to offer to fill
+          * and save based on exactly those, so putting this form on TextField
+          * would mean nobody's password manager works here again. See
+          * NativeTextField for the full note.
+          *
+          * The labels are associated via htmlFor/id; both were once missing
+          * entirely, so a screen reader announced two unlabelled text fields.
           */}
-        <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4 text-sm">
-          <div className="flex flex-col gap-1.5">
-            <label className="font-medium text-slate-600" htmlFor="login-email">
-              CHRIST email address
-            </label>
-            <input
-              id="login-email"
-              name="email"
-              type="email"
-              autoComplete="username"
-              required
-              placeholder="name@christuniversity.in"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="font-medium text-slate-600" htmlFor="login-password">
-              Password
-            </label>
-            <input
-              id="login-password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              placeholder="••••••••"
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900"
-            />
-          </div>
+        <form onSubmit={handleSubmit(submit)} noValidate className="flex flex-col gap-4 text-sm">
+          <NativeTextField
+            id="login-email"
+            label="CHRIST email address"
+            type="email"
+            placeholder="name@christuniversity.in"
+            autoComplete="username"
+            registration={register('email')}
+            error={errors.email}
+            isDisabled={isSubmitting}
+          />
 
-          {/* role=alert so the failure is announced, not just recoloured. */}
-          {loginError ? (
-            <p role="alert" className="text-sm text-rose-600">{loginError}</p>
-          ) : null}
+          <NativeTextField
+            id="login-password"
+            label="Password"
+            type="password"
+            placeholder="••••••••"
+            autoComplete="current-password"
+            registration={register('password')}
+            error={errors.password}
+            isDisabled={isSubmitting}
+          />
 
+          <FormError message={rootServerError(errors)} />
+
+          {/*
+            * `disabled` while submitting. Without it this form could be
+            * double-submitted, firing two OAuth2 password grants — which on a
+            * rate-limited endpoint (slowapi is configured on /auth/login) can
+            * lock someone out for typing quickly.
+            */}
           <button
             type="submit"
-            className="w-full rounded-lg bg-slate-900 py-2.5 font-medium text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+            disabled={isSubmitting}
+            className="w-full rounded-full bg-accent py-2.5 font-semibold text-on-accent transition-colors hover:bg-gold-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-60"
           >
-            Sign in
+            {isSubmitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
-        <div className="text-center pt-2">
+
+        <div className="pt-2 text-center">
           <button
             type="button"
             onClick={() => navigate('/')}
-            className="text-sm text-slate-500 hover:underline"
+            className="text-sm text-secondary hover:underline"
           >
             Back to the public website
           </button>

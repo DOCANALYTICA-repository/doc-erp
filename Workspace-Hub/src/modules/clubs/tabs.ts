@@ -16,6 +16,7 @@ export const CLUB_TABS = [
   { id: 'tasks', label: 'Tasks' },
   { id: 'recruitment', label: 'Recruitment' },
   { id: 'events', label: 'Annual Events' },
+  { id: 'yellow-forms', label: 'Yellow Forms' },
   { id: 'announcements', label: 'Announcements' },
   { id: 'budget', label: 'Club Budget' },
   { id: 'reimbursements', label: 'Reimbursements' },

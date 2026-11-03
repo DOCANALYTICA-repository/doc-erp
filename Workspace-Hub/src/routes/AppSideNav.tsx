@@ -1,10 +1,11 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SideNav, SideNavItem, SideNavSection } from '@astryxdesign/core/SideNav';
-import { Award, Compass, FolderOpen, GitBranch, Inbox } from 'lucide-react';
+import { GitBranch, Inbox } from 'lucide-react';
 
 import { useActionQueue } from '../api/hooks';
 import { useStore } from '../context/useStore';
+import { MODULES } from '../lib/navigation';
 
 /**
  * The application's primary navigation.
@@ -19,11 +20,6 @@ import { useStore } from '../context/useStore';
  *     no navigation whatsoever. Not an oversight in the markup: the hamburger
  *     is gated on the slot being filled.
  */
-const MODULES = [
-  { id: 'clubs', label: 'Clubs', icon: Award, perm: 'clubs:view' },
-  { id: 'claims', label: 'Claims', icon: Compass, perm: 'claims:view_own' },
-  { id: 'faculty', label: 'Faculty workspace', icon: FolderOpen, perm: 'faculty:dashboard' },
-];
 
 export const AppSideNav: React.FC = () => {
   const navigate = useNavigate();
@@ -37,7 +33,8 @@ export const AppSideNav: React.FC = () => {
   const canSeePipeline =
     hasPermission('claims:approve_coordinator') ||
     hasPermission('clubs:approve_plan') ||
-    hasPermission('rbac:assign_roles');
+    hasPermission('rbac:assign_roles') ||
+    hasPermission('yellow_forms:view_all');
   const waiting = queue?.total ?? 0;
 
   return (
@@ -54,7 +51,7 @@ export const AppSideNav: React.FC = () => {
           endContent={
             waiting > 0 ? (
               <span
-                className="rounded-full bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-700"
+                className="rounded-full bg-gold-200 px-2 py-0.5 text-xs font-semibold text-accent"
                 aria-label={`${waiting} items waiting on you`}
               >
                 {waiting}
@@ -79,7 +76,7 @@ export const AppSideNav: React.FC = () => {
       ) : null}
 
       <SideNavSection title="Workspaces">
-        {MODULES.filter(m => hasPermission(m.perm)).map(m => (
+        {MODULES.filter(m => hasPermission(m.permission)).map(m => (
           <SideNavItem
             key={m.id}
             label={m.label}

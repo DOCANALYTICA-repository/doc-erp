@@ -128,18 +128,22 @@ STAGES: dict = {
         required_permissions=("claims:approve_coordinator",),
         scope_check=_course_coordinator_scoped,
         denial="You are not the assigned Course Coordinator for this programme",
+        # The LAST acting stage. Approving here finishes the claim as far as
+        # this application is concerned.
         on_approve="attendance_office",
         approve_status="approved",
     ),
     "attendance_office": StageSpec(
         id="attendance_office",
-        label="Attendance office update",
-        required_permissions=("claims:approve_coordinator",),
-        scope_check=_course_coordinator_scoped,
-        denial="You are not the assigned Course Coordinator for this programme",
-        # The last acting stage: approving here CLOSES the claim.
-        on_approve="closed",
-        approve_status="closed",
+        label="Forwarded to attendance office",
+        # Terminal, and deliberately so. The attendance office is not part of
+        # this application's approval chain — it is where an already-approved
+        # claim is SENT once every approval is in. Modelling it as a review
+        # stage meant the Course Coordinator had to approve the same claim
+        # twice: once as themselves, and once standing in for an office that
+        # does not use this system.
+        is_terminal=True,
+        denial="This claim is approved and has been forwarded to the attendance office",
     ),
     "closed": StageSpec(
         id="closed",
@@ -150,9 +154,14 @@ STAGES: dict = {
 }
 
 #: Display order, for the stepper and for progress calculations.
+#:
+#: The happy path only. "closed" is a real stage — it is where a rejected or
+#: returned claim lands — but it is not a step on the way to approval, and
+#: listing it here put a node on the stepper that an approved claim could
+#: never light up.
 STAGE_ORDER: List[str] = [
     "initial_review", "subject_faculty", "course_coordinator",
-    "attendance_office", "closed",
+    "attendance_office",
 ]
 
 

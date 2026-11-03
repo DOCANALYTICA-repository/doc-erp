@@ -1,8 +1,9 @@
 import React, { createContext, useContext } from 'react';
+import { useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useClaims, useClaimsInvalidator, useTimetable } from '../../api/hooks';
-import type { Claim, TimetableSession } from '../../api/types';
+import type { Claim, ClaimView, TimetableSession } from '../../api/types';
 import { useStore } from '../../context/useStore';
 
 interface ClaimsWorkspace {
@@ -21,6 +22,8 @@ interface ClaimsWorkspace {
   invalidate: () => void;
   /** Reviewer view: faculty AND super_admin. */
   isReviewer: boolean;
+  /** Which slice of the reviewer's claims this tab is showing. */
+  view: ClaimView;
   academicContext: { programme: string; semester: string; section: string };
 }
 
@@ -47,12 +50,27 @@ export const ClaimsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     section: user?.section || '',
   };
 
+  /**
+   * The tab decides which list we fetch.
+   *
+   * "Approved & Actioned" is not a filter applied to the queue — it is a
+   * different question asked of the server ("what have I already decided?"),
+   * because the answer includes claims that have since moved to another
+   * reviewer's desk and are no longer in this one's scope at all.
+   */
+  const { tab } = useParams<{ tab: string }>();
+  const view: ClaimView = tab === 'reviewed' ? 'actioned' : 'pending';
+
   // Page lives here rather than in a tab, so switching between "All claims"
   // and the review queue does not silently reset the reader's position.
   const [page, setPage] = React.useState(1);
   const pageSize = 25;
 
-  const claimsQuery = useClaims(page, pageSize);
+  // Two tabs, two lists: reset to page 1 when the question changes, or the
+  // reader lands on page 3 of a list that may only have one.
+  React.useEffect(() => { setPage(1); }, [view]);
+
+  const claimsQuery = useClaims(page, pageSize, view);
   const timetableQuery = useTimetable(
     academicContext.programme, academicContext.semester, academicContext.section,
   );
@@ -70,6 +88,7 @@ export const ClaimsProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     refetch: () => { void claimsQuery.refetch(); },
     invalidate,
     isReviewer,
+    view,
     academicContext,
   };
 

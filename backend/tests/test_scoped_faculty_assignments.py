@@ -24,19 +24,19 @@ def _submit_claim(client, student_h, section="A", date_range="2026-08-01 to 2026
 
 
 def test_subject_faculty_does_not_see_claim_still_awaiting_class_teacher(client):
-    student_h = auth_headers(client, "student.regular@christuniversity.in", "student123")
+    student_h = auth_headers(client, "student.regular@christuniversity.in", "123")
     claim = _submit_claim(client, student_h)
 
-    subject_faculty_h = auth_headers(client, "faculty.accounting@christuniversity.in", "faculty123")
+    subject_faculty_h = auth_headers(client, "faculty.accounting@christuniversity.in", "123")
     listing = client.get("/api/v1/claims", headers=subject_faculty_h).json()["items"]
     assert claim["id"] not in {c["id"] for c in listing}
 
 
 def test_class_teacher_scoped_to_their_own_section_only(client):
-    student_h = auth_headers(client, "student.regular@christuniversity.in", "student123")
+    student_h = auth_headers(client, "student.regular@christuniversity.in", "123")
     claim = _submit_claim(client, student_h, section="B")
 
-    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "faculty123")
+    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "123")
     listing = client.get("/api/v1/claims", headers=teacher_h).json()["items"]
     assert claim["id"] not in {c["id"] for c in listing}
 
@@ -45,10 +45,10 @@ def test_class_teacher_scoped_to_their_own_section_only(client):
 
 
 def test_revise_requires_a_reason(client):
-    student_h = auth_headers(client, "student.regular@christuniversity.in", "student123")
+    student_h = auth_headers(client, "student.regular@christuniversity.in", "123")
     claim = _submit_claim(client, student_h)
 
-    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "faculty123")
+    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "123")
     r = client.post(f"/api/v1/claims/{claim['id']}/approve-stage?action=revise", headers=teacher_h)
     assert r.status_code == 400
 
@@ -64,10 +64,10 @@ def test_revise_requires_a_reason(client):
 
 
 def test_resubmit_edits_same_claim_and_notifies(client):
-    student_h = auth_headers(client, "student.regular@christuniversity.in", "student123")
+    student_h = auth_headers(client, "student.regular@christuniversity.in", "123")
     claim = _submit_claim(client, student_h, date_range="2026-08-05 to 2026-08-05")
 
-    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "faculty123")
+    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "123")
     client.post(
         f"/api/v1/claims/{claim['id']}/approve-stage?action=revise&feedback=Wrong+date",
         headers=teacher_h,
@@ -87,11 +87,26 @@ def test_resubmit_edits_same_claim_and_notifies(client):
 
 
 def test_club_faculty_coordinator_scoped_to_their_own_club(client):
-    # fac_subject_2 (faculty.accounting) is seeded as Club Faculty Coordinator for club_commerce only
-    coordinator_h = auth_headers(client, "faculty.accounting@christuniversity.in", "faculty123")
-    listing = client.get("/api/v1/claims", headers=coordinator_h).json()["items"]
-    club_claim_ids = {c["id"] for c in listing if c.get("submission_type") == "club"}
-    assert "cl_club_1" in club_claim_ids
+    # fac_subject_2 (faculty.accounting) coordinates club_commerce only and
+    # fac_reynal club_doc_analytica only; each has one seeded yellow-form
+    # pre-approval waiting at the Faculty Coordinator stage.
+    dsouza_h = auth_headers(client, "faculty.accounting@christuniversity.in", "123")
+    reynal_h = auth_headers(client, "reynal@christuniversity.in", "123")
+
+    def queue(headers):
+        r = client.get("/api/v1/yellow-forms/queue", headers=headers)
+        assert r.status_code == 200, r.text
+        return {f["id"] for f in r.json()["pre_approvals"]}
+
+    assert "paf_cc_1" in queue(dsouza_h) and "paf_da_2" not in queue(dsouza_h)
+    assert "paf_da_2" in queue(reynal_h) and "paf_cc_1" not in queue(reynal_h)
+
+    for form_id, headers in (("paf_da_2", dsouza_h), ("paf_cc_1", reynal_h)):
+        r = client.post(
+            f"/api/v1/yellow-forms/pre-approvals/{form_id}/review", json={"action": "approve"}, headers=headers,
+        )
+        assert r.status_code == 403, r.text
+        assert r.json()["detail"] == "You are not the assigned Faculty Coordinator for this club"
 
 
 # ---------------------------------------------------------------------------
@@ -102,10 +117,10 @@ def test_club_faculty_coordinator_scoped_to_their_own_club(client):
 # separate places, and each one alone was enough to block the workflow.
 # ---------------------------------------------------------------------------
 
-COORDINATOR = ("faculty.accounting@christuniversity.in", "faculty123")
-CULTURAL_COORDINATOR = ("faculty.cultural@christuniversity.in", "faculty123")
-HOD_USER = ("hod.commerce@christuniversity.in", "faculty123")
-UNTAGGED_FACULTY = ("faculty.finance@christuniversity.in", "faculty123")
+COORDINATOR = ("faculty.accounting@christuniversity.in", "123")
+CULTURAL_COORDINATOR = ("faculty.cultural@christuniversity.in", "123")
+HOD_USER = ("hod.commerce@christuniversity.in", "123")
+UNTAGGED_FACULTY = ("faculty.finance@christuniversity.in", "123")
 
 
 def test_coordinator_selector_contains_the_club_he_oversees(client):

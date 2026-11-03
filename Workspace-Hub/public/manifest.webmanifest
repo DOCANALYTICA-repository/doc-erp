@@ -1,15 +1,30 @@
 {
-  "name": "DOC Portal — Department of Commerce, CHRIST University",
+  "name": "DOC Portal \u2014 Department of Commerce, CHRIST University",
   "short_name": "DOC Portal",
   "description": "Attendance claims, club operations and the faculty workspace for the Department of Commerce.",
   "start_url": "/app",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f8fafc",
-  "theme_color": "#0284c7",
+  "background_color": "#f5ead8",
+  "theme_color": "#b8860b",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

@@ -1,6 +1,7 @@
 """In-app notifications, and delivering the ones that need acting on by email."""
 import logging
 import uuid
+from urllib.parse import quote
 
 from sqlalchemy.orm import Session
 
@@ -21,8 +22,12 @@ def notification_link_path(notification: Notification) -> str | None:
     entity_type, entity_id = notification.entity_type, notification.entity_id
     if not entity_type or not entity_id:
         return None
+    # No club id on a notification, so Claims opens it for everyone and offers filers the club link.
+    yellow_form = f"/app/claims/yellow_forms?open={quote(entity_id, safe='')}"
     return {
         "claim": f"/app/claims/my_claims?claim={entity_id}",
+        "pre_approval": yellow_form,
+        "claim_sheet": yellow_form,
         "annual_plan": "/app/clubs/annual-plan",
         "club": f"/app/clubs/dashboard?club={entity_id}",
         "task": "/app/faculty/tasks",

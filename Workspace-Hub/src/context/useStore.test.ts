@@ -1,5 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useStore } from './useStore';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { useStore, type UserState } from './useStore';
+import { ApiError, api } from '../services/api';
+import { readSession, writeSession } from '../services/session';
 
 describe('useStore RBAC/capabilities (single source of truth from /auth/me)', () => {
   beforeEach(() => {
@@ -42,5 +44,50 @@ describe('useStore RBAC/capabilities (single source of truth from /auth/me)', ()
     useStore.getState().logout();
     expect(useStore.getState().user).toBeNull();
     expect(localStorage.getItem('doc_user_session')).toBeNull();
+  });
+});
+
+describe('restoreSession', () => {
+  const stale: UserState = {
+    id: 'fac_reynal', email: 'reynal@christuniversity.in', name: 'Dr. Reynal', primary_role: 'faculty',
+    role_tags_str: 'Club Faculty Coordinator', status: 'active', permissions: ['claims:review_faculty'],
+  };
+
+  beforeEach(() => {
+    useStore.setState({ user: null, token: null, capabilities: {}, isSessionRestoring: true });
+    localStorage.clear();
+    writeSession({ user: stale as never, token: 'tok', refreshToken: 'rt1', capabilities: {} });
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it('re-reads the profile, so a session from before a release gets its new permissions and capabilities', async () => {
+    vi.spyOn(api, 'get').mockImplementation((async () => {
+      // The access token expired and was refreshed (and rotated) during the request.
+      writeSession({ ...readSession()!, token: 'tok2', refreshToken: 'rt2' });
+      return {
+        ...stale,
+        permissions: ['claims:review_faculty', 'yellow_forms:approve_faculty_coordinator'],
+        capabilities: { 'claims.individual_co_curricular': 'coming_soon' },
+      };
+    }) as never);
+
+    await useStore.getState().restoreSession();
+
+    const state = useStore.getState();
+    expect(state.isSessionRestoring).toBe(false);
+    expect(state.hasPermission('yellow_forms:approve_faculty_coordinator')).toBe(true);
+    expect(state.isEnabled('claims.individual_co_curricular')).toBe(false);
+    const stored = readSession();
+    expect(stored?.user?.permissions).toContain('yellow_forms:approve_faculty_coordinator');
+    expect([stored?.token, stored?.refreshToken]).toEqual(['tok2', 'rt2']);
+  });
+
+  it('keeps the stored profile when the server cannot be reached', async () => {
+    vi.spyOn(api, 'get').mockRejectedValue(new ApiError(0, { detail: 'Cannot reach the server.' }));
+
+    await useStore.getState().restoreSession();
+
+    expect(useStore.getState().user?.permissions).toEqual(['claims:review_faculty']);
+    expect(useStore.getState().isSessionRestoring).toBe(false);
   });
 });

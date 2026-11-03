@@ -81,9 +81,9 @@ export const EventAttendanceSheet: React.FC<{ event: ClubEvent; onClose: () => v
   const presentCount = activeMembers.filter(m => (marks[m.student_id] ?? 'present') === 'present').length;
 
   return (
-    <div className="mt-4 border-t border-slate-100 pt-4">
+    <div className="mt-4 border-t border-border pt-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-medium text-slate-600">
+        <h4 className="text-sm font-medium text-secondary">
           Attendance register — {presentCount} of {activeMembers.length} present
         </h4>
         <div className="flex gap-2">
@@ -106,12 +106,12 @@ export const EventAttendanceSheet: React.FC<{ event: ClubEvent; onClose: () => v
         </div>
       </div>
 
-      <ul className="mt-3 flex flex-col divide-y divide-slate-100">
+      <ul className="mt-3 flex flex-col divide-y divide-border">
         {activeMembers.map(m => {
           const value = marks[m.student_id] ?? 'present';
           return (
             <li key={m.id} className="flex items-center justify-between gap-3 py-2">
-              <span className="text-sm text-slate-800">{m.student_name ?? m.student_id}</span>
+              <span className="text-sm text-primary">{m.student_name ?? m.student_id}</span>
               <fieldset className="flex gap-1" aria-label={`Attendance for ${m.student_name ?? m.student_id}`}>
                 {(['present', 'absent'] as const).map(option => (
                   <label
@@ -119,9 +119,9 @@ export const EventAttendanceSheet: React.FC<{ event: ClubEvent; onClose: () => v
                     className={`cursor-pointer rounded-lg px-3 py-1 text-sm font-medium ${
                       value === option
                         ? option === 'present'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-rose-100 text-rose-800'
-                        : 'text-slate-500 hover:bg-slate-100'
+                          ? 'bg-success-muted text-success'
+                          : 'bg-error-muted text-error'
+                        : 'text-secondary hover:bg-muted'
                     }`}
                   >
                     <input

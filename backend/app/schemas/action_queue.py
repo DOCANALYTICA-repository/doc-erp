@@ -16,6 +16,10 @@ ActionKind = Literal[
     "task_due",
     "meeting_without_minutes",
     "reimbursement_review",
+    "pre_approval_review",
+    "claim_sheet_review",
+    "claim_sheet_due",
+    "yellow_form_returned",
 ]
 
 Urgency = Literal["overdue", "today", "soon", "normal"]

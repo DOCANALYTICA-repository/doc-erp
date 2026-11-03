@@ -34,7 +34,7 @@ export const TabStrip: React.FC<{
   return (
     <nav
       aria-label={label}
-      className="z-10 w-full border-b border-slate-200 bg-white px-6 py-2.5 shadow-sm"
+      className="z-10 w-full border-b border-border bg-card px-6 py-2.5 shadow-sm"
     >
       <OverflowList
         gap={1}
@@ -59,8 +59,8 @@ export const TabStrip: React.FC<{
             onMouseEnter={item.onHover}
             className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               activeId === item.id
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-500 hover:text-slate-900'
+                ? 'bg-sand-900 text-white shadow-sm'
+                : 'text-secondary hover:text-primary'
             }`}
           >
             {item.label}

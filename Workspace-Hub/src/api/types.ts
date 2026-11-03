@@ -43,8 +43,32 @@ export type Claim = Schemas['ClaimOut'];
 export type ClaimPage = Schemas['Page_ClaimOut_'];
 export type ClaimParticipant = Schemas['ClaimParticipantOut'];
 export type AttendanceEntry = Schemas['AttendanceEntryOut'];
+export type PendingApproval = Schemas['PendingApprovalOut'];
+/** Which slice of a reviewer's claims to fetch: their to-do list, or their history. */
+export type ClaimView = 'pending' | 'actioned';
 export type TimetableSession = Schemas['TimetableSessionOut'];
 export type SupportingDocument = Schemas['SupportingDocumentOut'];
+
+// --- Yellow forms (club co-curricular attendance claims) --------------------
+export type PreApproval = Schemas['PreApprovalOut'];
+export type PreApprovalStudent = Schemas['PreApprovalStudentOut'];
+/** The approved list a claim sheet is filed against, as attached to the sheet. */
+export type PreApprovalSummary = Schemas['PreApprovalSummary'];
+export type PreApprovalCreate = Schemas['PreApprovalCreate'];
+export type PreApprovalUpdate = Schemas['PreApprovalUpdate'];
+export type PreApprovalStudentInput = Schemas['PreApprovalStudentIn'];
+export type ClaimSheet = Schemas['ClaimSheetOut'];
+export type ClaimSheetStudent = Schemas['ClaimSheetStudentOut'];
+export type ClaimSheetEntry = Schemas['ClaimSheetEntryOut'];
+export type ClaimSheetUpsert = Schemas['ClaimSheetUpsert'];
+export type ClaimSheetStudentInput = Schemas['ClaimSheetStudentIn'];
+export type ClaimSheetEntryInput = Schemas['ClaimSheetEntryIn'];
+/** GET /yellow-forms/queue, /reviewed and /mine all return this pair of lists. */
+export type YellowFormBundle = Schemas['YellowFormBundle'];
+export type EligibleStudent = Schemas['EligibleStudentOut'];
+export type StudentLookup = Schemas['StudentLookupOut'];
+export type ReviewAction = Schemas['ReviewAction'];
+export type ReviewActionKind = ReviewAction['action'];
 
 // --- Faculty workspace -----------------------------------------------------
 export type Note = Schemas['NoteOut'];
@@ -97,6 +121,38 @@ export interface ClaimWorkflow {
   stage_order: string[];
   actions: string[];
   stages: ClaimWorkflowStage[];
+}
+
+/**
+ * GET /yellow-forms/workflow — both yellow-form state machines and the claim
+ * sheet's period columns, served from backend/app/core/yellow_form_workflow.py.
+ */
+export interface ClaimSheetPeriod {
+  id: string;
+  /** Human label, e.g. "9:45 AM". */
+  label: string;
+  /** The department template's column header, e.g. "Period 9_45AM". */
+  column: string;
+}
+
+/** One step of the happy path; `is_review` marks the steps a reviewer signs. */
+export interface YellowFormWorkflowStep {
+  id: string;
+  label: string;
+  is_review: boolean;
+}
+
+export interface YellowFormWorkflowPart {
+  stage_order: string[];
+  stages: YellowFormWorkflowStep[];
+  status_labels: Record<string, string>;
+}
+
+export interface YellowFormWorkflow {
+  actions: ReviewActionKind[];
+  periods: ClaimSheetPeriod[];
+  pre_approval: YellowFormWorkflowPart;
+  claim_sheet: YellowFormWorkflowPart;
 }
 
 export interface CalendarEvent {

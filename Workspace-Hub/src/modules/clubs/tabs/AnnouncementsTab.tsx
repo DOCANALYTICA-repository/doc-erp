@@ -3,16 +3,36 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@astryxdesign/core/Button';
 import { useToast } from '@astryxdesign/core/Toast';
 import { Megaphone } from 'lucide-react';
+import { z } from 'zod';
 
 import { useClubAnnouncements } from '../../../api/hooks';
 import { api } from '../../../services/api';
-import { describeError } from '../../../services/errors';
 import { clubKeys } from '../../../lib/queryKeys';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { PageSkeleton } from '../../../components/ui/PageSkeleton';
+import { Card } from '../../../components/ui/Card';
 import { ErrorState } from '../../../components/ui/ErrorState';
-import { PageLoader } from '../../../components/ui/PageLoader';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
 import { useClubWorkspace } from '../ClubWorkspaceContext';
+import { useZodForm, withServerErrors } from '../../../lib/forms';
+import { TextField, TextAreaField, SelectField } from '../../../components/ui/form/fields';
+import { FormError } from '../../../components/ui/form/FormError';
+import { rootServerError } from '../../../components/ui/form/fieldStatus';
+
+/**
+ * Validated before the request, so an empty title is caught next to the title
+ * field rather than becoming a 422 and a toast.
+ *
+ * The old form relied on native `required`, which does work inside a real
+ * `<form>` — but it produces the browser's own bubble, which cannot be styled,
+ * disappears on the next click, and says "Please fill out this field" rather
+ * than anything about announcements.
+ */
+const announcementSchema = z.object({
+  title: z.string().trim().min(1, 'Give the announcement a title.'),
+  body: z.string().trim().min(1, 'Write the message you want members to see.'),
+  announcement_type: z.string().min(1, 'Choose a type.'),
+});
 
 const TYPES = [
   { value: 'general', label: 'General update' },
@@ -28,29 +48,38 @@ export const AnnouncementsTab: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [isOpen, setIsOpen] = React.useState(false);
-  const [title, setTitle] = React.useState('');
-  const [body, setBody] = React.useState('');
-  const [type, setType] = React.useState('general');
-  const [isSaving, setIsSaving] = React.useState(false);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    try {
-      await api.post(`/clubs/${clubId}/announcements`, {
-        club_id: clubId, title, body, announcement_type: type,
-      });
-      setTitle(''); setBody(''); setIsOpen(false);
-      showToast({ body: 'Announcement published.', type: 'info' });
-      queryClient.invalidateQueries({ queryKey: clubKeys.resource(clubId, 'announcements') });
-    } catch (err) {
-      showToast({ body: `Could not publish: ${describeError(err)}`, type: 'error' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const form = useZodForm(announcementSchema, {
+    defaultValues: { title: '', body: '', announcement_type: 'general' },
+  });
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = form;
 
-  if (isLoading) return <PageLoader label="Loading announcements..." />;
+  /*
+   * `withServerErrors` handles the failure path: a 422 lands on the field it
+   * names, anything else becomes a form-level alert. The toast that remains is
+   * for SUCCESS only — announcing "published" while the form collapses is
+   * exactly what a toast is for. The old `Could not publish: …` toast is gone,
+   * because a failure now appears next to the thing that caused it.
+   */
+  const submit = withServerErrors(form, async values => {
+    await api.post(`/clubs/${clubId}/announcements`, {
+      club_id: clubId,
+      title: values.title,
+      body: values.body,
+      announcement_type: values.announcement_type,
+    });
+    reset();
+    setIsOpen(false);
+    showToast({ body: 'Announcement published.', type: 'info' });
+    queryClient.invalidateQueries({ queryKey: clubKeys.resource(clubId, 'announcements') });
+  });
+
+  if (isLoading) return <PageSkeleton variant="list" label="Loading announcements" />;
   if (isError) return <ErrorState title="Announcements didn't load" error={error} onRetry={() => void refetch()} />;
 
   return (
@@ -65,28 +94,28 @@ export const AnnouncementsTab: React.FC = () => {
       />
 
       {isOpen ? (
-        <form onSubmit={submit} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 text-sm shadow-sm">
-          <label className="font-medium text-slate-600" htmlFor="ann-title">Title</label>
-          <input
-            id="ann-title" required value={title} onChange={e => setTitle(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+        <Card as="form" padding="md" className="flex flex-col gap-4 text-sm shadow-sm" onSubmit={handleSubmit(submit)} noValidate>
+          <TextField control={control} name="title" label="Title" isRequired />
+          <TextAreaField control={control} name="body" label="Message" rows={3} isRequired />
+          <SelectField
+            control={control}
+            name="announcement_type"
+            label="Type"
+            options={TYPES}
+            isRequired
           />
-          <label className="font-medium text-slate-600" htmlFor="ann-body">Message</label>
-          <textarea
-            id="ann-body" required rows={3} value={body} onChange={e => setBody(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-          />
-          <label className="font-medium text-slate-600" htmlFor="ann-type">Type</label>
-          <select
-            id="ann-type" value={type} onChange={e => setType(e.target.value)}
-            className="w-fit rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-          >
-            {TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+
+          <FormError message={rootServerError(errors)} />
+
           <div>
-            <Button label={isSaving ? 'Publishing…' : 'Publish'} variant="primary" isDisabled={isSaving} type="submit" />
+            <Button
+              label={isSubmitting ? 'Publishing…' : 'Publish'}
+              variant="primary"
+              isDisabled={isSubmitting}
+              type="submit"
+            />
           </div>
-        </form>
+        </Card>
       ) : null}
 
       {rows && rows.length === 0 ? (
@@ -94,10 +123,10 @@ export const AnnouncementsTab: React.FC = () => {
       ) : (
         <div className="flex flex-col gap-3">
           {rows?.map(a => (
-            <article key={a.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h3 className="font-semibold text-slate-900">{a.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">{a.body}</p>
-            </article>
+            <Card as="article" padding="sm" key={a.id}>
+              <h3 className="font-semibold text-primary">{a.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-secondary">{a.body}</p>
+            </Card>
           ))}
         </div>
       )}

@@ -7,8 +7,8 @@ placeholders.
 """
 from .conftest import auth_headers
 
-HOD = ("hod.commerce@christuniversity.in", "faculty123")
-STUDENT = ("student.regular@christuniversity.in", "student123")
+HOD = ("hod.commerce@christuniversity.in", "123")
+STUDENT = ("student.regular@christuniversity.in", "123")
 
 
 def test_statistics_are_counted_not_asserted(client):
@@ -17,7 +17,7 @@ def test_statistics_are_counted_not_asserted(client):
     # Counted from the seed, which has far fewer than 2500 students.
     assert stats["total_students"] < 100
     assert stats["faculty_count"] < 100
-    assert stats["number_of_clubs"] == 2
+    assert stats["number_of_clubs"] == 3
     assert stats["founded_year"] == 1971
     assert stats["years_established"] > 50
 

@@ -8,14 +8,15 @@ import {
 import { api } from '../services/api';
 import { parseActionQueue, parseClubBootstrap, parseTimetable } from './contracts';
 import {
-  claimKeys, clubKeys, contentKeys, facultyKeys, platformKeys,
+  claimKeys, clubKeys, contentKeys, facultyKeys, platformKeys, yellowFormKeys,
 } from '../lib/queryKeys';
 import type {
   ActionQueue, Announcement, AwaitingReviewPlan, AnnualPlan, Budget, CalendarEvent,
   ClubBootstrap, ClubDocument, ClubEvent, ClubMember, DirectoryEntry, FacultyDocument,
   GalleryImage, HierarchyLevel, Meeting, MyClub, Note, Notification, Programme,
   PublicStatistics, RecruitmentDrive, Reimbursement, Reminder, ShowcaseClub, Sponsorship,
-  SupportingDocument, Task, TimetableSession, ClaimWorkflow, Pipeline, ClaimPage,
+  SupportingDocument, Task, TimetableSession, ClaimWorkflow, Pipeline, ClaimPage, ClaimView,
+  ClaimSheet, EligibleStudent, PreApproval, YellowFormBundle, YellowFormWorkflow,
 } from './types';
 
 type Options<T> = Omit<UseQueryOptions<T, Error, T>, 'queryKey' | 'queryFn'>;
@@ -106,10 +107,14 @@ export function usePlansAwaitingMyReview() {
 // Claims
 // ---------------------------------------------------------------------------
 
-export function useClaims(page = 1, pageSize = 25) {
+export function useClaims(page = 1, pageSize = 25, view: ClaimView = 'pending') {
   return useQuery({
-    queryKey: claimKeys.list(page, pageSize),
-    queryFn: () => api.get<ClaimPage>(`/claims?page=${page}&page_size=${pageSize}`),
+    // `view` is part of the key: a reviewer's to-do list and their history are
+    // two different lists, and caching them under one key showed the wrong one
+    // for a frame every time they switched tabs.
+    queryKey: claimKeys.list(page, pageSize, view),
+    queryFn: () =>
+      api.get<ClaimPage>(`/claims?page=${page}&page_size=${pageSize}&view=${view}`),
     // Keep the current page on screen while the next one loads, rather than
     // flashing an empty table between pages.
     placeholderData: previous => previous,
@@ -155,6 +160,91 @@ export function useClaimDocuments(claimId: string | null) {
     queryKey: claimKeys.documents(claimId ?? ''),
     queryFn: () => api.get<SupportingDocument[]>(`/claims/${claimId}/documents`),
     enabled: Boolean(claimId),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Yellow forms (club co-curricular attendance claims)
+// ---------------------------------------------------------------------------
+
+/**
+ * Both yellow-form state machines plus the claim sheet's period columns, from
+ * the table the backend enforces. Static for the life of a deploy.
+ */
+export function useYellowFormWorkflow() {
+  return useQuery({
+    queryKey: yellowFormKeys.workflow(),
+    queryFn: () => api.get<YellowFormWorkflow>('/yellow-forms/workflow'),
+    staleTime: Infinity,
+  });
+}
+
+/** What the caller can act on right now, oldest first. */
+export function useYellowFormQueue(enabled = true) {
+  return useQuery({
+    queryKey: yellowFormKeys.queue(),
+    queryFn: () => api.get<YellowFormBundle>('/yellow-forms/queue'),
+    enabled,
+  });
+}
+
+/** What the caller has already approved, returned or rejected, newest first. */
+export function useYellowFormsReviewed(enabled = true) {
+  return useQuery({
+    queryKey: yellowFormKeys.reviewed(),
+    queryFn: () => api.get<YellowFormBundle>('/yellow-forms/reviewed'),
+    enabled,
+  });
+}
+
+/** Submitted forms the caller is listed on as a student. */
+export function useMyYellowForms(enabled = true) {
+  return useQuery({
+    queryKey: yellowFormKeys.mine(),
+    queryFn: () => api.get<YellowFormBundle>('/yellow-forms/mine'),
+    enabled,
+  });
+}
+
+export function useClubPreApprovals(clubId: string | null) {
+  return useQuery({
+    queryKey: yellowFormKeys.clubPreApprovals(clubId ?? ''),
+    queryFn: () => api.get<PreApproval[]>(`/yellow-forms/clubs/${clubId}/pre-approvals`),
+    enabled: Boolean(clubId),
+  });
+}
+
+export function useClubClaimSheets(clubId: string | null) {
+  return useQuery({
+    queryKey: yellowFormKeys.clubClaimSheets(clubId ?? ''),
+    queryFn: () => api.get<ClaimSheet[]>(`/yellow-forms/clubs/${clubId}/claim-sheets`),
+    enabled: Boolean(clubId),
+  });
+}
+
+export function usePreApproval(id: string | null) {
+  return useQuery({
+    queryKey: yellowFormKeys.preApproval(id ?? ''),
+    queryFn: () => api.get<PreApproval>(`/yellow-forms/pre-approvals/${id}`),
+    enabled: Boolean(id),
+  });
+}
+
+export function useClaimSheet(id: string | null) {
+  return useQuery({
+    queryKey: yellowFormKeys.claimSheet(id ?? ''),
+    queryFn: () => api.get<ClaimSheet>(`/yellow-forms/claim-sheets/${id}`),
+    enabled: Boolean(id),
+  });
+}
+
+/** Active club members, for "Add club members" on the pre-approval editor. Filers only. */
+export function useEligibleStudents(clubId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: yellowFormKeys.eligibleStudents(clubId ?? ''),
+    queryFn: () =>
+      api.get<EligibleStudent[]>(`/yellow-forms/clubs/${clubId}/eligible-students`),
+    enabled: Boolean(clubId) && enabled,
   });
 }
 
@@ -284,6 +374,25 @@ export function useClaimsInvalidator() {
   return () => {
     queryClient.invalidateQueries({ queryKey: claimKeys.all });
     queryClient.invalidateQueries({ queryKey: platformKeys.actionQueue });
+    queryClient.invalidateQueries({ queryKey: platformKeys.notifications });
+  };
+}
+
+/**
+ * Invalidate everything a yellow-form write can affect: every yellow-form list
+ * and detail, plus the inbox, the pipeline and the bell, which all carry
+ * yellow-form items.
+ */
+export function useYellowFormInvalidator() {
+  const queryClient = useQueryClient();
+  return () => {
+    queryClient.invalidateQueries({
+      queryKey: yellowFormKeys.all,
+      // The workflow table is static; refetching it after every action buys nothing.
+      predicate: query => query.queryKey[1] !== 'workflow',
+    });
+    queryClient.invalidateQueries({ queryKey: platformKeys.actionQueue });
+    queryClient.invalidateQueries({ queryKey: platformKeys.pipeline });
     queryClient.invalidateQueries({ queryKey: platformKeys.notifications });
   };
 }

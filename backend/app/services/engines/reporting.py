@@ -1,13 +1,14 @@
 from collections import Counter
 from datetime import datetime
 from typing import Any, Dict, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, contains_eager, selectinload
 from app.models.claim import Claim
 from app.models.club import (
     Club, Event, ClubMember, Budget, Sponsorship, RecruitmentDrive, RecruitmentApplication,
     EventAttendance,
 )
 from app.models.faculty import Task
+from app.models.yellow_form import ClubClaimSheet, PreApprovalForm
 
 class ReportingEngine:
     def generate_club_performance_report(self, db: Session, *, club_id: str) -> Dict[str, Any]:
@@ -160,10 +161,21 @@ class ReportingEngine:
             }
 
         claims = db.query(Claim).filter(Claim.academic_year == academic_year).all()
-        total_claims = len(claims)
-        approved_claims = sum(1 for c in claims if c.status == "approved")
+        # Clubs file co-curricular claims as yellow forms now: one submitted
+        # claim sheet is one club filing, as a legacy club claim was.
+        sheets = (
+            db.query(ClubClaimSheet)
+            .join(PreApprovalForm, PreApprovalForm.id == ClubClaimSheet.pre_approval_id)
+            .options(contains_eager(ClubClaimSheet.pre_approval), selectinload(ClubClaimSheet.creator))
+            .filter(PreApprovalForm.academic_year == academic_year, ClubClaimSheet.status != "draft")
+            .all()
+        )
+        total_claims = len(claims) + len(sheets)
+        approved_claims = (
+            sum(1 for c in claims if c.status == "approved") + sum(1 for s in sheets if s.status == "approved")
+        )
         medical_claims = sum(1 for c in claims if c.category == "medical")
-        cocurricular_claims = sum(1 for c in claims if c.category == "co_curricular")
+        cocurricular_claims = sum(1 for c in claims if c.category == "co_curricular") + len(sheets)
 
         return {
             "academic_year": academic_year,
@@ -171,7 +183,10 @@ class ReportingEngine:
             "metrics": {
                 "total_claims_submitted": total_claims,
                 "approved_claims": approved_claims,
-                "pending_claims": sum(1 for c in claims if c.status == "submitted" or c.status == "under_review"),
+                "pending_claims": (
+                    sum(1 for c in claims if c.status == "submitted" or c.status == "under_review")
+                    + sum(1 for s in sheets if s.status == "claims_coordinator_review")
+                ),
                 "medical_count": medical_claims,
                 "co_curricular_count": cocurricular_claims
             },
@@ -184,6 +199,15 @@ class ReportingEngine:
                     "status": c.status
                 }
                 for c in claims
+            ] + [
+                {
+                    "reference": s.reference_number,
+                    "student_name": s.creator.name if s.creator else "Unknown",
+                    "category": "co_curricular",
+                    "date_range": f"{s.pre_approval.event_start_date} to {s.pre_approval.event_end_date}",
+                    "status": s.status
+                }
+                for s in sheets
             ]
         }
 

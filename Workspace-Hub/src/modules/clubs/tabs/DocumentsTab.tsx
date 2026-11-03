@@ -1,4 +1,5 @@
 import React from 'react';
+import { z } from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@astryxdesign/core/Button';
 import { useToast } from '@astryxdesign/core/Toast';
@@ -9,17 +10,32 @@ import { api } from '../../../services/api';
 import { describeError } from '../../../services/errors';
 import { clubKeys } from '../../../lib/queryKeys';
 import { DataTable, type Column } from '../../../components/ui/DataTable';
+import { PageSkeleton } from '../../../components/ui/PageSkeleton';
+import { Card } from '../../../components/ui/Card';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
-import { PageLoader } from '../../../components/ui/PageLoader';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
 import type { ClubDocument } from '../../../api/types';
 import { useClubWorkspace } from '../ClubWorkspaceContext';
+import { useZodForm, withServerErrors } from '../../../lib/forms';
+import { TextField, SelectField } from '../../../components/ui/form/fields';
+import { FormError } from '../../../components/ui/form/FormError';
+import { rootServerError } from '../../../components/ui/form/fieldStatus';
 
 const CATEGORIES = [
   'Annual Plans', 'Reports', 'Meeting Documents', 'Policies', 'Templates',
   'Recruitment Material', 'Financial Documents', 'Brand Assets', 'Presentations',
 ];
+
+/**
+ * Metadata only — the `File` itself is not an rhf field. See the note on
+ * `file` state below.
+ */
+const uploadSchema = z.object({
+  name: z.string().trim().optional(),
+  category: z.string().min(1, 'Pick a category.'),
+  tags: z.string().trim().optional(),
+});
 
 export const DocumentsTab: React.FC = () => {
   const { clubId, bootstrap } = useClubWorkspace();
@@ -31,35 +47,56 @@ export const DocumentsTab: React.FC = () => {
   const kb = useClubKnowledgeBase(clubId);
   const active = view === 'all' ? all : kb;
 
+  /*
+   * `file` stays in local state rather than in the form.
+   *
+   * A `File` is not serialisable and rhf's resolver would have to validate an
+   * opaque browser object; the checks that matter (size, MIME type) are the
+   * server's anyway, and it enforces them properly with 413 and 415. So the
+   * schema validates the metadata and the file is carried alongside — with one
+   * client-side rule kept, that a file was actually chosen.
+   */
   const [file, setFile] = React.useState<File | null>(null);
-  const [name, setName] = React.useState('');
-  const [category, setCategory] = React.useState('Templates');
-  const [tags, setTags] = React.useState('');
-  const [isUploading, setIsUploading] = React.useState(false);
 
-  const upload = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file) return;
-    setIsUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('name', name || file.name);
-      fd.append('category', category);
-      fd.append('tags', tags);
-      await api.upload(`/clubs/${clubId}/documents`, fd);
-      setFile(null); setName(''); setTags('');
-      showToast({ body: 'Document uploaded.', type: 'info' });
-      queryClient.invalidateQueries({ queryKey: clubKeys.resource(clubId, 'documents') });
-      queryClient.invalidateQueries({ queryKey: clubKeys.resource(clubId, 'knowledge-base') });
-    } catch (err) {
-      // The server refuses oversized files (413) and disallowed types (415)
-      // with a specific reason; surface it rather than a generic message.
-      showToast({ body: `Upload failed: ${describeError(err)}`, type: 'error' });
-    } finally {
-      setIsUploading(false);
+  const form = useZodForm(uploadSchema, {
+    defaultValues: { name: '', category: 'Templates', tags: '' },
+  });
+  const {
+    control,
+    handleSubmit,
+    reset,
+    setError,
+    formState: { errors, isSubmitting },
+  } = form;
+
+  const upload = withServerErrors(form, async values => {
+    if (!file) {
+      // The only client-side file rule worth having. It reads as a form-level
+      // error because the file input is not an rhf field.
+      setError('root.server', { type: 'manual', message: 'Choose a file to upload.' });
+      return;
     }
-  };
+
+    const fd = new FormData();
+    fd.append('file', file);
+    // Fall back to the file's own name, as before — an unnamed document in a
+    // shared library is unfindable.
+    fd.append('name', values.name?.trim() || file.name);
+    fd.append('category', values.category);
+    fd.append('tags', values.tags ?? '');
+
+    // The server refuses oversized files (413) and disallowed types (415) with
+    // a specific reason. `withServerErrors` surfaces it as a form-level alert
+    // beside the control rather than a toast that vanishes.
+    await api.upload(`/clubs/${clubId}/documents`, fd);
+
+    setFile(null);
+    reset();
+    showToast({ body: 'Document uploaded.', type: 'info' });
+    queryClient.invalidateQueries({ queryKey: clubKeys.resource(clubId, 'documents') });
+    queryClient.invalidateQueries({ queryKey: clubKeys.resource(clubId, 'knowledge-base') });
+  });
+
 
   const download = async (doc: ClubDocument) => {
     try {
@@ -74,20 +111,20 @@ export const DocumentsTab: React.FC = () => {
     }
   };
 
-  if (active.isLoading) return <PageLoader label="Loading documents..." />;
+  if (active.isLoading) return <PageSkeleton variant="table" label="Loading documents" />;
   if (active.isError) {
     return <ErrorState title="Documents didn't load" error={active.error} onRetry={() => void active.refetch()} />;
   }
 
   const columns: Column<ClubDocument>[] = [
-    { key: 'name', header: 'Name', render: d => <span className="font-medium text-slate-900">{d.name}</span> },
+    { key: 'name', header: 'Name', render: d => <span className="font-medium text-primary">{d.name}</span> },
     { key: 'category', header: 'Category', secondary: true, render: d => d.category },
     { key: 'version', header: 'Version', secondary: true, render: d => `v${d.version}` },
     { key: 'tags', header: 'Tags', secondary: true, render: d => d.tags || '—' },
     {
       key: 'action', header: 'Action', align: 'right',
       render: d => (
-        <button type="button" onClick={() => download(d)} className="text-sky-700 hover:underline">
+        <button type="button" onClick={() => download(d)} className="text-accent hover:underline">
           Download
         </button>
       ),
@@ -106,7 +143,7 @@ export const DocumentsTab: React.FC = () => {
             aria-selected={view === v}
             onClick={() => setView(v)}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-              view === v ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+              view === v ? 'bg-sand-900 text-white' : 'text-secondary hover:text-primary'
             }`}
           >
             {v === 'all' ? 'All documents' : 'Knowledge base'}
@@ -115,28 +152,54 @@ export const DocumentsTab: React.FC = () => {
       </div>
 
       {bootstrap.capabilities.can_write ? (
-        <form onSubmit={upload} className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-5 text-sm shadow-sm sm:grid-cols-4">
-          <label className="sr-only" htmlFor="doc-file">File</label>
-          <input
-            id="doc-file" required type="file"
-            onChange={e => setFile(e.target.files?.[0] ?? null)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:col-span-2"
+        <Card as="form" padding="md" className="flex flex-col gap-4 text-sm shadow-sm" onSubmit={handleSubmit(upload)} noValidate>
+          <div className="flex flex-col gap-1.5">
+            <label className="font-medium text-secondary" htmlFor="doc-file">
+              File
+            </label>
+            <input
+              id="doc-file"
+              type="file"
+              onChange={e => setFile(e.target.files?.[0] ?? null)}
+              className="rounded-md border border-border bg-card px-3 py-2 file:mr-3 file:rounded-full file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-on-accent"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TextField
+              control={control}
+              name="name"
+              label="Display name"
+              placeholder={file?.name ?? 'Defaults to the file name'}
+            />
+            <SelectField
+              control={control}
+              name="category"
+              label="Category"
+              options={CATEGORIES.map(c => ({ value: c, label: c }))}
+              isRequired
+            />
+          </div>
+
+          <TextField
+            control={control}
+            name="tags"
+            label="Tags"
+            description="Comma separated. Add `knowledge-base` to surface it in that view."
+            placeholder="sop, knowledge-base"
           />
-          <label className="sr-only" htmlFor="doc-name">Display name</label>
-          <input id="doc-name" placeholder="Display name (optional)" value={name}
-            onChange={e => setName(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2" />
-          <label className="sr-only" htmlFor="doc-category">Category</label>
-          <select id="doc-category" value={category} onChange={e => setCategory(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <label className="sr-only" htmlFor="doc-tags">Tags</label>
-          <input id="doc-tags" placeholder="Tags (comma separated, e.g. sop,knowledge-base)" value={tags}
-            onChange={e => setTags(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:col-span-3" />
-          <Button label={isUploading ? 'Uploading…' : 'Upload'} variant="primary" isDisabled={isUploading || !file} type="submit" />
-        </form>
+
+          <FormError message={rootServerError(errors)} />
+
+          <div>
+            <Button
+              label={isSubmitting ? 'Uploading…' : 'Upload'}
+              variant="primary"
+              isDisabled={isSubmitting}
+              type="submit"
+            />
+          </div>
+        </Card>
       ) : null}
 
       <DataTable

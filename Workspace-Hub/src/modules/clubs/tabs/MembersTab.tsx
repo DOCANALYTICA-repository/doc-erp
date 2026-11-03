@@ -47,7 +47,7 @@ export const MembersTab: React.FC = () => {
       key: 'name',
       header: 'Student',
       render: m => (
-        <span className="font-medium text-slate-900">{m.student_name ?? m.student_id}</span>
+        <span className="font-medium text-primary">{m.student_name ?? m.student_id}</span>
       ),
     },
     {
@@ -59,7 +59,7 @@ export const MembersTab: React.FC = () => {
             aria-label={`Club responsibility for ${m.student_name ?? m.student_id}`}
             defaultValue={m.hierarchy_level_id ?? ''}
             onChange={e => assignLevel(m, e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-sm"
+            className="rounded-lg border border-border bg-body px-2 py-1 text-sm"
           >
             <option value="" disabled>{m.role}</option>
             {levels.map(l => (

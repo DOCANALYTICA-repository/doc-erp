@@ -31,4 +31,9 @@ jobs:
           node-version: "20"
       - run: npm ci
       - run: npm run lint
+      # Two invariants nothing else can catch: the raw-Tailwind-palette ratchet
+      # (tokens exist and must actually get used), and the unlayered
+      # `color-scheme: light` in index.css, whose loss only reproduces for
+      # users with a dark OS setting.
+      - run: npm run check:style
       - run: npx vitest run --passWithNoTests

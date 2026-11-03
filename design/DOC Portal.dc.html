@@ -1,0 +1,2145 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/organic-bc305b69-2717-446f-b9fc-1a4679d393cc/styles.css">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Figtree:wght@400;500;600;700&display=swap">
+<script src="_ds/organic-bc305b69-2717-446f-b9fc-1a4679d393cc/_ds_bundle.js"></script>
+<style>
+  :root {
+    --font-heading: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --font-heading-weight: 600;
+    --color-accent: #b8860b;
+    --color-accent-100: #fdf6e3;
+    --color-accent-200: #f6e7bb;
+    --color-accent-300: #ecd28a;
+    --color-accent-400: #d9b453;
+    --color-accent-500: #bf9526;
+    --color-accent-600: #9c7a12;
+    --color-accent-700: #7a5f0d;
+    --color-accent-800: #58440a;
+    --color-accent-900: #392c06;
+  }
+  h1, h2, h3, h4, h5, h6 { letter-spacing: -0.008em; }
+  .btn { font-family: var(--font-body); font-weight: 600; letter-spacing: 0.005em; }
+  .btn-primary { color: #2e2b25; }
+  .card-title { font-weight: 600; }
+  html, body { margin: 0; height: 100%; background: var(--color-bg); }
+  a { color: var(--color-accent-700); text-decoration: none; }
+  a:hover { color: var(--color-accent-800); text-decoration: underline; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes popIn { from { opacity: 0; transform: translateY(-8px) scale(.97); } to { opacity: 1; transform: none; } }
+  @keyframes sheetIn { from { transform: translateX(100%); } to { transform: none; } }
+  @keyframes trayIn { from { opacity: 0; transform: translateY(-10px) scale(.98); } to { opacity: 1; transform: none; } }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @keyframes growX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @keyframes draw { from { stroke-dashoffset: 460; } to { stroke-dashoffset: 0; } }
+  @keyframes shimmer { from { background-position: -320px 0; } to { background-position: 320px 0; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .om-sk { background: linear-gradient(90deg, var(--color-neutral-200) 0%, var(--color-neutral-100) 45%, var(--color-neutral-200) 90%); background-size: 320px 100%; animation: shimmer 1.15s linear infinite; border-radius: 10px; }
+  .om-row:hover { background: color-mix(in srgb, var(--color-accent) 7%, transparent) !important; }
+  .om-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+  .om-scroll::-webkit-scrollbar-thumb { background: var(--color-neutral-300); border-radius: 999px; border: 3px solid var(--color-bg); }
+  .om-scroll::-webkit-scrollbar-track { background: transparent; }
+</style>
+</helmet>
+
+<sc-if value="{{ isLanding }}" hint-placeholder-val="{{ true }}">
+  <div style="min-height: 100dvh; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body)">
+    <header style="position: sticky; top: 0; z-index: 40; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: 16px clamp(20px, 5vw, 56px); background: color-mix(in srgb, var(--color-neutral-100) 92%, transparent); border-bottom: 1px solid var(--color-divider); backdrop-filter: blur(8px)">
+      <div style="display: flex; align-items: center; gap: 13px">
+        <img src="assets/icon-512.png" alt="Department of Commerce" style="width: 38px; height: 38px; border-radius: 11px; box-shadow: var(--shadow-sm)">
+        <span style="font-family: var(--font-heading); font-weight: 600; font-size: 18px; letter-spacing: -.01em">Department of Commerce</span>
+      </div>
+      <nav style="display: flex; align-items: center; gap: 26px; flex-wrap: wrap">
+        <a href="#about" style="font-size: 13.5px; font-weight: 500; color: color-mix(in srgb, var(--color-text) 68%, transparent)" style-hover="color: var(--color-accent-700)">About</a>
+        <a href="#programmes" style="font-size: 13.5px; font-weight: 500; color: color-mix(in srgb, var(--color-text) 68%, transparent)" style-hover="color: var(--color-accent-700)">Programmes</a>
+        <a href="#clubs" style="font-size: 13.5px; font-weight: 500; color: color-mix(in srgb, var(--color-text) 68%, transparent)" style-hover="color: var(--color-accent-700)">Clubs</a>
+        <a href="#contact" style="font-size: 13.5px; font-weight: 500; color: color-mix(in srgb, var(--color-text) 68%, transparent)" style-hover="color: var(--color-accent-700)">Contact</a>
+        <button type="button" onClick="{{ goLogin }}" class="btn btn-primary" style="border-radius: 999px; font-size: 13.5px; padding: 10px 20px; transition: transform .18s ease, background .18s ease" style-hover="transform: translateY(-1px)">Portal login</button>
+      </nav>
+    </header>
+
+    <section style="position: relative; overflow: hidden; padding: clamp(48px, 8vw, 96px) clamp(20px, 5vw, 56px) 72px">
+      <div style="position: absolute; width: 520px; height: 520px; border-radius: 999px; background: var(--color-accent-200); top: -180px; right: -130px; opacity: .8; animation: fadeIn 1s ease both"></div>
+      <div style="position: absolute; width: 300px; height: 300px; border-radius: 999px; background: var(--color-accent-2-200); bottom: -140px; right: 180px; opacity: .7; animation: fadeIn 1.3s ease both"></div>
+      <div style="position: relative; max-width: 1180px; margin: 0 auto">
+        <span style="display: inline-flex; align-items: center; gap: 9px; background: var(--color-surface); border: 1px solid var(--color-divider); border-radius: 999px; padding: 7px 16px; font-size: 12px; font-weight: 600; letter-spacing: .03em; animation: fadeUp .5s ease both">
+          <span style="width: 7px; height: 7px; border-radius: 999px; background: var(--color-accent)"></span>
+          CHRIST (Deemed to be University)
+        </span>
+        <h1 style="font-size: clamp(38px, 5.6vw, 62px); line-height: 1.06; margin: 22px 0 0; max-width: 22ch; animation: fadeUp .6s ease .08s both">Shape the future of global commerce and finance.</h1>
+        <p style="margin: 22px 0 0; max-width: 58ch; font-size: 17px; line-height: 1.65; color: color-mix(in srgb, var(--color-text) 70%, transparent); animation: fadeUp .6s ease .16s both">Leadership opportunities, technical accounting standards taught to global practice, and student-led club operations run on one department system — from annual plans to attendance claims.</p>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 34px; animation: fadeUp .6s ease .24s both">
+          <button type="button" onClick="{{ goLogin }}" class="btn btn-primary" style="border-radius: 999px; font-size: 15px; padding: 13px 26px; transition: transform .18s ease" style-hover="transform: translateY(-1px)">Access the ERP portal →</button>
+          <a href="#programmes" class="btn btn-secondary" style="border-radius: 999px; font-size: 15px; padding: 13px 26px; background: var(--color-neutral-100); text-decoration: none">Explore programmes</a>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 14px; margin-top: 56px">
+          <sc-for list="{{ publicStats }}" as="s" hint-placeholder-count="4">
+            <div style="flex: 1 1 190px; background: var(--color-surface); border-radius: var(--radius-lg); padding: 22px 24px; animation: fadeUp .55s ease both">
+              <div style="font-family: var(--font-heading); font-weight: 600; font-size: 32px; line-height: 1.1">{{ s.value }}</div>
+              <div style="font-size: 11px; letter-spacing: .11em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 55%, transparent); margin-top: 8px">{{ s.label }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section id="about" style="padding: 24px clamp(20px, 5vw, 56px) 80px">
+      <div style="max-width: 1180px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 44px; align-items: center">
+        <div style="flex: 1 1 380px; min-width: 0">
+          <h2 style="font-size: clamp(28px, 3.4vw, 38px); margin: 0 0 24px">Our vision and mission</h2>
+          <div style="display: flex; flex-direction: column; gap: 16px">
+            <div style="background: var(--color-surface); border-radius: var(--radius-lg); padding: 22px 24px">
+              <div style="font-size: 10px; letter-spacing: .11em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: 8px">Vision</div>
+              <p style="margin: 0; font-size: 15px; line-height: 1.65">To be a centre of excellence in commerce education, nurturing socially responsible leaders, financial experts and outstanding researchers.</p>
+            </div>
+            <div style="background: var(--color-accent-2-200); border-radius: var(--radius-lg); padding: 22px 24px">
+              <div style="font-size: 10px; letter-spacing: .11em; text-transform: uppercase; color: var(--color-accent-2-900); margin-bottom: 8px">Mission</div>
+              <p style="margin: 0; font-size: 15px; line-height: 1.65; color: var(--color-accent-2-900)">To provide holistic commerce education integrated with global standards, professional certifications, corporate internships and ethical principles.</p>
+            </div>
+          </div>
+        </div>
+        <figure style="flex: 1 1 380px; margin: 0; min-width: 0">
+          <img class="washed" src="assets/doc_department.webp" alt="Students and faculty at the Department of Commerce" width="1264" height="848" loading="lazy" decoding="async" style="width: 100%; height: auto; border-radius: var(--radius-lg); box-shadow: var(--shadow-md)">
+          <figcaption style="margin-top: 10px">The department, Bengaluru campus.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="programmes" style="padding: 76px clamp(20px, 5vw, 56px); background: var(--color-surface)">
+      <div style="max-width: 1180px; margin: 0 auto">
+        <h2 style="font-size: clamp(28px, 3.4vw, 38px); margin: 0 0 10px">Academic programmes</h2>
+        <p style="margin: 0 0 34px; max-width: 56ch; font-size: 15.5px; color: color-mix(in srgb, var(--color-text) 68%, transparent)">Specialised undergraduate and postgraduate pathways, each integrated with professional skills and a corporate internship.</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 18px">
+          <sc-for list="{{ programmes }}" as="p" hint-placeholder-count="3">
+            <article style="flex: 1 1 300px; background: var(--color-neutral-100); border-radius: var(--radius-lg); padding: 26px; display: flex; flex-direction: column; gap: 12px; transition: transform .22s ease, box-shadow .22s ease" style-hover="transform: translateY(-3px); box-shadow: var(--shadow-md)">
+              <h3 style="font-size: 22px; margin: 0">{{ p.name }}</h3>
+              <p style="margin: 0; font-size: 14px; line-height: 1.6; color: color-mix(in srgb, var(--color-text) 70%, transparent); flex: 1">{{ p.desc }}</p>
+              <div style="display: flex; flex-wrap: wrap; gap: 7px">
+                <sc-for list="{{ p.careers }}" as="c" hint-placeholder-count="3">
+                  <span class="tag" style="background: var(--color-accent-200); color: var(--color-accent-800); border-radius: 999px; padding: 5px 12px; font-size: 11px">{{ c }}</span>
+                </sc-for>
+              </div>
+            </article>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section id="clubs" style="padding: 76px clamp(20px, 5vw, 56px)">
+      <div style="max-width: 1180px; margin: 0 auto">
+        <h2 style="font-size: clamp(28px, 3.4vw, 38px); margin: 0 0 10px">Student-led clubs</h2>
+        <p style="margin: 0 0 34px; max-width: 56ch; font-size: 15.5px; color: color-mix(in srgb, var(--color-text) 68%, transparent)">Every club plans, budgets and reports through the same portal its faculty coordinator approves in.</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 18px">
+          <sc-for list="{{ showcase }}" as="cl" hint-placeholder-count="2">
+            <article style="flex: 1 1 320px; background: var(--color-surface); border-radius: var(--radius-lg); padding: 28px; transition: transform .22s ease" style-hover="transform: translateY(-3px)">
+              <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 14px">
+                <span style="position: relative; flex: none; width: 56px; height: 56px; border-radius: 14px; overflow: hidden; border: 1px solid var(--color-divider); background: var(--color-accent-200); display: grid; place-items: center">
+                  <span style="position: absolute; inset: 0; display: grid; place-items: center; color: var(--color-accent-900); font-family: var(--font-heading); font-weight: 600; font-size: 19px">{{ cl.initials }}</span>
+                  <img class="washed" src="{{ cl.logo }}" alt="{{ cl.name }} logo" width="56" height="56" loading="lazy" decoding="async" style="position: relative; width: 100%; height: 100%; object-fit: cover">
+                </span>
+                <h3 style="font-size: 23px; margin: 0">{{ cl.name }}</h3>
+              </div>
+              <p style="margin: 0; font-size: 14.5px; line-height: 1.65; color: color-mix(in srgb, var(--color-text) 70%, transparent)">{{ cl.desc }}</p>
+            </article>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <footer id="contact" style="padding: 62px clamp(20px, 5vw, 56px); background: var(--color-neutral-900); color: var(--color-neutral-100)">
+      <div style="max-width: 1180px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 40px; justify-content: space-between">
+        <div style="flex: 1 1 300px">
+          <div style="font-family: var(--font-heading); font-weight: 600; font-size: 24px; margin-bottom: 12px">Department of Commerce</div>
+          <p style="margin: 0; font-size: 14px; line-height: 1.7; opacity: .78; max-width: 40ch">Central Block, CHRIST (Deemed to be University), Hosur Road, Bengaluru 560029.</p>
+        </div>
+        <div style="flex: 0 1 220px">
+          <div style="font-size: 10px; letter-spacing: .11em; text-transform: uppercase; opacity: .6; margin-bottom: 12px">Reach us</div>
+          <div style="font-size: 14px; line-height: 2; opacity: .85">commerce@christuniversity.in<br>+91 80 4012 9100</div>
+        </div>
+        <div style="flex: 0 1 220px">
+          <div style="font-size: 10px; letter-spacing: .11em; text-transform: uppercase; opacity: .6; margin-bottom: 12px">Members</div>
+          <button type="button" onClick="{{ goLogin }}" class="btn btn-primary" style="border-radius: 999px; font-size: 13.5px; padding: 11px 22px">Sign in to the portal</button>
+        </div>
+      </div>
+    </footer>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isLogin }}">
+  <div style="min-height: 100dvh; display: grid; grid-template-columns: 1.05fr 1fr; background: var(--color-bg); font-family: var(--font-body); color: var(--color-text)">
+    <div style="display: flex; flex-direction: column; justify-content: center; padding: 64px clamp(40px, 7vw, 104px); animation: fadeUp .5s ease both">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 44px">
+        <img src="assets/icon-512.png" alt="Department of Commerce" style="width: 44px; height: 44px; border-radius: 14px; box-shadow: var(--shadow-sm)">
+        <div style="font-family: var(--font-heading); font-size: 17px; letter-spacing: -.01em">DOC Unified Digital ERP</div>
+      </div>
+      <h1 style="font-size: 46px; margin: 0 0 14px; max-width: 12ch; line-height: 1.06">Welcome back.</h1>
+      <p style="font-size: 16px; max-width: 42ch; color: color-mix(in srgb, var(--color-text) 68%, transparent)">Sign in with your CHRIST account to reach your inbox, your clubs and everything waiting on you.</p>
+      <form style="display: flex; flex-direction: column; gap: 18px; max-width: 380px; margin-top: 30px" onSubmit="{{ doLogin }}">
+        <div class="field">
+          <label for="login-email">CHRIST email address</label>
+          <input class="input" id="login-email" name="email" type="email" autoComplete="username" placeholder="name@christuniversity.in" style="min-height: 46px; border-radius: 999px; padding: 6px 16px; background: var(--color-neutral-100)">
+        </div>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <input class="input" id="login-password" name="password" type="password" autoComplete="current-password" placeholder="••••••••" style="min-height: 46px; border-radius: 999px; padding: 6px 16px; background: var(--color-neutral-100)">
+        </div>
+        <button type="submit" class="btn btn-primary" style="border-radius: 999px; min-height: 46px; font-size: 15px; transition: transform .18s ease, background .18s ease" style-hover="transform: translateY(-1px)">Sign in</button>
+      </form>
+      <div style="margin-top: 34px; display: flex; flex-direction: column; gap: 10px; max-width: 380px">
+        <button type="button" onClick="{{ goLanding }}" class="btn btn-ghost" style="font-size: 13px; align-self: flex-start; padding-left: 0">← Back to the public website</button>
+        <div style="font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700)">Or continue as a demo persona</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <sc-for list="{{ personas }}" as="p" hint-placeholder-count="4">
+            <button type="button" class="btn btn-secondary" style="border-radius: 999px; font-size: 13px; background: var(--color-neutral-100); transition: background .18s ease, transform .18s ease" style-hover="transform: translateY(-1px); background: var(--color-accent-100)" onClick="{{ p.pick }}">{{ p.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    <div style="position: relative; overflow: hidden; background: var(--color-surface); display: grid; place-items: center">
+      <div style="position: absolute; width: 520px; height: 520px; border-radius: 999px; background: var(--color-accent-200); top: -140px; right: -120px; animation: fadeIn 1s ease both"></div>
+      <div style="position: absolute; width: 340px; height: 340px; border-radius: 999px; background: var(--color-accent-2-200); bottom: -90px; left: -80px; animation: fadeIn 1.2s ease both"></div>
+      <div style="position: relative; width: min(420px, 78%); background: var(--color-neutral-100); border-radius: var(--radius-lg); padding: 30px; box-shadow: var(--shadow-lg); animation: fadeUp .7s ease both">
+        <div style="font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: 10px">Today, across the department</div>
+        <div style="display: grid; gap: 16px">
+          <div style="display: flex; align-items: baseline; gap: 12px"><span style="font-family: var(--font-heading); font-size: 40px; line-height: 1">14</span><span style="font-size: 14px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">items in flight across claims and annual plans</span></div>
+          <div style="height: 1px; background: var(--color-divider)"></div>
+          <div style="display: flex; align-items: baseline; gap: 12px"><span style="font-family: var(--font-heading); font-size: 40px; line-height: 1">3</span><span style="font-size: 14px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">past their service level and waiting on a person</span></div>
+          <div style="height: 1px; background: var(--color-divider)"></div>
+          <div style="display: flex; align-items: baseline; gap: 12px"><span style="font-family: var(--font-heading); font-size: 40px; line-height: 1">2</span><span style="font-size: 14px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">clubs, 4 office-bearers, one shared inbox</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isApp }}" hint-placeholder-val="{{ true }}">
+<div style="height: 100dvh; display: flex; flex-direction: column; background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); overflow: hidden">
+
+  <header style="height: 68px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 22px; background: var(--color-neutral-100); border-bottom: 1px solid var(--color-divider); z-index: 30">
+    <button type="button" onClick="{{ goInbox }}" style="display: flex; align-items: center; gap: 12px; background: none; border: 0; cursor: pointer; padding: 6px; border-radius: var(--radius-md); text-align: left; color: inherit">
+      <img src="assets/icon-512.png" alt="Department of Commerce" style="width: 36px; height: 36px; border-radius: 11px; box-shadow: var(--shadow-sm)">
+      <div style="font-family: var(--font-heading); font-size: 16px; letter-spacing: -.01em; white-space: nowrap">DOC Unified Digital ERP</div>
+      <sc-if value="{{ moduleChip }}">
+        <span class="tag" style="background: var(--color-accent-200); color: var(--color-accent-800); border-radius: 999px; padding: 3px 10px; font-size: 10px; letter-spacing: .09em; text-transform: uppercase">{{ moduleChip }}</span>
+      </sc-if>
+    </button>
+
+    <div style="display: flex; align-items: center; gap: 10px">
+      <button type="button" onClick="{{ openPalette }}" style="display: flex; align-items: center; gap: 10px; background: var(--color-surface); border: 1px solid var(--color-divider); border-radius: 999px; padding: 8px 8px 8px 14px; cursor: pointer; color: color-mix(in srgb, var(--color-text) 60%, transparent); font: inherit; font-size: 13px; transition: background .18s ease, border-color .18s ease" style-hover="border-color: var(--color-accent); background: var(--color-accent-100)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <span>Search or jump to…</span>
+        <span style="display: inline-flex; gap: 3px; margin-left: 6px">
+          <kbd style="font: inherit; font-size: 11px; background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: 6px; padding: 1px 5px">⌘</kbd>
+          <kbd style="font: inherit; font-size: 11px; background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: 6px; padding: 1px 6px">K</kbd>
+        </span>
+      </button>
+
+      <button type="button" onClick="{{ toggleTray }}" aria-label="Notifications" style="position: relative; width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--color-divider); background: var(--color-surface); display: grid; place-items: center; cursor: pointer; color: var(--color-text); transition: background .18s ease" style-hover="background: var(--color-accent-100)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"></path><path d="M10.3 20a2 2 0 0 0 3.4 0"></path></svg>
+        <sc-if value="{{ unread }}">
+          <span style="position: absolute; top: -2px; right: -2px; min-width: 19px; height: 19px; border-radius: 999px; background: var(--color-accent); color: var(--color-bg); font-size: 10px; font-weight: 700; display: grid; place-items: center; border: 2px solid var(--color-neutral-100)">{{ unread }}</span>
+        </sc-if>
+      </button>
+
+      <div style="position: relative">
+        <button type="button" onClick="{{ toggleUserMenu }}" style="display: flex; align-items: center; gap: 9px; background: var(--color-surface); border: 1px solid var(--color-divider); border-radius: 999px; padding: 5px 12px 5px 5px; cursor: pointer; color: inherit; font: inherit; transition: background .18s ease" style-hover="background: var(--color-accent-100)">
+          <span style="width: 30px; height: 30px; border-radius: 999px; background: var(--color-accent-2-300); color: var(--color-accent-2-900); display: grid; place-items: center; font-size: 12px; font-weight: 700">{{ user.initials }}</span>
+          <span style="display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15">
+            <span style="font-size: 13px; font-weight: 600">{{ user.name }}</span>
+            <span style="font-size: 10.5px; color: color-mix(in srgb, var(--color-text) 58%, transparent)">{{ user.role }}</span>
+          </span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg>
+        </button>
+        <sc-if value="{{ userMenu }}">
+          <div style="position: absolute; right: 0; top: 48px; width: 268px; background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 8px; z-index: 40; animation: popIn .16s ease both">
+            <div style="padding: 10px 12px 12px; border-bottom: 1px solid var(--color-divider)">
+              <div style="font-weight: 700; font-size: 13.5px">{{ user.name }}</div>
+              <div style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 58%, transparent); margin-top: 2px">{{ user.email }}</div>
+            </div>
+            <div style="padding: 12px 12px 6px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700)">Switch persona</div>
+            <sc-for list="{{ personas }}" as="p" hint-placeholder-count="4">
+              <button type="button" onClick="{{ p.pick }}" class="om-row" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: none; border: 0; cursor: pointer; font: inherit; font-size: 13px; text-align: left; padding: 9px 12px; border-radius: 10px; color: inherit; transition: background .15s ease">
+                <span style="display: flex; flex-direction: column; line-height: 1.2"><span style="font-weight: 600">{{ p.name }}</span><span style="font-size: 11px; color: color-mix(in srgb, var(--color-text) 58%, transparent)">{{ p.role }}</span></span>
+                <sc-if value="{{ p.active }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+              </button>
+            </sc-for>
+            <div style="height: 1px; background: var(--color-divider); margin: 8px 0"></div>
+            <button type="button" onClick="{{ doLogout }}" class="om-row" style="width: 100%; background: none; border: 0; cursor: pointer; font: inherit; font-size: 13px; text-align: left; padding: 9px 12px; border-radius: 10px; color: var(--color-accent-700); font-weight: 600; transition: background .15s ease">Log out</button>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </header>
+
+  <div style="flex: 1; display: flex; min-height: 0">
+    <aside class="om-scroll" style="width: 258px; flex: none; background: var(--color-neutral-100); border-right: 1px solid var(--color-divider); padding: 20px 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 22px">
+      <sc-for list="{{ navSections }}" as="sec" hint-placeholder-count="3">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <div style="font-size: 10px; letter-spacing: .11em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 48%, transparent); padding: 0 12px 6px">{{ sec.title }}</div>
+          <sc-for list="{{ sec.items }}" as="item" hint-placeholder-count="3">
+            <button type="button" onClick="{{ item.go }}" style="width: 100%; display: flex; align-items: center; gap: 11px; border: 0; cursor: pointer; font: inherit; font-size: 13.5px; text-align: left; padding: 10px 12px; border-radius: 999px; color: inherit; background: {{ item.bg }}; font-weight: {{ item.weight }}; transition: background .2s ease, transform .2s ease" style-hover="background: var(--color-accent-100); transform: translateX(2px)">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="flex: none; opacity: .9"><path d="{{ item.icon }}"></path></svg>
+              <span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ item.label }}</span>
+              <sc-if value="{{ item.count }}">
+                <span style="flex: none; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--color-accent-2-200); color: var(--color-accent-2-900); font-size: 11px; font-weight: 700; display: grid; place-items: center">{{ item.count }}</span>
+              </sc-if>
+            </button>
+          </sc-for>
+        </div>
+      </sc-for>
+
+      <div style="margin-top: auto; background: var(--color-surface); border-radius: var(--radius-md); padding: 14px">
+        <div style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: 6px">Signed in as</div>
+        <div style="font-size: 13px; font-weight: 700">{{ user.name }}</div>
+        <div style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 60%, transparent); margin-top: 2px; margin-bottom: 10px">{{ user.role }}</div>
+        <button type="button" onClick="{{ toggleUserMenu }}" class="btn btn-secondary" style="border-radius: 999px; font-size: 12px; width: 100%; min-height: 32px; background: var(--color-neutral-100)">Switch persona</button>
+      </div>
+    </aside>
+
+    <main class="om-scroll" style="flex: 1; min-width: 0; overflow-y: auto; position: relative">
+      <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width: 1160px; margin: 0 auto; padding: 34px 34px 60px; display: flex; flex-direction: column; gap: 18px">
+          <div class="om-sk" style="height: 34px; width: 320px"></div>
+          <div class="om-sk" style="height: 16px; width: 460px"></div>
+          <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 12px">
+            <div class="om-sk" style="height: 96px"></div><div class="om-sk" style="height: 96px"></div><div class="om-sk" style="height: 96px"></div><div class="om-sk" style="height: 96px"></div>
+          </div>
+          <div class="om-sk" style="height: 200px; margin-top: 6px"></div>
+          <div class="om-sk" style="height: 140px"></div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showBody }}" hint-placeholder-val="{{ true }}">
+      <div>
+      <sc-if value="{{ isInbox }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width: 1180px; margin: 0 auto; padding: 34px 34px 64px">
+          <header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; padding-bottom: 22px; border-bottom: 1px solid var(--color-divider); animation: fadeUp .4s ease both">
+            <div>
+              <h1 style="font-size: 38px; margin: 0 0 6px">{{ greeting }}</h1>
+              <p style="margin: 0; font-size: 15px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">{{ queueLine }}</p>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap">
+              <sc-for list="{{ inboxFilters }}" as="f" hint-placeholder-count="5">
+                <button type="button" onClick="{{ f.pick }}" style="border: 1px solid var(--color-divider); border-radius: 999px; padding: 7px 15px; font: inherit; font-size: 12.5px; cursor: pointer; background: {{ f.bg }}; color: {{ f.fg }}; transition: background .2s ease, color .2s ease, transform .2s ease" style-hover="transform: translateY(-1px)">{{ f.label }}</button>
+              </sc-for>
+            </div>
+          </header>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start; margin-top: 26px">
+            <div style="flex: 3 1 440px; display: flex; flex-direction: column; gap: 12px; min-width: 0">
+              <sc-if value="{{ queueEmpty }}">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; background: var(--color-surface); border-radius: var(--radius-lg); padding: 64px 30px; text-align: center; animation: fadeUp .4s ease both">
+                  <div style="width: 56px; height: 56px; border-radius: 999px; background: var(--color-accent-2-200); display: grid; place-items: center">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-2-800)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                  </div>
+                  <div style="font-family: var(--font-heading); font-size: 21px">You're all caught up</div>
+                  <p style="margin: 0; max-width: 42ch; font-size: 14px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">Approvals, claims awaiting your review and tasks coming due will appear here.</p>
+                </div>
+              </sc-if>
+
+              <sc-for list="{{ queue }}" as="item" hint-placeholder-count="4">
+                <article style="display: flex; align-items: flex-start; gap: 16px; background: var(--color-surface); border-radius: var(--radius-md); padding: 18px; box-shadow: var(--shadow-sm); animation: fadeUp .45s ease both; animation-delay: {{ item.delay }}; transition: box-shadow .22s ease, transform .22s ease" style-hover="box-shadow: var(--shadow-md); transform: translateY(-2px)">
+                              <span style="flex: none; width: 42px; height: 42px; border-radius: 999px; background: var(--color-accent-100); color: var(--color-accent-700); display: grid; place-items: center">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="{{ item.icon }}"></path></svg>
+                  </span>
+                  <div style="flex: 1; min-width: 0">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px">
+                      <span style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 50%, transparent)">{{ item.kind }}</span>
+                      <sc-if value="{{ item.hasUrgency }}">
+                        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: {{ item.urgencyFg }}">
+                          <span style="width: 7px; height: 7px; border-radius: 999px; background: {{ item.urgencyDot }}"></span>{{ item.urgencyLabel }}
+                        </span>
+                      </sc-if>
+                    </div>
+                    <button type="button" onClick="{{ item.open }}" style="background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: 15.5px; font-weight: 600; text-align: left; color: inherit" style-hover="text-decoration: underline">{{ item.title }}</button>
+                    <p style="margin: 4px 0 0; font-size: 13.5px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">{{ item.sub }}</p>
+                    <sc-if value="{{ item.due }}">
+                      <p style="margin: 6px 0 0; font-size: 12px; color: color-mix(in srgb, var(--color-text) 50%, transparent)">{{ item.due }}</p>
+                    </sc-if>
+                  </div>
+                  <sc-if value="{{ item.canApprove }}">
+                    <button type="button" onClick="{{ item.approveIt }}" class="btn btn-primary" style="flex: none; border-radius: 999px; font-size: 13px; padding: 8px 18px; transition: transform .18s ease, background .18s ease" style-hover="transform: translateY(-1px)">Approve</button>
+                  </sc-if>
+                </article>
+              </sc-for>
+
+              <div style="margin-top: 20px; padding-top: 22px; border-top: 1px solid var(--color-divider)">
+                <div style="font-size: 10px; letter-spacing: .11em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: 12px">Browse</div>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px">
+                  <sc-for list="{{ browse }}" as="m" hint-placeholder-count="3">
+                    <button type="button" onClick="{{ m.go }}" style="display: flex; align-items: center; gap: 9px; background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: 999px; padding: 10px 18px; font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; color: inherit; transition: background .2s ease, transform .2s ease" style-hover="background: var(--color-accent-100); transform: translateY(-1px)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="{{ m.icon }}"></path></svg>
+                      {{ m.label }}
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+
+            <aside style="flex: 1 1 260px; background: var(--color-surface); border-radius: var(--radius-lg); padding: 22px; animation: fadeUp .5s ease both">
+              <div style="font-size: 10px; letter-spacing: .11em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: 16px">Recent activity</div>
+              <ol style="list-style: none; margin: 0; padding: 0; position: relative">
+                <sc-for list="{{ activity }}" as="a" hint-placeholder-count="5">
+                  <li style="display: flex; gap: 14px; padding-bottom: 20px; position: relative">
+                    <span style="flex: none; width: 11px; height: 11px; border-radius: 999px; background: {{ a.color }}; margin-top: 5px; box-shadow: 0 0 0 4px var(--color-surface), 0 0 0 5px var(--color-divider)"></span>
+                    <div style="min-width: 0">
+                      <div style="font-size: 13.5px; line-height: 1.45"><strong style="font-weight: 700">{{ a.who }}</strong> {{ a.what }}</div>
+                      <div style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 50%, transparent); margin-top: 3px">{{ a.when }}</div>
+                    </div>
+                  </li>
+                </sc-for>
+              </ol>
+            </aside>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isClubDash }}">
+        <div style="max-width: 1180px; margin: 0 auto; padding: 30px 34px 64px">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; animation: fadeUp .4s ease both">
+            <div style="min-width: 0">
+              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+                <h1 style="font-size: 34px; margin: 0">{{ clubName }}</h1>
+                <span class="tag" style="background: var(--color-accent-2-200); color: var(--color-accent-2-900); border-radius: 999px; padding: 4px 12px; font-size: 11px">{{ clubCategory }}</span>
+              </div>
+              <p style="margin: 8px 0 0; max-width: 62ch; font-size: 14.5px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">{{ clubTagline }}</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px">
+              <sc-for list="{{ clubOptions }}" as="cl" hint-placeholder-count="2">
+                <button type="button" onClick="{{ cl.pick }}" style="border: 1px solid var(--color-divider); border-radius: 999px; padding: 9px 16px; font: inherit; font-size: 13px; cursor: pointer; color: inherit; background: var(--color-neutral-100); transition: background .2s ease" style-hover="background: var(--color-accent-100)">{{ cl.name }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 4px; flex-wrap: wrap; margin: 24px 0 26px; padding: 5px; background: var(--color-surface); border-radius: 999px; width: fit-content; max-width: 100%">
+            <sc-for list="{{ clubTabs }}" as="t" hint-placeholder-count="5">
+              <button type="button" onClick="{{ t.go }}" style="border: 0; border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 13px; cursor: pointer; background: {{ t.bg }}; color: {{ t.fg }}; font-weight: {{ t.weight }}; transition: background .24s ease, color .24s ease">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px">
+            <div style="background: var(--color-surface); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm); animation: fadeUp .45s ease both">
+              <div style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 60%, transparent)">Members</div>
+              <div style="font-family: var(--font-heading); font-size: 34px; line-height: 1.1; margin-top: 6px">{{ counters.members }}</div>
+              <svg viewBox="0 0 120 28" width="100%" height="28" style="margin-top: 10px; overflow: visible"><polyline points="0,22 20,20 40,15 60,16 80,10 100,7 120,4" fill="none" stroke="var(--color-accent-400)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="460" style="animation: draw 1.1s ease both"></polyline></svg>
+            </div>
+            <div style="background: var(--color-surface); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm); animation: fadeUp .45s ease .07s both">
+              <div style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 60%, transparent)">Events</div>
+              <div style="font-family: var(--font-heading); font-size: 34px; line-height: 1.1; margin-top: 6px">{{ counters.events }}</div>
+              <svg viewBox="0 0 120 28" width="100%" height="28" style="margin-top: 10px; overflow: visible"><polyline points="0,20 20,22 40,12 60,18 80,8 100,12 120,6" fill="none" stroke="var(--color-accent-2-500)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="460" style="animation: draw 1.2s ease .1s both"></polyline></svg>
+            </div>
+            <div style="background: var(--color-surface); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm); animation: fadeUp .45s ease .14s both">
+              <div style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 60%, transparent)">Budget spent</div>
+              <div style="font-family: var(--font-heading); font-size: 34px; line-height: 1.1; margin-top: 6px">{{ counters.spent }}</div>
+              <div style="height: 8px; border-radius: 999px; background: var(--color-neutral-300); margin-top: 14px; overflow: hidden">
+                <div style="height: 100%; width: {{ counters.spentPct }}; background: var(--color-accent); border-radius: 999px; transform-origin: left; animation: growX .8s cubic-bezier(.22,1,.36,1) both"></div>
+              </div>
+              <div style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 55%, transparent); margin-top: 7px">{{ counters.spentPct }} of {{ counters.allocated }}</div>
+            </div>
+            <div style="background: var(--color-surface); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm); animation: fadeUp .45s ease .21s both">
+              <div style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 60%, transparent)">Open tasks</div>
+              <div style="font-family: var(--font-heading); font-size: 34px; line-height: 1.1; margin-top: 6px">{{ openTaskCount }}</div>
+              <button type="button" onClick="{{ goTasks }}" class="btn btn-ghost" style="font-size: 12.5px; margin-top: 8px; padding-left: 0">Open the task list →</button>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 24px; margin-top: 26px; align-items: flex-start">
+            <section style="flex: 3 1 420px; min-width: 0; background: var(--color-surface); border-radius: var(--radius-lg); padding: 24px; animation: fadeUp .5s ease .1s both">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px">
+                <h2 style="font-size: 22px; margin: 0">Upcoming and recent events</h2>
+                <sc-if value="{{ canManage }}">
+                  <button type="button" onClick="{{ openSheet }}" class="btn btn-primary" style="border-radius: 999px; font-size: 12.5px; padding: 8px 16px">+ New event</button>
+                </sc-if>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 10px">
+                <sc-for list="{{ events }}" as="e" hint-placeholder-count="3">
+                  <button type="button" onClick="{{ e.open }}" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; text-align: left; background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 14px 16px; cursor: pointer; font: inherit; color: inherit; transition: transform .2s ease, box-shadow .2s ease" style-hover="transform: translateX(3px); box-shadow: var(--shadow-sm)">
+                    <span style="display: flex; align-items: center; gap: 13px; min-width: 0">
+                      <span class="tag" style="flex: none; background: {{ e.tone }}; color: {{ e.toneFg }}; border-radius: 999px; padding: 4px 11px; font-size: 10.5px">{{ e.statusLabel }}</span>
+                      <span style="min-width: 0">
+                        <span style="display: block; font-size: 14.5px; font-weight: 600">{{ e.title }}</span>
+                        <span style="display: block; font-size: 12.5px; color: color-mix(in srgb, var(--color-text) 58%, transparent); margin-top: 2px">{{ e.date }} · {{ e.venue }}</span>
+                      </span>
+                    </span>
+                    <span style="font-size: 13px; font-weight: 600; white-space: nowrap">{{ e.budgetLabel }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </section>
+
+            <section style="flex: 1 1 270px; background: var(--color-surface); border-radius: var(--radius-lg); padding: 24px; animation: fadeUp .5s ease .16s both">
+              <h2 style="font-size: 20px; margin: 0 0 4px">Where the money went</h2>
+              <p style="margin: 0 0 18px; font-size: 12.5px; color: color-mix(in srgb, var(--color-text) 58%, transparent)">{{ counters.remaining }} of {{ counters.allocated }} still available</p>
+              <div style="display: grid; place-items: center; margin-bottom: 18px">
+                <svg width="150" height="150" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--color-neutral-300)" stroke-width="12"></circle>
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="var(--color-accent)" stroke-width="12" stroke-linecap="round" stroke-dasharray="{{ counters.ring }}" transform="rotate(-90 50 50)" style="animation: fadeIn .8s ease both"></circle>
+                  <text x="50" y="49" text-anchor="middle" style="font-family: var(--font-heading); font-size: 19px; fill: var(--color-text)">{{ counters.spentPct }}</text>
+                  <text x="50" y="62" text-anchor="middle" style="font-size: 7px; fill: color-mix(in srgb, var(--color-text) 55%, transparent)">of allocation</text>
+                </svg>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 11px">
+                <sc-for list="{{ budgetLines }}" as="l" hint-placeholder-count="4">
+                  <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px"><span>{{ l.label }}</span><span style="font-weight: 600">{{ l.amountLabel }}</span></div>
+                    <div style="height: 6px; border-radius: 999px; background: var(--color-neutral-300); overflow: hidden">
+                      <div style="height: 100%; width: {{ l.pct }}; background: {{ l.color }}; border-radius: 999px; transform-origin: left; animation: growX .9s cubic-bezier(.22,1,.36,1) both"></div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isClubMembers }}">
+        <div style="max-width: 1180px; margin: 0 auto; padding: 30px 34px 64px">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; animation: fadeUp .4s ease both">
+            <div>
+              <h1 style="font-size: 34px; margin: 0">Members & structure</h1>
+              <p style="margin: 8px 0 0; font-size: 14.5px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">{{ memberCount }} people in {{ clubName }} for 2025-2026.</p>
+            </div>
+            <sc-if value="{{ canManage }}">
+              <button type="button" onClick="{{ openSheet }}" class="btn btn-primary" style="border-radius: 999px; font-size: 13px; padding: 10px 20px">+ Add member</button>
+            </sc-if>
+          </div>
+
+          <div style="display: flex; gap: 4px; flex-wrap: wrap; margin: 24px 0 26px; padding: 5px; background: var(--color-surface); border-radius: 999px; width: fit-content; max-width: 100%">
+            <sc-for list="{{ clubTabs }}" as="t" hint-placeholder-count="5">
+              <button type="button" onClick="{{ t.go }}" style="border: 0; border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 13px; cursor: pointer; background: {{ t.bg }}; color: {{ t.fg }}; font-weight: {{ t.weight }}; transition: background .24s ease, color .24s ease">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px">
+            <div style="position: relative; flex: 1; min-width: 220px; max-width: 340px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); opacity: .55"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+              <input class="input" placeholder="Search members" value="{{ memberQuery }}" onChange="{{ onMemberQuery }}" style="border-radius: 999px; min-height: 42px; padding-left: 38px; background: var(--color-neutral-100)">
+            </div>
+            <select class="input" value="{{ roleFilter }}" onChange="{{ onRoleFilter }}" style="border-radius: 999px; min-height: 42px; width: auto; padding: 6px 14px; background: var(--color-neutral-100); cursor: pointer">
+              <sc-for list="{{ roleOptions }}" as="r" hint-placeholder-count="6">
+                <option value="{{ r }}">{{ r }}</option>
+              </sc-for>
+            </select>
+            <span style="font-size: 12.5px; color: color-mix(in srgb, var(--color-text) 55%, transparent)">Sorted by {{ sortLabel }} {{ sortArrow }}</span>
+          </div>
+
+          <div class="om-scroll" style="background: var(--color-surface); border-radius: var(--radius-lg); overflow-x: auto; box-shadow: var(--shadow-sm); animation: fadeUp .45s ease both">
+            <table style="width: 100%; min-width: 660px; border-collapse: collapse; font-size: 13.5px">
+              <thead>
+                <tr style="background: var(--color-neutral-200)">
+                  <th scope="col" style="text-align: left; padding: 0"><button type="button" onClick="{{ sortName }}" style="width: 100%; text-align: left; background: none; border: 0; cursor: pointer; font: inherit; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; font-weight: 700; padding: 15px 20px; color: inherit">Name</button></th>
+                  <th scope="col" style="text-align: left; padding: 0"><button type="button" onClick="{{ sortRole }}" style="width: 100%; text-align: left; background: none; border: 0; cursor: pointer; font: inherit; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; font-weight: 700; padding: 15px 20px; color: inherit">Role</button></th>
+                  <th scope="col" style="text-align: left; padding: 0"><button type="button" onClick="{{ sortYear }}" style="width: 100%; text-align: left; background: none; border: 0; cursor: pointer; font: inherit; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; font-weight: 700; padding: 15px 20px; color: inherit">Academic year</button></th>
+                  <th scope="col" style="text-align: left; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; font-weight: 700; padding: 15px 20px">Status</th>
+                  <th scope="col" style="text-align: right; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; font-weight: 700; padding: 15px 20px">Contact</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ members }}" as="m" hint-placeholder-count="6">
+                  <tr class="om-row" style="border-top: 1px solid var(--color-divider); cursor: pointer; transition: background .18s ease" onClick="{{ m.open }}">
+                    <td style="padding: 14px 20px">
+                      <span style="display: flex; align-items: center; gap: 11px">
+                        <span style="flex: none; width: 34px; height: 34px; border-radius: 999px; background: var(--color-accent-2-200); color: var(--color-accent-2-900); display: grid; place-items: center; font-size: 11.5px; font-weight: 700">{{ m.initials }}</span>
+                        <span style="font-weight: 600">{{ m.name }}</span>
+                      </span>
+                    </td>
+                    <td style="padding: 14px 20px">{{ m.role }}</td>
+                    <td style="padding: 14px 20px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">{{ m.year }}</td>
+                    <td style="padding: 14px 20px"><span class="tag" style="background: {{ m.tone }}; color: {{ m.toneFg }}; border-radius: 999px; padding: 4px 11px; font-size: 10.5px">{{ m.statusLabel }}</span></td>
+                    <td style="padding: 14px 20px; text-align: right; color: color-mix(in srgb, var(--color-text) 62%, transparent)">{{ m.email }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+
+          <section style="margin-top: 30px; background: var(--color-surface); border-radius: var(--radius-lg); padding: 26px; animation: fadeUp .5s ease .08s both">
+            <h2 style="font-size: 22px; margin: 0 0 4px">Structure</h2>
+            <p style="margin: 0 0 22px; font-size: 13px; color: color-mix(in srgb, var(--color-text) 58%, transparent)">Who reports to whom this academic year.</p>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 0">
+              <div style="background: var(--color-accent); color: var(--color-bg); border-radius: 999px; padding: 12px 26px; font-family: var(--font-heading); font-size: 15px; box-shadow: var(--shadow-md)">Faculty Coordinator · Prof. Sarah Abraham</div>
+              <div style="width: 2px; height: 26px; background: var(--color-divider)"></div>
+              <div style="background: var(--color-accent-2-500); color: var(--color-bg); border-radius: 999px; padding: 11px 24px; font-family: var(--font-heading); font-size: 14px">President · Rahul Sharma</div>
+              <div style="width: 2px; height: 26px; background: var(--color-divider)"></div>
+              <div style="display: flex; gap: 18px; flex-wrap: wrap; justify-content: center">
+                <div style="background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 14px 20px; text-align: center; min-width: 180px">
+                  <div style="font-weight: 700; font-size: 13.5px">Ananya Rao</div>
+                  <div style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 58%, transparent)">Vice President</div>
+                  <div style="font-size: 11.5px; margin-top: 8px; color: var(--color-accent-700)">2 core members</div>
+                </div>
+                <div style="background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 14px 20px; text-align: center; min-width: 180px">
+                  <div style="font-weight: 700; font-size: 13.5px">Meera Iyer</div>
+                  <div style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 58%, transparent)">Treasurer</div>
+                  <div style="font-size: 11.5px; margin-top: 8px; color: var(--color-accent-700)">Budget & reimbursements</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isClubTasks }}">
+        <div style="max-width: 1180px; margin: 0 auto; padding: 30px 34px 64px">
+          <div style="animation: fadeUp .4s ease both">
+            <h1 style="font-size: 34px; margin: 0">Tasks & events</h1>
+            <p style="margin: 8px 0 0; font-size: 14.5px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">{{ openTaskCount }} tasks open and {{ counters.events }} events on the calendar for {{ clubName }}.</p>
+          </div>
+
+          <div style="display: flex; gap: 4px; flex-wrap: wrap; margin: 24px 0 26px; padding: 5px; background: var(--color-surface); border-radius: 999px; width: fit-content; max-width: 100%">
+            <sc-for list="{{ clubTabs }}" as="t" hint-placeholder-count="5">
+              <button type="button" onClick="{{ t.go }}" style="border: 0; border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 13px; cursor: pointer; background: {{ t.bg }}; color: {{ t.fg }}; font-weight: {{ t.weight }}; transition: background .24s ease, color .24s ease">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+            <section style="flex: 3 1 420px; min-width: 0; background: var(--color-surface); border-radius: var(--radius-lg); padding: 24px; animation: fadeUp .45s ease both">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px">
+                <h2 style="font-size: 22px; margin: 0">Task list</h2>
+                <sc-if value="{{ canManage }}">
+                  <button type="button" onClick="{{ openSheet }}" class="btn btn-secondary" style="border-radius: 999px; font-size: 12.5px; background: var(--color-neutral-100)">+ New task</button>
+                </sc-if>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 9px">
+                <sc-for list="{{ tasks }}" as="t" hint-placeholder-count="5">
+                  <div style="display: flex; align-items: center; gap: 14px; background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 13px 16px; opacity: {{ t.opacity }}; animation: fadeUp .45s ease both; animation-delay: {{ t.delay }}; transition: opacity .25s ease, box-shadow .2s ease" style-hover="box-shadow: var(--shadow-sm)">
+                    <button type="button" onClick="{{ t.check }}" aria-label="Toggle task" style="flex: none; width: 24px; height: 24px; border-radius: 999px; border: 2px solid var(--color-divider); background: {{ t.tick }}; cursor: pointer; display: grid; place-items: center; transition: background .22s ease, border-color .22s ease" style-hover="border-color: var(--color-accent)">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                    </button>
+                    <div style="flex: 1; min-width: 0">
+                      <div style="font-size: 14px; font-weight: 600; text-decoration: {{ t.mark }}">{{ t.title }}</div>
+                      <div style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 58%, transparent); margin-top: 3px">{{ t.owner }} · {{ t.due }}</div>
+                    </div>
+                    <span class="tag" style="flex: none; background: {{ t.prioBg }}; color: {{ t.prioFg }}; border-radius: 999px; padding: 4px 11px; font-size: 10.5px; text-transform: capitalize">{{ t.priority }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+
+            <section style="flex: 1 1 290px; background: var(--color-surface); border-radius: var(--radius-lg); padding: 24px; animation: fadeUp .5s ease .08s both">
+              <h2 style="font-size: 22px; margin: 0 0 18px">Annual events</h2>
+              <div style="display: flex; flex-direction: column; gap: 12px">
+                <sc-for list="{{ events }}" as="e" hint-placeholder-count="3">
+                  <button type="button" onClick="{{ e.open }}" class="card" style="text-align: left; cursor: pointer; border: 1px solid var(--color-divider); background: var(--color-neutral-100); font: inherit; color: inherit; transition: transform .2s ease, box-shadow .2s ease" style-hover="transform: translateY(-2px); box-shadow: var(--shadow-md)">
+                    <span class="card-kicker">{{ e.date }}</span>
+                    <span class="card-title">{{ e.title }}</span>
+                    <span class="card-body">{{ e.desc }}</span>
+                    <span class="card-meta" style="justify-content: space-between">
+                      <span class="tag" style="background: {{ e.tone }}; color: {{ e.toneFg }}; border-radius: 999px; padding: 3px 10px; font-size: 10px">{{ e.statusLabel }}</span>
+                      <span style="font-weight: 700; color: var(--color-text)">{{ e.budgetLabel }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isClubBudget }}">
+        <div style="max-width: 1180px; margin: 0 auto; padding: 30px 34px 64px">
+          <div style="animation: fadeUp .4s ease both">
+            <h1 style="font-size: 34px; margin: 0">Budget & reimbursements</h1>
+            <p style="margin: 8px 0 0; font-size: 14.5px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">{{ counters.spent }} spent of {{ counters.allocated }} allocated · {{ reimbPending }} reimbursements awaiting a decision.</p>
+          </div>
+
+          <div style="display: flex; gap: 4px; flex-wrap: wrap; margin: 24px 0 26px; padding: 5px; background: var(--color-surface); border-radius: 999px; width: fit-content; max-width: 100%">
+            <sc-for list="{{ clubTabs }}" as="t" hint-placeholder-count="5">
+              <button type="button" onClick="{{ t.go }}" style="border: 0; border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 13px; cursor: pointer; background: {{ t.bg }}; color: {{ t.fg }}; font-weight: {{ t.weight }}; transition: background .24s ease, color .24s ease">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-bottom: 26px">
+            <div style="background: var(--color-accent); color: var(--color-bg); border-radius: var(--radius-md); padding: 22px; box-shadow: var(--shadow-md); animation: fadeUp .45s ease both">
+              <div style="font-size: 12px; opacity: .85">Allocated 2025-2026</div>
+              <div style="font-family: var(--font-heading); font-size: 32px; margin-top: 6px">{{ counters.allocated }}</div>
+            </div>
+            <div style="background: var(--color-surface); border-radius: var(--radius-md); padding: 22px; box-shadow: var(--shadow-sm); animation: fadeUp .45s ease .07s both">
+              <div style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 60%, transparent)">Spent</div>
+              <div style="font-family: var(--font-heading); font-size: 32px; margin-top: 6px">{{ counters.spent }}</div>
+              <div style="height: 8px; border-radius: 999px; background: var(--color-neutral-300); margin-top: 14px; overflow: hidden"><div style="height: 100%; width: {{ counters.spentPct }}; background: var(--color-accent); transform-origin: left; animation: growX .85s cubic-bezier(.22,1,.36,1) both"></div></div>
+            </div>
+            <div style="background: var(--color-surface); border-radius: var(--radius-md); padding: 22px; box-shadow: var(--shadow-sm); animation: fadeUp .45s ease .14s both">
+              <div style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 60%, transparent)">Still available</div>
+              <div style="font-family: var(--font-heading); font-size: 32px; margin-top: 6px">{{ counters.remaining }}</div>
+            </div>
+            <div style="background: var(--color-accent-2-200); border-radius: var(--radius-md); padding: 22px; box-shadow: var(--shadow-sm); animation: fadeUp .45s ease .21s both">
+              <div style="font-size: 12px; color: var(--color-accent-2-900)">Committed sponsorship</div>
+              <div style="font-family: var(--font-heading); font-size: 32px; margin-top: 6px; color: var(--color-accent-2-900)">Rs 25,000</div>
+              <div style="font-size: 11.5px; margin-top: 6px; color: var(--color-accent-2-800)">HDFC Bank · MoU pending file</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+            <section style="flex: 3 1 440px; min-width: 0; background: var(--color-surface); border-radius: var(--radius-lg); padding: 24px; animation: fadeUp .5s ease both">
+              <h2 style="font-size: 22px; margin: 0 0 18px">Reimbursement requests</h2>
+              <div class="om-scroll" style="overflow-x: auto; margin: 0 -4px; padding: 0 4px">
+              <table style="width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13.5px">
+                <thead>
+                  <tr>
+                    <th scope="col" style="text-align: left; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; padding: 0 12px 12px 0">Filed by</th>
+                    <th scope="col" style="text-align: left; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; padding: 0 12px 12px 0">Purpose</th>
+                    <th scope="col" style="text-align: right; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; padding: 0 12px 12px 0">Amount</th>
+                    <th scope="col" style="text-align: left; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; padding: 0 12px 12px 0">Status</th>
+                    <th scope="col" style="text-align: right; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; padding: 0 0 12px 0">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{ reimb }}" as="r" hint-placeholder-count="4">
+                    <tr style="border-top: 1px solid var(--color-divider)">
+                      <td style="padding: 14px 12px 14px 0; font-weight: 600">{{ r.by }}</td>
+                      <td style="padding: 14px 12px 14px 0; color: color-mix(in srgb, var(--color-text) 68%, transparent)">{{ r.purpose }}</td>
+                      <td style="padding: 14px 12px 14px 0; text-align: right; font-weight: 700; white-space: nowrap">{{ r.amountLabel }}</td>
+                      <td style="padding: 14px 12px 14px 0"><span class="tag" style="background: {{ r.tone }}; color: {{ r.toneFg }}; border-radius: 999px; padding: 4px 11px; font-size: 10.5px">{{ r.statusLabel }}</span></td>
+                      <td style="padding: 14px 0; text-align: right">
+                        <sc-if value="{{ r.canAct }}">
+                          <button type="button" onClick="{{ r.approve }}" class="btn btn-primary" style="border-radius: 999px; font-size: 12px; padding: 6px 14px">Approve</button>
+                        </sc-if>
+                        <sc-if value="{{ r.done }}">
+                          <span style="font-size: 12px; color: var(--color-accent-2-800); font-weight: 600">Approved just now</span>
+                        </sc-if>
+                      </td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+              </div>
+            </section>
+
+            <section style="flex: 1 1 270px; background: var(--color-surface); border-radius: var(--radius-lg); padding: 24px; animation: fadeUp .5s ease .1s both">
+              <h2 style="font-size: 20px; margin: 0 0 18px">Spend by head</h2>
+              <div style="display: flex; align-items: flex-end; gap: 12px; height: 150px; padding-bottom: 6px; border-bottom: 1px solid var(--color-divider)">
+                <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%"><div style="height: 82%; background: var(--color-accent-400); border-radius: 12px 12px 0 0; transform-origin: bottom; animation: fadeUp .6s ease both"></div></div>
+                <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%"><div style="height: 40%; background: var(--color-accent-2-400); border-radius: 12px 12px 0 0; animation: fadeUp .6s ease .08s both"></div></div>
+                <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%"><div style="height: 30%; background: var(--color-accent-400); border-radius: 12px 12px 0 0; animation: fadeUp .6s ease .16s both"></div></div>
+                <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%"><div style="height: 11%; background: var(--color-accent-2-400); border-radius: 12px 12px 0 0; animation: fadeUp .6s ease .24s both"></div></div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 16px">
+                <sc-for list="{{ budgetLines }}" as="l" hint-placeholder-count="4">
+                  <div style="display: flex; align-items: center; gap: 9px; font-size: 12.5px">
+                    <span style="width: 10px; height: 10px; border-radius: 999px; background: {{ l.color }}; flex: none"></span>
+                    <span style="flex: 1">{{ l.label }}</span>
+                    <span style="font-weight: 700">{{ l.amountLabel }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isClubPlan }}">
+        <div style="max-width: 1180px; margin: 0 auto; padding: 30px 34px 64px">
+          <div style="animation: fadeUp .4s ease both">
+            <h1 style="font-size: 34px; margin: 0">Annual planning</h1>
+            <p style="margin: 8px 0 0; font-size: 14.5px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">{{ clubName }} · 2025-2026 · currently at <strong>{{ planStageLabel }}</strong>.</p>
+          </div>
+
+          <div style="display: flex; gap: 4px; flex-wrap: wrap; margin: 24px 0 26px; padding: 5px; background: var(--color-surface); border-radius: 999px; width: fit-content; max-width: 100%">
+            <sc-for list="{{ clubTabs }}" as="t" hint-placeholder-count="5">
+              <button type="button" onClick="{{ t.go }}" style="border: 0; border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 13px; cursor: pointer; background: {{ t.bg }}; color: {{ t.fg }}; font-weight: {{ t.weight }}; transition: background .24s ease, color .24s ease">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <section style="background: var(--color-surface); border-radius: var(--radius-lg); padding: 28px; animation: fadeUp .45s ease both">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap">
+              <div>
+                <div style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700)">Annual plan · AP-2025-26/CC</div>
+                <h2 style="font-size: 26px; margin: 8px 0 0">Build the department's flagship commerce calendar</h2>
+              </div>
+              <sc-if value="{{ planApproved }}">
+                <span class="tag" style="background: var(--color-accent-2-200); color: var(--color-accent-2-900); border-radius: 999px; padding: 6px 14px; font-size: 11.5px">Approved</span>
+              </sc-if>
+            </div>
+
+            <ol style="list-style: none; display: flex; gap: 10px; margin: 26px 0 0; padding: 0; flex-wrap: wrap">
+              <sc-for list="{{ planStages }}" as="st" hint-placeholder-count="6">
+                <li style="flex: 1; min-width: 120px">
+                  <div style="height: 7px; border-radius: 999px; background: {{ st.fill }}; transform-origin: left; animation: growX .7s cubic-bezier(.22,1,.36,1) both"></div>
+                  <div style="font-size: 11.5px; margin-top: 8px; color: {{ st.fg }}; font-weight: {{ st.weight }}">{{ st.label }}</div>
+                </li>
+              </sc-for>
+            </ol>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 22px; margin-top: 32px">
+              <div>
+                <div style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: 8px">Vision</div>
+                <p style="margin: 0; font-size: 14px; line-height: 1.6">Make the Commerce Club the place a first-year student meets industry for the first time — one flagship conclave, four skill labs and a mentorship pairing for every core member.</p>
+              </div>
+              <div>
+                <div style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: 8px">Objectives</div>
+                <ul style="margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.75">
+                  <li>National Commerce Conclave with six external speakers</li>
+                  <li>Recruit 12 first-year volunteers by August</li>
+                  <li>Four skill labs on taxation, markets, audit and analytics</li>
+                  <li>Publish a semester newsletter twice</li>
+                  <li>Raise Rs 25,000 in sponsorship</li>
+                  <li>Close every reimbursement within 10 days</li>
+                </ul>
+              </div>
+              <div>
+                <div style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: 8px">Requested allocation</div>
+                <div style="font-family: var(--font-heading); font-size: 32px">Rs 50,000</div>
+                <p style="margin: 8px 0 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 60%, transparent)">Rs 25,000 of it offset by committed sponsorship from HDFC Bank.</p>
+              </div>
+            </div>
+
+            <sc-if value="{{ canApprove }}">
+              <sc-if value="{{ planPending }}">
+                <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--color-divider)">
+                  <button type="button" onClick="{{ approvePlan }}" class="btn btn-primary" style="border-radius: 999px; font-size: 14px; padding: 11px 24px; transition: transform .18s ease" style-hover="transform: translateY(-1px)">Approve and pass on</button>
+                  <button type="button" onClick="{{ returnPlan }}" class="btn btn-secondary" style="border-radius: 999px; font-size: 14px; padding: 11px 24px; background: var(--color-neutral-100)">Request changes</button>
+                </div>
+              </sc-if>
+            </sc-if>
+          </section>
+
+          <section style="background: var(--color-surface); border-radius: var(--radius-lg); padding: 26px; margin-top: 22px; animation: fadeUp .5s ease .08s both">
+            <h2 style="font-size: 20px; margin: 0 0 18px">Approval trail</h2>
+            <ol style="list-style: none; margin: 0; padding: 0">
+              <li style="display: flex; gap: 14px; padding-bottom: 18px">
+                <span style="flex: none; width: 11px; height: 11px; border-radius: 999px; background: var(--color-accent-2-400); margin-top: 5px; box-shadow: 0 0 0 4px var(--color-surface), 0 0 0 5px var(--color-divider)"></span>
+                <div><div style="font-size: 13.5px"><strong>Rahul Sharma</strong> submitted the plan for review</div><div style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 50%, transparent); margin-top: 3px">Yesterday, 18:42</div></div>
+              </li>
+              <li style="display: flex; gap: 14px; padding-bottom: 18px">
+                <span style="flex: none; width: 11px; height: 11px; border-radius: 999px; background: var(--color-accent-400); margin-top: 5px; box-shadow: 0 0 0 4px var(--color-surface), 0 0 0 5px var(--color-divider)"></span>
+                <div><div style="font-size: 13.5px"><strong>Prof. Sarah Abraham</strong> is reviewing as Faculty Coordinator</div><div style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 50%, transparent); margin-top: 3px">Waiting 1 day · service level is 5 days</div></div>
+              </li>
+              <li style="display: flex; gap: 14px">
+                <span style="flex: none; width: 11px; height: 11px; border-radius: 999px; background: var(--color-neutral-300); margin-top: 5px; box-shadow: 0 0 0 4px var(--color-surface), 0 0 0 5px var(--color-divider)"></span>
+                <div><div style="font-size: 13.5px; color: color-mix(in srgb, var(--color-text) 55%, transparent)">Cultural Coordinator, then HOD sign-off</div></div>
+              </li>
+            </ol>
+          </section>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isClaimsOverview }}">
+        <div style="max-width: 1180px; margin: 0 auto; padding: 30px 34px 64px">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; animation: fadeUp .4s ease both">
+            <div>
+              <h1 style="font-size: 34px; margin: 0">Attendance claims</h1>
+              <p style="margin: 8px 0 0; font-size: 14.5px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">Everything you have filed this year, and where each one is sitting.</p>
+            </div>
+            <button type="button" onClick="{{ goNewClaim }}" class="btn btn-primary" style="border-radius: 999px; font-size: 14px; padding: 11px 22px; transition: transform .18s ease" style-hover="transform: translateY(-1px)">+ New claim</button>
+          </div>
+
+          <div style="display: flex; gap: 4px; flex-wrap: wrap; margin: 24px 0 26px; padding: 5px; background: var(--color-surface); border-radius: 999px; width: fit-content; max-width: 100%">
+            <sc-for list="{{ claimTabs }}" as="t" hint-placeholder-count="3">
+              <button type="button" onClick="{{ t.go }}" style="border: 0; border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 13px; cursor: pointer; background: {{ t.bg }}; color: {{ t.fg }}; font-weight: {{ t.weight }}; transition: background .24s ease, color .24s ease">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px">
+            <sc-for list="{{ claimStats }}" as="s" hint-placeholder-count="4">
+              <div style="background: var(--color-surface); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm); animation: fadeUp .45s ease both">
+                <div style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 60%, transparent)">{{ s.label }}</div>
+                <div style="font-family: var(--font-heading); font-size: 32px; margin-top: 6px">{{ s.value }}</div>
+                <div style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 52%, transparent); margin-top: 4px">{{ s.note }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <section style="background: var(--color-surface); border-radius: var(--radius-lg); padding: 26px; margin-top: 26px; animation: fadeUp .5s ease .08s both">
+            <h2 style="font-size: 22px; margin: 0 0 20px">My claims</h2>
+            <div style="display: flex; flex-direction: column; gap: 12px">
+              <sc-for list="{{ myClaims }}" as="c" hint-placeholder-count="3">
+                <button type="button" onClick="{{ c.open }}" style="text-align: left; background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 18px; cursor: pointer; font: inherit; color: inherit; transition: transform .2s ease, box-shadow .2s ease" style-hover="transform: translateY(-2px); box-shadow: var(--shadow-md)">
+                  <span style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap">
+                    <span style="display: flex; align-items: center; gap: 12px">
+                      <span style="font-family: var(--font-heading); font-size: 16px">{{ c.ref }}</span>
+                      <span class="tag" style="background: {{ c.tone }}; color: {{ c.toneFg }}; border-radius: 999px; padding: 4px 11px; font-size: 10.5px">{{ c.statusLabel }}</span>
+                    </span>
+                    <span style="font-size: 12.5px; color: color-mix(in srgb, var(--color-text) 58%, transparent)">{{ c.category }} · {{ c.dates }} · {{ c.hours }} hours</span>
+                  </span>
+                  <span style="display: block; font-size: 13.5px; margin-top: 10px; color: color-mix(in srgb, var(--color-text) 70%, transparent)">{{ c.reason }}</span>
+                  <span style="display: block; height: 6px; border-radius: 999px; background: var(--color-neutral-300); margin-top: 14px; overflow: hidden">
+                    <span style="display: block; height: 100%; width: {{ c.stepPct }}; background: var(--color-accent); border-radius: 999px; transform-origin: left; animation: growX .8s cubic-bezier(.22,1,.36,1) both"></span>
+                  </span>
+                  <span style="display: block; font-size: 11.5px; margin-top: 7px; color: color-mix(in srgb, var(--color-text) 52%, transparent)">At {{ c.stageLabel }} · submitted {{ c.submitted }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isClaimsNew }}">
+        <div style="max-width: 980px; margin: 0 auto; padding: 30px 34px 64px">
+          <div style="animation: fadeUp .4s ease both">
+            <h1 style="font-size: 34px; margin: 0">New attendance claim</h1>
+            <p style="margin: 8px 0 0; font-size: 14.5px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">B.Com (Hons) · Semester 5 · Section A · academic year 2025-2026.</p>
+          </div>
+
+          <ol style="list-style: none; display: flex; gap: 8px; margin: 30px 0 0; padding: 0; flex-wrap: wrap">
+            <sc-for list="{{ wizardSteps }}" as="w" hint-placeholder-count="5">
+              <li style="flex: 1; min-width: 130px">
+                <button type="button" onClick="{{ w.go }}" style="width: 100%; display: flex; align-items: center; gap: 9px; background: none; border: 0; cursor: pointer; font: inherit; text-align: left; padding: 0; color: inherit">
+                  <span style="flex: none; width: 26px; height: 26px; border-radius: 999px; background: {{ w.bg }}; color: {{ w.fg }}; display: grid; place-items: center; font-size: 12px; font-weight: 700; transition: background .3s ease">{{ w.n }}</span>
+                  <span style="font-size: 12.5px; color: {{ w.labelFg }}; font-weight: {{ w.weight }}">{{ w.label }}</span>
+                </button>
+              </li>
+            </sc-for>
+          </ol>
+
+          <section style="background: var(--color-surface); border-radius: var(--radius-lg); padding: 30px; margin-top: 22px; min-height: 340px; animation: fadeUp .45s ease both">
+            <sc-if value="{{ w1 }}">
+              <div style="animation: fadeUp .35s ease both">
+                <h2 style="font-size: 24px; margin: 0 0 6px">What kind of absence was this?</h2>
+                <p style="margin: 0 0 24px; font-size: 14px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">Medical claims need a certificate; co-curricular claims need the pre-approval form.</p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px">
+                  <button type="button" onClick="{{ pickMedical }}" style="text-align: left; background: var(--color-neutral-100); border: 2px solid {{ medBorder }}; border-radius: var(--radius-md); padding: 22px; cursor: pointer; font: inherit; color: inherit; transition: border-color .22s ease, transform .22s ease" style-hover="transform: translateY(-2px)">
+                    <span style="display: block; font-family: var(--font-heading); font-size: 19px">Medical</span>
+                    <span style="display: block; font-size: 13px; margin-top: 8px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">Illness, injury or a procedure. A signed certificate is required before the claim can move.</span>
+                  </button>
+                  <button type="button" onClick="{{ pickCoCurricular }}" style="text-align: left; background: var(--color-neutral-100); border: 2px solid {{ ccBorder }}; border-radius: var(--radius-md); padding: 22px; cursor: pointer; font: inherit; color: inherit; transition: border-color .22s ease, transform .22s ease" style-hover="transform: translateY(-2px)">
+                    <span style="display: block; font-family: var(--font-heading); font-size: 19px">Co-curricular</span>
+                    <span style="display: block; font-size: 13px; margin-top: 8px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">Representing the department or university. Attach the pre-approval signed before the event.</span>
+                  </button>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ w2 }}">
+              <div style="animation: fadeUp .35s ease both">
+                <h2 style="font-size: 24px; margin: 0 0 6px">Which dates were you away?</h2>
+                <p style="margin: 0 0 24px; font-size: 14px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">The classes you can claim for are drawn from your timetable for these dates.</p>
+                <div style="display: flex; gap: 16px; flex-wrap: wrap; max-width: 520px">
+                  <div class="field" style="flex: 1; min-width: 180px"><label for="d-from">From</label><input class="input" id="d-from" type="date" value="2026-07-05" style="border-radius: 999px; min-height: 44px; background: var(--color-neutral-100)"></div>
+                  <div class="field" style="flex: 1; min-width: 180px"><label for="d-to">To</label><input class="input" id="d-to" type="date" value="2026-07-06" style="border-radius: 999px; min-height: 44px; background: var(--color-neutral-100)"></div>
+                </div>
+                <div style="display: flex; align-items: flex-start; gap: 12px; background: var(--color-accent-100); border-radius: var(--radius-md); padding: 16px; margin-top: 24px; max-width: 620px; animation: fadeUp .4s ease .1s both">
+                  <span style="flex: none; width: 24px; height: 24px; border-radius: 999px; background: var(--color-accent-300); display: grid; place-items: center; font-weight: 700; font-size: 13px; color: var(--color-accent-900)">!</span>
+                  <p style="margin: 0; font-size: 13px; color: var(--color-accent-900)">You already have a claim covering 05 Jul 2026 (ACP-2026-000101). You can still file this one — a reviewer will see both.</p>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ w3 }}">
+              <div style="animation: fadeUp .35s ease both">
+                <h2 style="font-size: 24px; margin: 0 0 6px">Which classes did you miss?</h2>
+                <p style="margin: 0 0 24px; font-size: 14px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">{{ pickedHours }} of your scheduled hours selected.</p>
+                <div style="display: flex; flex-direction: column; gap: 20px">
+                  <sc-for list="{{ timetableDays }}" as="d" hint-placeholder-count="2">
+                    <div>
+                      <div style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: 10px">{{ d.day }}</div>
+                      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px">
+                        <sc-for list="{{ d.slots }}" as="sl" hint-placeholder-count="3">
+                          <button type="button" onClick="{{ sl.toggle }}" style="display: flex; align-items: center; gap: 12px; text-align: left; background: {{ sl.bg }}; border: 1.5px solid {{ sl.border }}; border-radius: var(--radius-md); padding: 14px; cursor: pointer; font: inherit; color: inherit; transition: background .2s ease, border-color .2s ease, transform .2s ease" style-hover="transform: translateY(-2px)">
+                            <span style="flex: none; width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--color-divider); background: {{ sl.tick }}; display: grid; place-items: center; transition: background .2s ease">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+                            </span>
+                            <span style="min-width: 0">
+                              <span style="display: block; font-size: 13.5px; font-weight: 600">{{ sl.subject }}</span>
+                              <span style="display: block; font-size: 12px; color: color-mix(in srgb, var(--color-text) 58%, transparent); margin-top: 2px">{{ sl.hour }} · {{ sl.faculty }}</span>
+                            </span>
+                          </button>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ w4 }}">
+              <div style="animation: fadeUp .35s ease both">
+                <h2 style="font-size: 24px; margin: 0 0 6px">Why were you away, and what proves it?</h2>
+                <p style="margin: 0 0 24px; font-size: 14px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">Reviewers read this first. Two clear sentences are enough.</p>
+                <div class="field" style="max-width: 620px">
+                  <label for="claim-reason">Reason</label>
+                  <textarea class="input" id="claim-reason" value="{{ reason }}" onChange="{{ onReason }}" placeholder="Recovering from viral fever and advised absolute bed rest." style="border-radius: var(--radius-md); background: var(--color-neutral-100); min-height: 120px"></textarea>
+                </div>
+                <div style="max-width: 620px; margin-top: 22px; border: 2px dashed var(--color-neutral-400); border-radius: var(--radius-md); padding: 28px; text-align: center; background: var(--color-neutral-100); transition: border-color .2s ease, background .2s ease" style-hover="border-color: var(--color-accent); background: var(--color-accent-100)">
+                  <div style="font-family: var(--font-heading); font-size: 17px">Drop the medical certificate here</div>
+                  <div style="font-size: 12.5px; color: color-mix(in srgb, var(--color-text) 58%, transparent); margin-top: 6px">PDF or image, up to 10 MB — or <span style="color: var(--color-accent-700); font-weight: 600">browse your files</span></div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px; background: var(--color-accent-2-200); border-radius: 999px; padding: 10px 18px; margin-top: 16px; max-width: 620px; font-size: 12.5px; color: var(--color-accent-2-900)">
+                  <span style="width: 20px; height: 20px; border-radius: 999px; background: var(--color-accent-2-500); display: grid; place-items: center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-bg)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                  fever-certificate-05jul.pdf attached · 214 KB
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ w5 }}">
+              <div style="animation: fadeUp .35s ease both">
+                <h2 style="font-size: 24px; margin: 0 0 6px">Check it over, then submit</h2>
+                <p style="margin: 0 0 24px; font-size: 14px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">Once submitted it goes to initial review and you will be told at every stage.</p>
+                <dl style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin: 0">
+                  <div><dt style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700)">Category</dt><dd style="margin: 6px 0 0; font-size: 15px; font-weight: 600">{{ catLabel }}</dd></div>
+                  <div><dt style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700)">Dates</dt><dd style="margin: 6px 0 0; font-size: 15px; font-weight: 600">05 – 06 Jul 2026</dd></div>
+                  <div><dt style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700)">Hours claimed</dt><dd style="margin: 6px 0 0; font-size: 15px; font-weight: 600">{{ pickedHours }}</dd></div>
+                  <div><dt style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700)">Proof</dt><dd style="margin: 6px 0 0; font-size: 15px; font-weight: 600">fever-certificate-05jul.pdf</dd></div>
+                </dl>
+                <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--color-divider)">
+                  <div style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: 8px">Reason</div>
+                  <p style="margin: 0; font-size: 14px; line-height: 1.6; max-width: 62ch">{{ reasonText }}</p>
+                </div>
+                <div style="margin-top: 24px">
+                  <div style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: 10px">Classes</div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                    <sc-for list="{{ pickedList }}" as="pl" hint-placeholder-count="2">
+                      <span class="tag" style="background: var(--color-accent-200); color: var(--color-accent-800); border-radius: 999px; padding: 6px 14px; font-size: 11.5px">{{ pl.subject }} · {{ pl.hour }}</span>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 32px; padding-top: 22px; border-top: 1px solid var(--color-divider)">
+              <sc-if value="{{ notFirst }}">
+                <button type="button" onClick="{{ back }}" class="btn btn-secondary" style="border-radius: 999px; font-size: 13.5px; background: var(--color-neutral-100)">← Back</button>
+              </sc-if>
+              <div style="flex: 1"></div>
+              <sc-if value="{{ notLast }}">
+                <button type="button" onClick="{{ next }}" class="btn btn-primary" style="border-radius: 999px; font-size: 13.5px; padding: 10px 22px; transition: transform .18s ease" style-hover="transform: translateY(-1px)">Continue →</button>
+              </sc-if>
+              <sc-if value="{{ w5 }}">
+                <button type="button" onClick="{{ submitClaim }}" class="btn btn-primary" style="border-radius: 999px; font-size: 13.5px; padding: 10px 24px; transition: transform .18s ease" style-hover="transform: translateY(-1px)">Submit claim</button>
+              </sc-if>
+            </div>
+          </section>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isClaimsReview }}">
+        <div style="max-width: 1180px; margin: 0 auto; padding: 30px 34px 64px">
+          <div style="animation: fadeUp .4s ease both">
+            <h1 style="font-size: 34px; margin: 0">Review queue</h1>
+            <p style="margin: 8px 0 0; font-size: 14.5px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">{{ reviewCount }} claims routed to you · {{ breachCount }} past their service level.</p>
+          </div>
+
+          <div style="display: flex; gap: 4px; flex-wrap: wrap; margin: 24px 0 22px; padding: 5px; background: var(--color-surface); border-radius: 999px; width: fit-content; max-width: 100%">
+            <sc-for list="{{ claimTabs }}" as="t" hint-placeholder-count="3">
+              <button type="button" onClick="{{ t.go }}" style="border: 0; border-radius: 999px; padding: 9px 18px; font: inherit; font-size: 13px; cursor: pointer; background: {{ t.bg }}; color: {{ t.fg }}; font-weight: {{ t.weight }}; transition: background .24s ease, color .24s ease">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; align-items: flex-start; gap: 14px; background: var(--color-accent-200); border-radius: var(--radius-md); padding: 18px 20px; margin-bottom: 22px; animation: fadeUp .45s ease both">
+            <span style="flex: none; width: 26px; height: 26px; border-radius: 999px; background: var(--color-accent-400); color: var(--color-accent-900); display: grid; place-items: center; font-weight: 700">!</span>
+            <div>
+              <div style="font-family: var(--font-heading); font-size: 17px; color: var(--color-accent-900)">{{ breachCount }} claims are past their service level</div>
+              <p style="margin: 4px 0 0; font-size: 13px; color: var(--color-accent-900)">ACP-2026-000101 has been at subject faculty for nine days. The student cannot do anything about it.</p>
+            </div>
+          </div>
+
+          <div class="om-scroll" style="background: var(--color-surface); border-radius: var(--radius-lg); overflow-x: auto; box-shadow: var(--shadow-sm)">
+            <table style="width: 100%; min-width: 900px; border-collapse: collapse; font-size: 13.5px">
+              <thead>
+                <tr style="background: var(--color-neutral-200)">
+                  <th scope="col" style="text-align: left; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; padding: 15px 20px">Reference</th>
+                  <th scope="col" style="text-align: left; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; padding: 15px 20px">Student</th>
+                  <th scope="col" style="text-align: left; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; padding: 15px 20px">Reason</th>
+                  <th scope="col" style="text-align: left; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; padding: 15px 20px">Stage</th>
+                  <th scope="col" style="text-align: left; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; padding: 15px 20px">Waiting</th>
+                  <th scope="col" style="text-align: right; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; padding: 15px 20px">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ reviewRows }}" as="r" hint-placeholder-count="4">
+                  <tr class="om-row" style="border-top: 1px solid var(--color-divider); animation: fadeUp .45s ease both; animation-delay: {{ r.delay }}; transition: background .18s ease">
+                    <td style="padding: 15px 20px">
+                      <button type="button" onClick="{{ r.open }}" style="background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-family: var(--font-heading); font-size: 14.5px; color: inherit" style-hover="text-decoration: underline">{{ r.ref }}</button>
+                      <div style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 52%, transparent); margin-top: 3px">{{ r.category }} · {{ r.hours }} hours · {{ r.docsLabel }}</div>
+                    </td>
+                    <td style="padding: 15px 20px"><div style="font-weight: 600">{{ r.student }}</div><div style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 52%, transparent); margin-top: 3px">{{ r.programme }}</div></td>
+                    <td style="padding: 15px 20px; max-width: 300px; color: color-mix(in srgb, var(--color-text) 68%, transparent)">{{ r.reason }}</td>
+                    <td style="padding: 15px 20px"><span class="tag" style="background: var(--color-accent-200); color: var(--color-accent-800); border-radius: 999px; padding: 4px 11px; font-size: 10.5px">{{ r.stageLabel }}</span></td>
+                    <td style="padding: 15px 20px"><span style="display: inline-block; background: {{ r.dayBg }}; color: {{ r.dayFg }}; border-radius: 999px; padding: 4px 11px; font-size: 11.5px; font-weight: 700">{{ r.days }}d</span></td>
+                    <td style="padding: 15px 20px; text-align: right; white-space: nowrap">
+                      <sc-if value="{{ r.done }}">
+                        <span style="font-size: 12px; color: var(--color-accent-2-800); font-weight: 600">Cleared</span>
+                      </sc-if>
+                      <sc-if value="{{ r.pending }}" hint-placeholder-val="{{ true }}">
+                        <span style="display: inline-flex; gap: 6px">
+                          <button type="button" onClick="{{ r.approve }}" class="btn btn-primary" style="border-radius: 999px; font-size: 12px; padding: 6px 14px">Approve</button>
+                          <button type="button" onClick="{{ r.open }}" class="btn btn-secondary" style="border-radius: 999px; font-size: 12px; padding: 6px 14px; background: var(--color-neutral-100)">Open</button>
+                        </span>
+                      </sc-if>
+                    </td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; font-size: 12.5px; color: color-mix(in srgb, var(--color-text) 58%, transparent)">
+            <span>Showing {{ reviewCount }} of {{ reviewCount }} claims</span>
+            <span style="display: flex; gap: 8px">
+              <button type="button" class="btn btn-secondary" style="border-radius: 999px; font-size: 12px; background: var(--color-neutral-100)" disabled>Previous</button>
+              <button type="button" class="btn btn-secondary" style="border-radius: 999px; font-size: 12px; background: var(--color-neutral-100)" disabled>Next</button>
+            </span>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ isFacultyDash }}">
+        <div style="max-width: 1180px; margin: 0 auto; padding: 30px 34px 64px">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; animation: fadeUp .4s ease both">
+            <div>
+              <h1 style="font-size: 34px; margin: 0">Faculty workspace</h1>
+              <p style="margin: 8px 0 0; font-size: 14.5px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">Monday, 6 July 2026 · three sessions, one meeting and four claims on your desk.</p>
+            </div>
+            <button type="button" onClick="{{ goCalendar }}" class="btn btn-secondary" style="border-radius: 999px; font-size: 13.5px; background: var(--color-neutral-100)">Open the calendar →</button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-top: 26px">
+            <sc-for list="{{ facultyStats }}" as="s" hint-placeholder-count="4">
+              <div style="background: var(--color-surface); border-radius: var(--radius-md); padding: 20px; box-shadow: var(--shadow-sm); animation: fadeUp .45s ease both">
+                <div style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 60%, transparent)">{{ s.label }}</div>
+                <div style="font-family: var(--font-heading); font-size: 32px; margin-top: 6px">{{ s.value }}</div>
+                <div style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 52%, transparent); margin-top: 4px">{{ s.note }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 24px; margin-top: 26px; align-items: flex-start">
+            <section style="flex: 3 1 420px; min-width: 0; background: var(--color-surface); border-radius: var(--radius-lg); padding: 24px; animation: fadeUp .5s ease both">
+              <h2 style="font-size: 22px; margin: 0 0 18px">Today's schedule</h2>
+              <div style="display: flex; flex-direction: column; gap: 10px">
+                <sc-for list="{{ todaySessions }}" as="s" hint-placeholder-count="3">
+                  <div style="display: flex; align-items: center; gap: 16px; background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 14px 16px; transition: transform .2s ease" style-hover="transform: translateX(3px)">
+                    <span style="flex: none; font-family: var(--font-heading); font-size: 16px; width: 58px">{{ s.hour }}</span>
+                    <span style="flex: none; width: 5px; height: 34px; border-radius: 999px; background: {{ s.bg }}"></span>
+                    <span style="flex: 1; min-width: 0">
+                      <span style="display: block; font-size: 14px; font-weight: 600">{{ s.subject }}</span>
+                      <span style="display: block; font-size: 12px; color: color-mix(in srgb, var(--color-text) 58%, transparent); margin-top: 2px">{{ s.span }} · {{ s.room }}</span>
+                    </span>
+                  </div>
+                </sc-for>
+              </div>
+
+              <h2 style="font-size: 22px; margin: 28px 0 16px">Meetings desk</h2>
+              <div style="background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 18px">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap">
+                  <div>
+                    <div style="font-family: var(--font-heading); font-size: 17px">Department Curriculum Review Meeting</div>
+                    <div style="font-size: 12.5px; color: color-mix(in srgb, var(--color-text) 58%, transparent); margin-top: 4px">08 Jul 2026 · 14:30 · 1.5 hours · Conference Room, Block A</div>
+                  </div>
+                  <span class="tag" style="background: var(--color-accent-200); color: var(--color-accent-800); border-radius: 999px; padding: 4px 12px; font-size: 10.5px">No minutes yet</span>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap">
+                  <button type="button" onClick="{{ openSheet }}" class="btn btn-primary" style="border-radius: 999px; font-size: 12.5px">Record minutes</button>
+                  <button type="button" class="btn btn-secondary" style="border-radius: 999px; font-size: 12.5px; background: var(--color-surface)">View agenda</button>
+                </div>
+              </div>
+            </section>
+
+            <div style="flex: 1 1 280px; display: flex; flex-direction: column; gap: 20px">
+              <section style="background: var(--color-surface); border-radius: var(--radius-lg); padding: 24px; animation: fadeUp .5s ease .08s both">
+                <h2 style="font-size: 20px; margin: 0 0 16px">Tasks due</h2>
+                <div style="display: flex; flex-direction: column; gap: 10px">
+                  <div style="display: flex; align-items: flex-start; gap: 11px; font-size: 13.5px">
+                    <span style="flex: none; width: 8px; height: 8px; border-radius: 999px; background: var(--color-accent); margin-top: 6px"></span>
+                    <span><strong>Audit 3rd semester claim files</strong><br><span style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 55%, transparent)">Due 12 Jul · from Dr. Joy Kishor</span></span>
+                  </div>
+                  <div style="display: flex; align-items: flex-start; gap: 11px; font-size: 13.5px">
+                    <span style="flex: none; width: 8px; height: 8px; border-radius: 999px; background: var(--color-accent-2-500); margin-top: 6px"></span>
+                    <span><strong>Complete Unit 3 — Direct Taxes</strong><br><span style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 55%, transparent)">Due 18 Jul · syllabus target</span></span>
+                  </div>
+                  <div style="display: flex; align-items: flex-start; gap: 11px; font-size: 13.5px">
+                    <span style="flex: none; width: 8px; height: 8px; border-radius: 999px; background: var(--color-neutral-400); margin-top: 6px"></span>
+                    <span><strong>Schedule the revision test</strong><br><span style="font-size: 12px; color: color-mix(in srgb, var(--color-text) 55%, transparent)">Due 21 Jul · Sem 5 A</span></span>
+                  </div>
+                </div>
+              </section>
+
+              <section style="background: var(--color-accent-2-200); border-radius: var(--radius-lg); padding: 24px; animation: fadeUp .5s ease .14s both">
+                <div style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-2-900); margin-bottom: 10px">Pinned note</div>
+                <div style="font-family: var(--font-heading); font-size: 18px; color: var(--color-accent-2-900)">Syllabus completion targets</div>
+                <p style="margin: 8px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--color-accent-2-900)">Must complete Unit 3 (Direct Taxes) by July 18. Schedule revision test on July 21.</p>
+              </section>
+
+              <section style="background: var(--color-surface); border-radius: var(--radius-lg); padding: 24px; animation: fadeUp .5s ease .2s both">
+                <h2 style="font-size: 20px; margin: 0 0 14px">Documents locker</h2>
+                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13.5px">
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--color-neutral-100); border-radius: 12px">
+                    <span>Timetable Scheme A 2026.pdf</span>
+                    <span class="tag" style="background: var(--color-accent-200); color: var(--color-accent-800); border-radius: 999px; padding: 3px 9px; font-size: 10px">Link live</span>
+                  </div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--color-neutral-100); border-radius: 12px">
+                    <span>Claim audit checklist.docx</span>
+                    <span style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 50%, transparent)">Private</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isFacultyCal }}">
+        <div style="max-width: 1280px; margin: 0 auto; padding: 30px 34px 64px">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; animation: fadeUp .4s ease both">
+            <div>
+              <h1 style="font-size: 34px; margin: 0">Calendar schedule</h1>
+              <p style="margin: 8px 0 0; font-size: 14.5px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">Week of 6 – 11 July 2026 · teaching, meetings and held blocks.</p>
+            </div>
+            <div style="display: flex; gap: 8px">
+              <button type="button" class="btn btn-secondary" style="border-radius: 999px; font-size: 13px; background: var(--color-neutral-100)">← Previous week</button>
+              <button type="button" class="btn btn-secondary" style="border-radius: 999px; font-size: 13px; background: var(--color-neutral-100)">Next week →</button>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-top: 26px">
+            <sc-for list="{{ week }}" as="d" hint-placeholder-count="6">
+              <div style="background: var(--color-surface); border-radius: var(--radius-md); padding: 16px; min-height: 340px; animation: fadeUp .45s ease both">
+                <div style="display: flex; align-items: baseline; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--color-divider); margin-bottom: 14px">
+                  <span style="font-family: var(--font-heading); font-size: 20px">{{ d.date }}</span>
+                  <span style="font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: color-mix(in srgb, var(--color-text) 55%, transparent)">{{ d.day }}</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 9px">
+                  <sc-for list="{{ d.sessions }}" as="s" hint-placeholder-count="2">
+                    <div style="background: {{ s.bg }}; color: {{ s.fg }}; border-radius: 14px; padding: 11px 12px; transition: transform .2s ease" style-hover="transform: translateY(-2px)">
+                      <div style="font-size: 11px; font-weight: 700; opacity: .8">{{ s.hour }}</div>
+                      <div style="font-size: 13px; font-weight: 600; margin-top: 3px; line-height: 1.3">{{ s.subject }}</div>
+                      <div style="font-size: 11px; opacity: .75; margin-top: 3px">{{ s.span }} · {{ s.room }}</div>
+                    </div>
+                  </sc-for>
+                  <sc-if value="{{ d.isEmpty }}">
+                    <div style="font-size: 12.5px; color: color-mix(in srgb, var(--color-text) 42%, transparent); padding: 12px 0">Nothing scheduled</div>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isPipeline }}">
+        <div style="max-width: 1400px; margin: 0 auto; padding: 30px 34px 64px">
+          <div style="animation: fadeUp .4s ease both">
+            <h1 style="font-size: 34px; margin: 0">Workflow pipeline</h1>
+            <p style="margin: 8px 0 0; font-size: 14.5px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">{{ pipelineTotal }} items in flight across claims and annual plans, and how long each has been sitting there.</p>
+          </div>
+
+          <section style="background: var(--color-accent-200); border-radius: var(--radius-lg); padding: 24px; margin-top: 24px; animation: fadeUp .45s ease both">
+            <h2 style="font-size: 22px; margin: 0; color: var(--color-accent-900)">{{ escalationCount }} past their service level</h2>
+            <p style="margin: 6px 0 18px; font-size: 13.5px; color: var(--color-accent-900)">Oldest first. These are the ones somebody is waiting on.</p>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <sc-for list="{{ escalations }}" as="e" hint-placeholder-count="4">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 14px; flex-wrap: wrap; background: color-mix(in srgb, var(--color-neutral-100) 70%, transparent); border-radius: 12px; padding: 11px 15px">
+                  <span style="font-size: 13.5px; font-weight: 600; color: var(--color-accent-900)">{{ e.title }}</span>
+                  <span style="font-size: 12.5px; color: var(--color-accent-800)">{{ e.days }} days at {{ e.stage }} · waiting on {{ e.waiting }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+
+          <div class="om-scroll" style="display: flex; gap: 16px; margin-top: 26px; overflow-x: auto; padding-bottom: 12px; align-items: start">
+            <sc-for list="{{ pipelineStages }}" as="st" hint-placeholder-count="5">
+              <section style="flex: 1 0 268px; background: var(--color-surface); border-radius: var(--radius-lg); padding: 20px; animation: fadeUp .5s ease both">
+                <header style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--color-divider)">
+                  <div>
+                    <h3 style="font-size: 17px; margin: 0">{{ st.label }}</h3>
+                    <p style="margin: 4px 0 0; font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 55%, transparent)">{{ st.count }} items · oldest {{ st.oldest }}d · SLA {{ st.sla }}d</p>
+                  </div>
+                  <sc-if value="{{ st.hasBreach }}">
+                    <span style="flex: none; background: var(--color-accent-300); color: var(--color-accent-900); border-radius: 999px; padding: 3px 10px; font-size: 11px; font-weight: 700">{{ st.breaching }}</span>
+                  </sc-if>
+                </header>
+                <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px">
+                  <sc-for list="{{ st.items }}" as="i" hint-placeholder-count="2">
+                    <button type="button" onClick="{{ i.open }}" style="text-align: left; background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: 14px; padding: 13px; cursor: pointer; font: inherit; color: inherit; transition: transform .2s ease, box-shadow .2s ease" style-hover="transform: translateY(-2px); box-shadow: var(--shadow-sm)">
+                      <span style="display: flex; align-items: center; justify-content: space-between; gap: 10px">
+                        <span style="font-family: var(--font-heading); font-size: 12.5px">{{ i.ref }}</span>
+                        <span style="flex: none; background: {{ i.dayBg }}; color: {{ i.dayFg }}; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700">{{ i.days }}d</span>
+                      </span>
+                      <span style="display: block; font-size: 13px; font-weight: 600; margin-top: 6px; line-height: 1.35">{{ i.title }}</span>
+                      <span style="display: block; font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 55%, transparent); margin-top: 4px">Waiting on {{ i.waiting }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+              </section>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+      <!--SCREENS-->
+      </div>
+      </sc-if>
+    </main>
+  </div>
+</div>
+<sc-if value="{{ paletteOpen }}">
+  <div style="position: fixed; inset: 0; background: color-mix(in srgb, #2e2b25 45%, transparent); z-index: 90; display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; animation: fadeIn .16s ease both" onClick="{{ closePalette }}">
+    <div style="width: min(620px, 92vw); background: var(--color-neutral-100); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden; animation: popIn .2s cubic-bezier(.22,1,.36,1) both">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 18px 22px; border-bottom: 1px solid var(--color-divider)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" stroke-width="2.75" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <input value="{{ paletteQuery }}" onChange="{{ onPaletteQuery }}" placeholder="Search clubs, people, meetings and tasks…" autoFocus="{{ true }}" style="flex: 1; border: 0; background: none; font: inherit; font-size: 16px; color: var(--color-text); outline: none">
+        <span style="font-size: 11px; color: color-mix(in srgb, var(--color-text) 45%, transparent)">esc to close</span>
+      </div>
+      <div class="om-scroll" style="max-height: 52vh; overflow-y: auto; padding: 10px">
+        <sc-if value="{{ noCommands }}">
+          <div style="padding: 40px 20px; text-align: center; font-size: 13.5px; color: color-mix(in srgb, var(--color-text) 55%, transparent)">Nothing matched. Try a club, a person or “review”.</div>
+        </sc-if>
+        <sc-for list="{{ commandGroups }}" as="g" hint-placeholder-count="3">
+          <div style="margin-bottom: 8px">
+            <div style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700); padding: 10px 12px 6px">{{ g.title }}</div>
+            <sc-for list="{{ g.items }}" as="c" hint-placeholder-count="4">
+              <button type="button" onClick="{{ c.pick }}" class="om-row" style="width: 100%; display: flex; align-items: center; gap: 12px; background: none; border: 0; cursor: pointer; font: inherit; font-size: 14px; text-align: left; padding: 11px 12px; border-radius: 12px; color: inherit; transition: background .15s ease">
+                <span style="flex: none; width: 26px; height: 26px; border-radius: 999px; background: var(--color-accent-200); color: var(--color-accent-800); display: grid; place-items: center; font-size: 11px; font-weight: 700">→</span>
+                <span>{{ c.label }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ trayOpen }}">
+  <div style="position: fixed; inset: 0; z-index: 80" onClick="{{ closeTray }}">
+    <div style="position: absolute; top: 74px; right: 90px; width: min(400px, 88vw); background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); overflow: hidden; animation: trayIn .18s cubic-bezier(.22,1,.36,1) both">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--color-divider)">
+        <div style="font-family: var(--font-heading); font-size: 17px">Notifications</div>
+        <button type="button" onClick="{{ markAllRead }}" class="btn btn-ghost" style="font-size: 12px">Mark all read</button>
+      </div>
+      <div class="om-scroll" style="max-height: 400px; overflow-y: auto">
+        <sc-for list="{{ notifications }}" as="n" hint-placeholder-count="5">
+          <button type="button" onClick="{{ n.read }}" class="om-row" style="width: 100%; display: flex; gap: 12px; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--color-divider); cursor: pointer; font: inherit; padding: 15px 20px; color: inherit; transition: background .15s ease">
+            <span style="flex: none; width: 8px; height: 8px; border-radius: 999px; background: {{ n.dot }}; margin-top: 6px"></span>
+            <span style="min-width: 0">
+              <span style="display: block; font-size: 13.5px; font-weight: 600">{{ n.title }}</span>
+              <span style="display: block; font-size: 12.5px; color: color-mix(in srgb, var(--color-text) 62%, transparent); margin-top: 3px; line-height: 1.45">{{ n.body }}</span>
+              <span style="display: block; font-size: 11px; color: color-mix(in srgb, var(--color-text) 45%, transparent); margin-top: 5px">{{ n.module }} · {{ n.when }}</span>
+            </span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ drawer }}">
+  <div style="position: fixed; inset: 0; background: color-mix(in srgb, #2e2b25 40%, transparent); z-index: 85; animation: fadeIn .18s ease both" onClick="{{ closeDrawer }}">
+    <aside style="position: absolute; top: 0; right: 0; height: 100%; width: min(460px, 94vw); background: var(--color-bg); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; animation: sheetIn .26s cubic-bezier(.22,1,.36,1) both">
+      <header style="display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 26px 26px 20px; border-bottom: 1px solid var(--color-divider)">
+        <div style="min-width: 0">
+          <div style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700)">{{ drawer.type }}</div>
+          <h2 style="font-size: 25px; margin: 8px 0 4px">{{ drawer.title }}</h2>
+          <p style="margin: 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 62%, transparent)">{{ drawer.sub }}</p>
+        </div>
+        <button type="button" onClick="{{ closeDrawer }}" aria-label="Close" style="flex: none; width: 34px; height: 34px; border-radius: 999px; border: 1px solid var(--color-divider); background: var(--color-surface); cursor: pointer; display: grid; place-items: center; color: inherit; transition: background .18s ease" style-hover="background: var(--color-accent-100)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+        </button>
+      </header>
+      <div class="om-scroll" style="flex: 1; overflow-y: auto; padding: 26px">
+        <sc-if value="{{ drawer.status }}">
+          <span class="tag" style="background: var(--color-accent-200); color: var(--color-accent-800); border-radius: 999px; padding: 5px 13px; font-size: 11.5px">{{ drawer.status }}</span>
+        </sc-if>
+        <sc-if value="{{ drawer.body }}">
+          <p style="margin: 18px 0 0; font-size: 14.5px; line-height: 1.65">{{ drawer.body }}</p>
+        </sc-if>
+        <sc-if value="{{ drawer.meta }}">
+          <div style="margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--color-divider); font-size: 13px; color: color-mix(in srgb, var(--color-text) 65%, transparent)">{{ drawer.meta }}</div>
+        </sc-if>
+        <sc-if value="{{ drawer.email }}">
+          <div style="margin-top: 22px; display: flex; align-items: center; gap: 12px; background: var(--color-surface); border-radius: var(--radius-md); padding: 16px">
+            <span style="flex: none; width: 40px; height: 40px; border-radius: 999px; background: var(--color-accent-2-300); color: var(--color-accent-2-900); display: grid; place-items: center; font-weight: 700; font-size: 13px">{{ drawer.initials }}</span>
+            <span style="font-size: 13.5px">{{ drawer.email }}</span>
+          </div>
+        </sc-if>
+        <div style="margin-top: 28px">
+          <div style="font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-accent-700); margin-bottom: 14px">History</div>
+          <ol style="list-style: none; margin: 0; padding: 0">
+            <li style="display: flex; gap: 13px; padding-bottom: 16px"><span style="flex: none; width: 10px; height: 10px; border-radius: 999px; background: var(--color-accent-2-400); margin-top: 5px"></span><div style="font-size: 13px">Created and routed automatically<div style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 50%, transparent); margin-top: 3px">05 Jul 2026, 09:14</div></div></li>
+            <li style="display: flex; gap: 13px"><span style="flex: none; width: 10px; height: 10px; border-radius: 999px; background: var(--color-accent-400); margin-top: 5px"></span><div style="font-size: 13px">Waiting on the current reviewer<div style="font-size: 11.5px; color: color-mix(in srgb, var(--color-text) 50%, transparent); margin-top: 3px">Notified twice</div></div></li>
+          </ol>
+        </div>
+      </div>
+      <footer style="display: flex; gap: 10px; padding: 20px 26px; border-top: 1px solid var(--color-divider); background: var(--color-neutral-100)">
+        <sc-if value="{{ canApprove }}">
+          <button type="button" onClick="{{ closeDrawer }}" class="btn btn-primary" style="border-radius: 999px; font-size: 13.5px; flex: 1">Approve</button>
+        </sc-if>
+        <button type="button" onClick="{{ closeDrawer }}" class="btn btn-secondary" style="border-radius: 999px; font-size: 13.5px; flex: 1; background: var(--color-surface)">Close</button>
+      </footer>
+    </aside>
+  </div>
+</sc-if>
+
+<sc-if value="{{ sheetOpen }}">
+  <div style="position: fixed; inset: 0; background: color-mix(in srgb, #2e2b25 40%, transparent); z-index: 86; animation: fadeIn .18s ease both" onClick="{{ closeSheet }}">
+    <aside style="position: absolute; top: 0; right: 0; height: 100%; width: min(480px, 94vw); background: var(--color-bg); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; animation: sheetIn .26s cubic-bezier(.22,1,.36,1) both">
+      <header style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 26px 26px 20px; border-bottom: 1px solid var(--color-divider)">
+        <h2 style="font-size: 25px; margin: 0">Add to the workspace</h2>
+        <button type="button" onClick="{{ closeSheet }}" aria-label="Close" style="flex: none; width: 34px; height: 34px; border-radius: 999px; border: 1px solid var(--color-divider); background: var(--color-surface); cursor: pointer; display: grid; place-items: center; color: inherit">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+        </button>
+      </header>
+      <div class="om-scroll" style="flex: 1; overflow-y: auto; padding: 26px; display: flex; flex-direction: column; gap: 18px">
+        <div class="field"><label for="s-title">Title</label><input class="input" id="s-title" placeholder="Inter-collegiate Finance Quiz" style="border-radius: 999px; min-height: 44px; background: var(--color-neutral-100)"></div>
+        <div class="field"><label for="s-when">Date</label><input class="input" id="s-when" type="date" value="2026-08-02" style="border-radius: 999px; min-height: 44px; background: var(--color-neutral-100)"></div>
+        <div class="field"><label for="s-venue">Venue</label><input class="input" id="s-venue" placeholder="Block A, Room 104" style="border-radius: 999px; min-height: 44px; background: var(--color-neutral-100)"></div>
+        <div class="field"><label for="s-budget">Budget requested</label><input class="input" id="s-budget" placeholder="6500" style="border-radius: 999px; min-height: 44px; background: var(--color-neutral-100)"></div>
+        <div class="field"><label for="s-desc">Description</label><textarea class="input" id="s-desc" placeholder="Six-team knockout on markets, taxation and corporate law." style="border-radius: var(--radius-md); background: var(--color-neutral-100)"></textarea></div>
+        <div style="display: flex; align-items: flex-start; gap: 12px; background: var(--color-accent-2-200); border-radius: var(--radius-md); padding: 15px; font-size: 12.5px; color: var(--color-accent-2-900)">Saving this files a draft. It reaches the faculty coordinator only when you submit it for approval.</div>
+      </div>
+      <footer style="display: flex; gap: 10px; padding: 20px 26px; border-top: 1px solid var(--color-divider); background: var(--color-neutral-100)">
+        <button type="button" onClick="{{ saveSheet }}" class="btn btn-primary" style="border-radius: 999px; font-size: 13.5px; flex: 1">Save draft</button>
+        <button type="button" onClick="{{ closeSheet }}" class="btn btn-secondary" style="border-radius: 999px; font-size: 13.5px; background: var(--color-surface)">Cancel</button>
+      </footer>
+    </aside>
+  </div>
+</sc-if>
+
+<sc-if value="{{ confirm }}">
+  <div style="position: fixed; inset: 0; background: color-mix(in srgb, #2e2b25 48%, transparent); z-index: 95; display: grid; place-items: center; padding: 24px; animation: fadeIn .16s ease both" onClick="{{ cancelConfirm }}">
+    <div style="width: min(460px, 94vw); background: var(--color-bg); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); padding: 30px; animation: popIn .2s cubic-bezier(.22,1,.36,1) both">
+      <h2 style="font-size: 25px; margin: 0 0 10px">{{ confirm.title }}</h2>
+      <p style="margin: 0; font-size: 14.5px; line-height: 1.6; color: color-mix(in srgb, var(--color-text) 72%, transparent)">{{ confirm.body }}</p>
+      <div class="field" style="margin-top: 20px"><label for="cf-note">Note for the record (optional)</label><textarea class="input" id="cf-note" placeholder="Approved from the inbox." style="border-radius: var(--radius-md); background: var(--color-surface); min-height: 74px"></textarea></div>
+      <div style="display: flex; gap: 10px; margin-top: 22px">
+        <button type="button" onClick="{{ confirmAction }}" class="btn btn-primary" style="border-radius: 999px; font-size: 13.5px; flex: 1; padding: 11px 20px">{{ confirm.cta }}</button>
+        <button type="button" onClick="{{ cancelConfirm }}" class="btn btn-secondary" style="border-radius: 999px; font-size: 13.5px; padding: 11px 20px; background: var(--color-surface)">Cancel</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ toast }}">
+  <div style="position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 99; display: flex; align-items: center; gap: 13px; background: var(--color-neutral-900); color: var(--color-neutral-100); border-radius: 999px; padding: 14px 24px; box-shadow: var(--shadow-lg); font-size: 13.5px; max-width: 90vw; animation: toastIn .24s cubic-bezier(.22,1,.36,1) both">
+    <span style="flex: none; width: 20px; height: 20px; border-radius: 999px; background: var(--color-accent-2-400); display: grid; place-items: center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--color-neutral-900)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>
+    <span>{{ toast }}</span>
+  </div>
+</sc-if>
+</sc-if>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const PERSONAS = [
+  { id: 'student', name: 'Vikram Aditya', initials: 'VA', role: 'Student · B.Com (Hons), Sem 5 A', email: 'student.regular@christuniversity.in', label: 'Student' },
+  { id: 'president', name: 'Rahul Sharma', initials: 'RS', role: 'Club President · Commerce Club', email: 'student.president@christuniversity.in', label: 'Club President' },
+  { id: 'coordinator', name: 'Prof. Sarah Abraham', initials: 'SA', role: 'Faculty Coordinator · Class Teacher', email: 'teacher.class@christuniversity.in', label: 'Faculty Coordinator' },
+  { id: 'hod', name: 'Dr. Joy Kishor', initials: 'JK', role: 'HOD · Department of Commerce', email: 'hod.commerce@christuniversity.in', label: 'HOD' },
+];
+
+const ICON = {
+  inbox: 'M4 13h4l2 3h4l2-3h4M5 6h14l1.5 7v4a2 2 0 0 1-2 2H5.5a2 2 0 0 1-2-2v-4z',
+  branch: 'M6 3v12a3 3 0 0 0 3 3h4a3 3 0 0 0 3-3V9M6 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4m10 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4M9 18a2 2 0 1 0 0 4 2 2 0 0 0 0-4',
+  award: 'M12 3a6 6 0 1 1 0 12 6 6 0 0 1 0-12m-3.5 10L7 22l5-2.5L17 22l-1.5-9',
+  compass: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18m3.5 5.5-2 5.5-5.5 2 2-5.5z',
+  folder: 'M4 8V6a2 2 0 0 1 2-2h3.5l2 2.5H18a2 2 0 0 1 2 2V10M3.5 10h17l-1.5 8a2 2 0 0 1-2 1.8H7a2 2 0 0 1-2-1.8z',
+  calendar: 'M7 3v3m10-3v3M4 9h16M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1',
+  fileText: 'M14 3v5h5M15 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM9 13h6M9 17h4',
+  clipboardList: 'M9 4h6v3H9zM8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 12h6M9 16h6',
+  receipt: 'M5 3v18l3-2 2 2 2-2 2 2 3-2V3zM9 8h6M9 12h6',
+};
+
+/** Mirrors KIND_ICON in modules/inbox/Inbox.tsx. */
+const KIND_ICON = {
+  'Claim': ICON.fileText,
+  'Annual plan': ICON.award,
+  'Task': ICON.clipboardList,
+  'Meeting': ICON.calendar,
+  'Reimbursement': ICON.receipt,
+};
+
+const NAV = {
+  work: [
+    { id: 'inbox', label: 'Inbox', icon: ICON.inbox, screen: 'inbox' },
+  ],
+  oversight: [
+    { id: 'pipeline', label: 'Pipeline', icon: ICON.branch, screen: 'pipeline' },
+  ],
+  workspaces: [
+    { id: 'clubs', label: 'Clubs', icon: ICON.award, screen: 'clubs-dashboard' },
+    { id: 'claims', label: 'Claims', icon: ICON.compass, screen: 'claims-overview' },
+    { id: 'faculty', label: 'Faculty workspace', icon: ICON.folder, screen: 'faculty-dashboard' },
+  ],
+};
+
+const CLUBS = {
+  club_commerce: {
+    id: 'club_commerce', name: 'Commerce Club', category: 'Academic',
+    tagline: 'Fostering academic excellence, analytical reasoning and industrial insights in finance and economics.',
+    counters: { members: 24, events: 6, budget_spent: 15000, allocated: 50000, open_tasks: 5 },
+  },
+  club_cultural: {
+    id: 'club_cultural', name: 'Cultural Committee', category: 'Cultural',
+    tagline: 'The heart of theatrical, musical and artistic expression for the Department of Commerce.',
+    counters: { members: 31, events: 4, budget_spent: 1000, allocated: 40000, open_tasks: 2 },
+  },
+};
+
+const MEMBERS = {
+  club_commerce: [
+    { id: 'mbr_1', name: 'Rahul Sharma', initials: 'RS', role: 'President', year: '2025-2026', status: 'active', email: 'rahul.s@christuniversity.in' },
+    { id: 'mbr_2', name: 'Ananya Rao', initials: 'AR', role: 'Vice President', year: '2025-2026', status: 'active', email: 'ananya.r@christuniversity.in' },
+    { id: 'mbr_3', name: 'Vikram Aditya', initials: 'VA', role: 'Core Member', year: '2025-2026', status: 'active', email: 'vikram.a@christuniversity.in' },
+    { id: 'mbr_5', name: 'Meera Iyer', initials: 'MI', role: 'Treasurer', year: '2025-2026', status: 'active', email: 'meera.i@christuniversity.in' },
+    { id: 'mbr_6', name: 'Karthik Menon', initials: 'KM', role: 'Core Member', year: '2025-2026', status: 'active', email: 'karthik.m@christuniversity.in' },
+    { id: 'mbr_7', name: 'Sneha Pillai', initials: 'SP', role: 'Volunteer', year: '2026-2027', status: 'pending', email: 'sneha.p@christuniversity.in' },
+  ],
+  club_cultural: [
+    { id: 'mbr_4', name: 'Neha Kapoor', initials: 'NK', role: 'Core Member', year: '2025-2026', status: 'active', email: 'neha.k@christuniversity.in' },
+    { id: 'mbr_8', name: 'Arjun Das', initials: 'AD', role: 'President', year: '2025-2026', status: 'active', email: 'arjun.d@christuniversity.in' },
+    { id: 'mbr_9', name: 'Fatima Sheikh', initials: 'FS', role: 'Volunteer', year: '2025-2026', status: 'active', email: 'fatima.s@christuniversity.in' },
+  ],
+};
+
+const EVENTS = {
+  club_commerce: [
+    { id: 'evt_conclave', title: 'National Commerce Conclave 2026', date: '15 Jul 2026', venue: 'Main Auditorium, CHRIST University', budget: 15000, status: 'approved', desc: 'Annual national level panel discussions with CFOs and business executives.' },
+    { id: 'evt_orientation', title: 'Junior Recruitment Drive', date: '20 Jul 2026', venue: 'Seminar Room 402, Block B', budget: 2000, status: 'draft', desc: 'Introductory seminars and case study screening to recruit first year volunteers.' },
+    { id: 'evt_quiz', title: 'Inter-collegiate Finance Quiz', date: '02 Aug 2026', venue: 'Block A, Room 104', budget: 6500, status: 'pending', desc: 'Six-team knockout on markets, taxation and corporate law.' },
+  ],
+  club_cultural: [
+    { id: 'evt_drama', title: 'Street Play Auditions', date: '22 Jul 2026', venue: 'Open Air Theater', budget: 1000, status: 'approved', desc: 'Auditions for the annual theater fest play.' },
+  ],
+};
+
+const TASKS = {
+  club_commerce: [
+    { id: 'tsk_1', title: 'Confirm auditorium booking for the Conclave', due: '10 Jul 2026', priority: 'high', owner: 'Rahul Sharma', done: false },
+    { id: 'tsk_2', title: 'Collect speaker travel invoices', due: '12 Jul 2026', priority: 'high', owner: 'Meera Iyer', done: false },
+    { id: 'tsk_3', title: 'Publish recruitment poster to the noticeboard', due: '14 Jul 2026', priority: 'medium', owner: 'Ananya Rao', done: false },
+    { id: 'tsk_4', title: 'Shortlist case-study screening questions', due: '16 Jul 2026', priority: 'medium', owner: 'Vikram Aditya', done: true },
+    { id: 'tsk_5', title: 'File the sponsorship MoU with HDFC Bank', due: '18 Jul 2026', priority: 'low', owner: 'Meera Iyer', done: false },
+  ],
+  club_cultural: [
+    { id: 'tsk_6', title: 'Book the Open Air Theater for auditions', due: '15 Jul 2026', priority: 'high', owner: 'Arjun Das', done: false },
+    { id: 'tsk_7', title: 'Draft the audition scoring sheet', due: '17 Jul 2026', priority: 'medium', owner: 'Neha Kapoor', done: false },
+  ],
+};
+
+const REIMB = {
+  club_commerce: [
+    { id: 'reimb_1', by: 'Rahul Sharma', purpose: 'Speaker travel — Bengaluru airport transfer', amount: 2500, status: 'approved', date: '02 Jul 2026' },
+    { id: 'reimb_2', by: 'Meera Iyer', purpose: 'Printing — Conclave delegate kits', amount: 4800, status: 'pending', date: '06 Jul 2026' },
+    { id: 'reimb_3', by: 'Ananya Rao', purpose: 'Recruitment drive stationery', amount: 1150, status: 'pending', date: '07 Jul 2026' },
+    { id: 'reimb_4', by: 'Karthik Menon', purpose: 'Refreshments — core team review', amount: 900, status: 'rejected', date: '28 Jun 2026' },
+  ],
+  club_cultural: [
+    { id: 'reimb_5', by: 'Neha Kapoor', purpose: 'Costume rental — street play', amount: 1000, status: 'pending', date: '05 Jul 2026' },
+  ],
+};
+
+const BUDGET_LINES = {
+  club_commerce: [
+    { label: 'Events & logistics', amount: 8200, tone: 'accent' },
+    { label: 'Printing & collateral', amount: 3400, tone: 'accent2' },
+    { label: 'Travel & hospitality', amount: 2500, tone: 'accent' },
+    { label: 'Stationery', amount: 900, tone: 'accent2' },
+  ],
+  club_cultural: [
+    { label: 'Costume & set', amount: 1000, tone: 'accent' },
+  ],
+};
+
+const PLAN_STAGES = [
+  { id: 'draft', label: 'Draft' },
+  { id: 'faculty_coordinator_review', label: 'Faculty Coordinator' },
+  { id: 'cultural_coordinator_review', label: 'Cultural Coordinator' },
+  { id: 'hod_review', label: 'HOD' },
+  { id: 'approved', label: 'Approved' },
+  { id: 'locked', label: 'Locked' },
+];
+
+const CLAIM_STAGES = [
+  { id: 'initial_review', label: 'Initial review' },
+  { id: 'subject_faculty', label: 'Subject faculty' },
+  { id: 'course_coordinator', label: 'Course coordinator' },
+  { id: 'attendance_office', label: 'Attendance office' },
+];
+
+const MY_CLAIMS = [
+  { id: 'cl_med_1', ref: 'ACP-2026-000101', category: 'Medical', dates: '05 – 06 Jul 2026', hours: 2, reason: 'Recovering from viral fever and advised absolute bed rest.', status: 'under_review', stage: 'subject_faculty', submitted: '05 Jul 2026', late: false },
+  { id: 'cl_cc_2', ref: 'ACP-2026-000094', category: 'Co-curricular', dates: '24 Jun 2026', hours: 3, reason: 'Represented the department at the state-level commerce meet.', status: 'approved', stage: 'attendance_office', submitted: '25 Jun 2026', late: false },
+  { id: 'cl_med_3', ref: 'ACP-2026-000088', category: 'Medical', dates: '11 Jun 2026', hours: 1, reason: 'Dental procedure, morning session only.', status: 'returned', stage: 'initial_review', submitted: '13 Jun 2026', late: true },
+];
+
+const REVIEW_QUEUE = [
+  { id: 'q1', ref: 'ACP-2026-000101', student: 'Vikram Aditya', programme: 'B.Com (Hons) · Sem 5 A', category: 'Medical', reason: 'Recovering from viral fever and advised absolute bed rest.', dates: '05 – 06 Jul 2026', hours: 2, docs: 1, days: 9, stage: 'subject_faculty', status: 'under_review', breach: true },
+  { id: 'q2', ref: 'ACP-2026-000107', student: 'Sneha Pillai', programme: 'B.Com (Hons) · Sem 3 B', category: 'Co-curricular', reason: 'Inter-university debate — pre-approved by the department.', dates: '01 Jul 2026', hours: 3, docs: 2, days: 4, stage: 'subject_faculty', status: 'under_review', breach: false },
+  { id: 'q3', ref: 'ACP-2026-000112', student: 'Karthik Menon', programme: 'B.Com (Hons) · Sem 5 A', category: 'Medical', reason: 'Admitted overnight for observation after a fall.', dates: '03 Jul 2026', hours: 4, docs: 1, days: 2, stage: 'initial_review', status: 'under_review', breach: false },
+  { id: 'q4', ref: 'ACP-2026-000115', student: 'Fatima Sheikh', programme: 'B.Com · Sem 1 A', category: 'Co-curricular', reason: 'Cultural fest rehearsal, evening sessions missed.', dates: '02 Jul 2026', hours: 2, docs: 0, days: 1, stage: 'initial_review', status: 'under_review', breach: false },
+];
+
+const TIMETABLE = [
+  { id: 'tt_m1', day: 'Monday', subject: 'Corporate Accounting', hour: '09:00 – 10:00', faculty: 'Dr. Anil Kumar' },
+  { id: 'tt_m2', day: 'Monday', subject: 'Financial Management', hour: '10:00 – 11:00', faculty: 'Prof. Sarah Abraham' },
+  { id: 'tt_m3', day: 'Monday', subject: 'Taxation Law', hour: '11:15 – 12:15', faculty: 'Dr. Anil Kumar' },
+  { id: 'tt_t1', day: 'Tuesday', subject: 'Cost Accounting', hour: '09:00 – 10:00', faculty: 'Prof. Divya Nair' },
+  { id: 'tt_t2', day: 'Tuesday', subject: 'Business Statistics', hour: '11:15 – 12:15', faculty: 'Dr. Anil Kumar' },
+];
+
+const WEEK = [
+  { day: 'Mon', date: '06', sessions: [
+    { subject: 'Corporate Accounting', hour: '09:00', room: 'B-402', tone: 'accent', span: 'Sem 5 A' },
+    { subject: 'Financial Management', hour: '10:00', room: 'B-402', tone: 'accent2', span: 'Sem 5 A' },
+    { subject: 'Taxation Law', hour: '11:15', room: 'A-104', tone: 'accent', span: 'Sem 5 A' },
+  ] },
+  { day: 'Tue', date: '07', sessions: [
+    { subject: 'Cost Accounting', hour: '09:00', room: 'B-311', tone: 'accent2', span: 'Sem 3 B' },
+    { subject: 'Curriculum Review Meeting', hour: '14:30', room: 'Conference Rm A', tone: 'meeting', span: 'Department' },
+  ] },
+  { day: 'Wed', date: '08', sessions: [
+    { subject: 'Business Statistics', hour: '11:15', room: 'A-104', tone: 'accent', span: 'Sem 5 A' },
+    { subject: 'Claims review block', hour: '15:00', room: 'Staff room', tone: 'accent2', span: 'Held' },
+  ] },
+  { day: 'Thu', date: '09', sessions: [
+    { subject: 'Financial Management', hour: '10:00', room: 'B-402', tone: 'accent2', span: 'Sem 5 A' },
+  ] },
+  { day: 'Fri', date: '10', sessions: [
+    { subject: 'Corporate Accounting', hour: '09:00', room: 'B-402', tone: 'accent', span: 'Sem 5 A' },
+    { subject: 'Commerce Club sync', hour: '16:00', room: 'B-210', tone: 'meeting', span: 'Club' },
+  ] },
+  { day: 'Sat', date: '11', sessions: [] },
+];
+
+const PIPELINE = [
+  { id: 'initial_review', label: 'Initial review', sla: 2, items: [
+    { ref: 'ACP-2026-000112', title: 'Medical claim · Karthik Menon', waiting: 'Prof. Sarah Abraham', days: 2, breach: false },
+    { ref: 'ACP-2026-000115', title: 'Co-curricular claim · Fatima Sheikh', waiting: 'Prof. Sarah Abraham', days: 1, breach: false },
+  ] },
+  { id: 'subject_faculty', label: 'Subject faculty', sla: 3, items: [
+    { ref: 'ACP-2026-000101', title: 'Medical claim · Vikram Aditya', waiting: 'Dr. Anil Kumar', days: 9, breach: true },
+    { ref: 'ACP-2026-000107', title: 'Co-curricular claim · Sneha Pillai', waiting: 'Prof. Divya Nair', days: 4, breach: true },
+    { ref: 'ACP-2026-000098', title: 'Medical claim · Aditi Ghosh', waiting: 'Dr. Anil Kumar', days: 2, breach: false },
+  ] },
+  { id: 'course_coordinator', label: 'Course coordinator', sla: 3, items: [
+    { ref: 'ACP-2026-000091', title: 'Medical claim · Rohan Verma', waiting: 'Prof. Sarah Abraham', days: 3, breach: false },
+  ] },
+  { id: 'attendance_office', label: 'Attendance office', sla: 2, items: [
+    { ref: 'ACP-2026-000094', title: 'Co-curricular claim · Vikram Aditya', waiting: 'Attendance office', days: 1, breach: false },
+    { ref: 'ACP-2026-000086', title: 'Medical claim · Neha Kapoor', waiting: 'Attendance office', days: 5, breach: true },
+  ] },
+  { id: 'plan_review', label: 'Annual plans', sla: 5, items: [
+    { ref: 'AP-2025-26/CC', title: 'Commerce Club annual plan', waiting: 'Dr. Joy Kishor (HOD)', days: 6, breach: true },
+    { ref: 'AP-2025-26/CU', title: 'Cultural Committee annual plan', waiting: 'Prof. Sarah Abraham', days: 2, breach: false },
+  ] },
+];
+
+const ACTIVITY = [
+  { who: 'Prof. Sarah Abraham', what: 'approved the Conclave budget line of Rs 15,000', when: '2 hours ago', tone: 'accent2' },
+  { who: 'Meera Iyer', what: 'filed a reimbursement for Rs 4,800 (delegate kits)', when: '5 hours ago', tone: 'accent' },
+  { who: 'Rahul Sharma', what: 'submitted the 2025-26 annual plan for review', when: 'Yesterday', tone: 'accent' },
+  { who: 'Ananya Rao', what: 'added Sneha Pillai as a volunteer', when: 'Yesterday', tone: 'accent2' },
+  { who: 'Dr. Joy Kishor', what: 'scheduled the Curriculum Review Meeting', when: '2 days ago', tone: 'accent' },
+];
+
+const NOTIFICATIONS = [
+  { id: 'n1', title: 'New claim pending initial review', body: 'Vikram Aditya submitted a medical claim: ACP-2026-000101.', when: '12 min ago', module: 'Claims', unread: true },
+  { id: 'n2', title: 'Annual plan waiting on you', body: 'Commerce Club submitted its 2025-26 plan for coordinator review.', when: '1 hour ago', module: 'Clubs', unread: true },
+  { id: 'n3', title: 'Reimbursement filed', body: 'Meera Iyer filed Rs 4,800 for Conclave delegate kits.', when: '5 hours ago', module: 'Clubs', unread: true },
+  { id: 'n4', title: 'Meeting has no minutes', body: 'Curriculum Review Meeting on 08 Jul still has no minutes recorded.', when: 'Yesterday', module: 'Faculty', unread: false },
+  { id: 'n5', title: 'Recruitment drive created', body: 'Your draft recruitment drive has been registered.', when: '2 days ago', module: 'Clubs', unread: false },
+];
+
+const QUEUE_BY_ROLE = {
+  student: [
+    { id: 'a1', kind: 'Claim', title: 'ACP-2026-000088 was returned for revision', sub: 'Initial review · attach a legible dental receipt', due: 'Due 10 Jul 2026', urgency: 'overdue', glyph: 'C', screen: 'claims-overview', approve: false },
+    { id: 'a2', kind: 'Task', title: 'Shortlist case-study screening questions', sub: 'Commerce Club · assigned by Ananya Rao', due: 'Due 16 Jul 2026', urgency: 'soon', glyph: 'T', screen: 'clubs-tasks', approve: false },
+    { id: 'a3', kind: 'Claim', title: 'ACP-2026-000101 is at subject faculty', sub: 'Nothing to do — you will be told when it moves', due: '', urgency: 'normal', glyph: 'C', screen: 'claims-overview', approve: false },
+  ],
+  president: [
+    { id: 'b1', kind: 'Annual plan', title: 'Annual plan 2025-26 is waiting on the coordinator', sub: 'Commerce Club · submitted yesterday', due: '', urgency: 'normal', glyph: 'P', screen: 'clubs-plan', approve: false },
+    { id: 'b2', kind: 'Task', title: 'Confirm auditorium booking for the Conclave', sub: 'Commerce Club · high priority', due: 'Due 10 Jul 2026', urgency: 'today', glyph: 'T', screen: 'clubs-tasks', approve: false },
+    { id: 'b3', kind: 'Reimbursement', title: 'Two reimbursements need your endorsement', sub: 'Rs 5,950 total · Meera Iyer, Ananya Rao', due: 'Due 12 Jul 2026', urgency: 'soon', glyph: 'R', screen: 'clubs-budget', approve: true },
+    { id: 'b4', kind: 'Task', title: 'Collect speaker travel invoices', sub: 'Commerce Club · Meera Iyer', due: 'Due 12 Jul 2026', urgency: 'soon', glyph: 'T', screen: 'clubs-tasks', approve: false },
+  ],
+  coordinator: [
+    { id: 'c1', kind: 'Claim', title: 'ACP-2026-000101 · Vikram Aditya', sub: 'Medical · 2 hours · 9 days at subject faculty', due: 'Overdue by 6 days', urgency: 'overdue', glyph: 'C', screen: 'claims-review', approve: true },
+    { id: 'c2', kind: 'Annual plan', title: 'Commerce Club annual plan 2025-26', sub: 'Vision, 6 objectives, Rs 50,000 requested', due: 'Due today', urgency: 'today', glyph: 'P', screen: 'clubs-plan', approve: true },
+    { id: 'c3', kind: 'Reimbursement', title: 'Rs 4,800 — Conclave delegate kits', sub: 'Commerce Club · Meera Iyer · receipt attached', due: 'Due 12 Jul 2026', urgency: 'soon', glyph: 'R', screen: 'clubs-budget', approve: true },
+    { id: 'c4', kind: 'Meeting', title: 'Curriculum Review Meeting has no minutes', sub: '08 Jul 2026 · Conference Room, Block A', due: 'Due 11 Jul 2026', urgency: 'soon', glyph: 'M', screen: 'faculty-dashboard', approve: false },
+    { id: 'c5', kind: 'Task', title: 'Audit 3rd semester claim files', sub: 'Assigned by Dr. Joy Kishor · high priority', due: 'Due 12 Jul 2026', urgency: 'soon', glyph: 'T', screen: 'faculty-dashboard', approve: false },
+  ],
+  hod: [
+    { id: 'd1', kind: 'Annual plan', title: 'Commerce Club annual plan · HOD approval', sub: '6 days at this stage · service level is 5', due: 'Overdue by 1 day', urgency: 'overdue', glyph: 'P', screen: 'clubs-plan', approve: true },
+    { id: 'd2', kind: 'Claim', title: '3 claims past their service level', sub: 'Subject faculty and attendance office', due: 'Due today', urgency: 'today', glyph: 'C', screen: 'pipeline', approve: false },
+    { id: 'd3', kind: 'Meeting', title: 'Curriculum Review Meeting — you are the organiser', sub: '08 Jul 2026 · 14:30 · Conference Room, Block A', due: 'Due 08 Jul 2026', urgency: 'soon', glyph: 'M', screen: 'faculty-dashboard', approve: false },
+    { id: 'd4', kind: 'Task', title: 'Confirm the semester attendance cut-off', sub: 'Attendance office is waiting on the circular', due: 'Due 15 Jul 2026', urgency: 'normal', glyph: 'T', screen: 'faculty-dashboard', approve: false },
+  ],
+};
+
+const PERMS = {
+  student: { clubs: true, claims: true, faculty: false, pipeline: false, approve: false, manage: false },
+  president: { clubs: true, claims: true, faculty: false, pipeline: false, approve: false, manage: true },
+  coordinator: { clubs: true, claims: true, faculty: true, pipeline: true, approve: true, manage: true },
+  hod: { clubs: true, claims: true, faculty: true, pipeline: true, approve: true, manage: true },
+};
+
+const COMMANDS = [
+  { id: 'go:inbox', group: 'Jump to', label: 'Go to inbox', screen: 'inbox' },
+  { id: 'go:clubs', group: 'Jump to', label: 'Go to clubs', screen: 'clubs-dashboard' },
+  { id: 'go:members', group: 'Jump to', label: 'Club members and structure', screen: 'clubs-members' },
+  { id: 'go:budget', group: 'Jump to', label: 'Club budget and reimbursements', screen: 'clubs-budget' },
+  { id: 'go:plan', group: 'Jump to', label: 'Annual plan approval', screen: 'clubs-plan' },
+  { id: 'go:claims', group: 'Jump to', label: 'My claims overview', screen: 'claims-overview' },
+  { id: 'do:new-claim', group: 'Actions', label: 'File a new attendance claim', screen: 'claims-new' },
+  { id: 'do:review', group: 'Actions', label: 'Open my review queue', screen: 'claims-review' },
+  { id: 'do:pipeline', group: 'Actions', label: 'Read the workflow pipeline', screen: 'pipeline' },
+  { id: 'go:calendar', group: 'Jump to', label: 'Faculty calendar schedule', screen: 'faculty-calendar' },
+  { id: 'r:club_commerce', group: 'Clubs', label: 'Commerce Club', screen: 'clubs-dashboard' },
+  { id: 'r:club_cultural', group: 'Clubs', label: 'Cultural Committee', screen: 'clubs-dashboard' },
+  { id: 'p:sarah', group: 'People', label: 'Prof. Sarah Abraham · teacher.class@christuniversity.in', screen: 'faculty-dashboard' },
+  { id: 'p:anil', group: 'People', label: 'Dr. Anil Kumar · anil.k@christuniversity.in', screen: 'faculty-dashboard' },
+  { id: 'm:review', group: 'Meetings', label: 'Curriculum Review Meeting · 08 Jul 2026', screen: 'faculty-calendar' },
+];
+
+const SCREEN_META = {
+  'inbox': { chip: '', module: 'inbox' },
+  'clubs-dashboard': { chip: 'Clubs', module: 'clubs' },
+  'clubs-members': { chip: 'Clubs', module: 'clubs' },
+  'clubs-tasks': { chip: 'Clubs', module: 'clubs' },
+  'clubs-budget': { chip: 'Clubs', module: 'clubs' },
+  'clubs-plan': { chip: 'Clubs', module: 'clubs' },
+  'claims-overview': { chip: 'Claims', module: 'claims' },
+  'claims-new': { chip: 'Claims', module: 'claims' },
+  'claims-review': { chip: 'Claims', module: 'claims' },
+  'faculty-dashboard': { chip: 'Faculty', module: 'faculty' },
+  'faculty-calendar': { chip: 'Faculty', module: 'faculty' },
+  'pipeline': { chip: 'Pipeline', module: 'pipeline' },
+};
+
+const CLUB_TABS = [
+  { id: 'clubs-dashboard', label: 'Dashboard' },
+  { id: 'clubs-members', label: 'Members & Structure' },
+  { id: 'clubs-tasks', label: 'Tasks & Events' },
+  { id: 'clubs-budget', label: 'Budget & Reimbursements' },
+  { id: 'clubs-plan', label: 'Annual Planning' },
+];
+
+const CLAIM_TABS_STUDENT = [
+  { id: 'claims-overview', label: 'Overview' },
+  { id: 'claims-new', label: 'New Submission' },
+];
+
+const WIZARD_STEPS = [
+  { n: 1, label: 'Category' },
+  { n: 2, label: 'Dates' },
+  { n: 3, label: 'Missed classes' },
+  { n: 4, label: 'Reason & proof' },
+  { n: 5, label: 'Review' },
+];
+
+const PUBLIC_STATS = [
+  { value: '1,240+', label: 'Enrolled students' },
+  { value: '48+', label: 'Faculty advisors' },
+  { value: '9', label: 'Operational clubs' },
+  { value: '52 years', label: 'Academic legacy' },
+];
+
+const PROGRAMMES = [
+  { name: 'B.Com (Honours)', desc: 'A four-year honours pathway in accounting, taxation and corporate law, integrated with professional certification.', careers: ['Chartered Accountancy', 'Corporate law', 'Audit'] },
+  { name: 'B.Com (Finance & Analytics)', desc: 'Markets, valuation and applied analytics, taught with live datasets and a mandatory corporate internship.', careers: ['Investment banking', 'Equity research', 'Data analysis'] },
+  { name: 'M.Com', desc: 'A research-led masters in advanced accounting and financial economics, with a dissertation in the final semester.', careers: ['Research', 'Academia', 'Consulting'] },
+];
+
+const SHOWCASE = [
+  { name: 'Commerce Club', initials: 'CC', logo: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=150&h=150&fit=crop', desc: 'Fostering academic excellence, analytical reasoning and industrial insights in finance and economics.' },
+  { name: 'Cultural Committee', initials: 'CC', logo: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150&h=150&fit=crop', desc: 'The heart of theatrical, musical and artistic expression for the Department of Commerce.' },
+];
+
+const rupee = (n) => 'Rs ' + n.toLocaleString('en-IN');
+
+const TONE = {
+  approved: { bg: 'var(--color-accent-2-200)', fg: 'var(--color-accent-2-900)', label: 'Approved' },
+  active: { bg: 'var(--color-accent-2-200)', fg: 'var(--color-accent-2-900)', label: 'Active' },
+  pending: { bg: 'var(--color-accent-200)', fg: 'var(--color-accent-800)', label: 'Pending' },
+  under_review: { bg: 'var(--color-accent-200)', fg: 'var(--color-accent-800)', label: 'Under review' },
+  draft: { bg: 'var(--color-neutral-300)', fg: 'var(--color-neutral-900)', label: 'Draft' },
+  returned: { bg: 'var(--color-accent-300)', fg: 'var(--color-accent-900)', label: 'Returned' },
+  rejected: { bg: 'var(--color-neutral-400)', fg: 'var(--color-neutral-900)', label: 'Rejected' },
+  locked: { bg: 'var(--color-neutral-300)', fg: 'var(--color-neutral-900)', label: 'Locked' },
+};
+
+const URGENCY = {
+  overdue: { dot: 'var(--color-accent-700)', fg: 'var(--color-accent-800)', label: 'Overdue' },
+  today: { dot: 'var(--color-accent-500)', fg: 'var(--color-accent-700)', label: 'Due today' },
+  soon: { dot: 'var(--color-accent-2-500)', fg: 'var(--color-accent-2-800)', label: 'Due soon' },
+  normal: { dot: 'var(--color-neutral-400)', fg: 'var(--color-neutral-700)', label: '' },
+};
+
+class Component extends DCLogic {
+  state = {
+    screen: 'inbox', role: 'coordinator', club: 'club_commerce',
+    loading: false, palette: false, tray: false, userMenu: false,
+    drawer: null, confirm: null, toast: null, sheet: false,
+    wizard: 1, inboxFilter: 'All', sortKey: 'role', sortDir: 'asc',
+    roleFilter: 'All roles', memberQuery: '', hours: ['tt_m1', 'tt_m2'],
+    claimCat: 'medical', reason: '', paletteQuery: '', readIds: [],
+    doneIds: [], approvedIds: [], planStage: 'faculty_coordinator_review',
+    loggedIn: true, seq: 0, publicView: 'landing',
+  };
+
+  componentDidMount() {
+    this._onKey = (e) => {
+      const k = (e.key || '').toLowerCase();
+      if ((e.metaKey || e.ctrlKey) && k === 'k') { e.preventDefault(); this.setState({ palette: true, paletteQuery: '' }); }
+      if (k === 'escape') this.setState({ palette: false, tray: false, userMenu: false, drawer: null, confirm: null, sheet: false });
+    };
+    document.addEventListener('keydown', this._onKey);
+  }
+  componentWillUnmount() {
+    document.removeEventListener('keydown', this._onKey);
+    if (this._t) clearTimeout(this._t);
+    if (this._tt) clearTimeout(this._tt);
+  }
+
+  go = (screen) => {
+    if (screen === this.state.screen) { this.setState({ palette: false, tray: false, userMenu: false }); return; }
+    this.setState({ loading: true, palette: false, tray: false, userMenu: false, drawer: null });
+    if (this._t) clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState(s => ({ screen, loading: false, seq: s.seq + 1 })), 420);
+  };
+
+  toast = (body) => {
+    this.setState({ toast: body });
+    if (this._tt) clearTimeout(this._tt);
+    this._tt = setTimeout(() => this.setState({ toast: null }), 3400);
+  };
+
+  perms() { return PERMS[this.state.role]; }
+
+  navSections() {
+    const p = this.perms();
+    const s = this.state;
+    const mk = (item) => {
+      const active = SCREEN_META[s.screen] && SCREEN_META[item.screen] &&
+        SCREEN_META[s.screen].module === SCREEN_META[item.screen].module;
+      return {
+        ...item,
+        go: () => this.go(item.screen),
+        bg: active ? 'var(--color-accent-200)' : 'transparent',
+        weight: active ? 700 : 500,
+        count: item.id === 'inbox' ? QUEUE_BY_ROLE[s.role].length : 0,
+      };
+    };
+    const out = [{ title: 'Your work', items: NAV.work.map(mk) }];
+    if (p.pipeline) out.push({ title: 'Oversight', items: NAV.oversight.map(mk) });
+    out.push({ title: 'Workspaces', items: NAV.workspaces.filter(m => p[m.id]).map(mk) });
+    return out;
+  }
+
+  members() {
+    const s = this.state;
+    let list = MEMBERS[s.club].slice();
+    if (s.roleFilter !== 'All roles') list = list.filter(m => m.role === s.roleFilter);
+    if (s.memberQuery.trim()) {
+      const q = s.memberQuery.toLowerCase();
+      list = list.filter(m => m.name.toLowerCase().includes(q) || m.role.toLowerCase().includes(q));
+    }
+    const dir = s.sortDir === 'asc' ? 1 : -1;
+    list.sort((a, b) => String(a[s.sortKey]).localeCompare(String(b[s.sortKey])) * dir);
+    return list.map(m => ({
+      ...m,
+      tone: TONE[m.status].bg, toneFg: TONE[m.status].fg, statusLabel: TONE[m.status].label,
+      open: () => this.setState({ drawer: { type: 'member', title: m.name, sub: m.role + ' · ' + m.year, email: m.email, initials: m.initials } }),
+    }));
+  }
+
+  renderVals() {
+    const s = this.state;
+    const persona = PERSONAS.find(p => p.id === s.role);
+    const p = this.perms();
+    const club = CLUBS[s.club];
+    const c = club.counters;
+    const meta = SCREEN_META[s.screen] || { chip: '' };
+    const queue = QUEUE_BY_ROLE[s.role]
+      .filter(i => s.inboxFilter === 'All' || i.kind === s.inboxFilter)
+      .filter(i => !s.approvedIds.includes(i.id));
+
+    const spentPct = Math.round((c.budget_spent / c.allocated) * 100);
+    const planIdx = PLAN_STAGES.findIndex(x => x.id === s.planStage);
+
+    const pq = s.paletteQuery.trim().toLowerCase();
+    const cmds = COMMANDS.filter(c2 => !pq || c2.label.toLowerCase().includes(pq));
+    const groups = [];
+    cmds.forEach(c2 => {
+      let g = groups.find(x => x.title === c2.group);
+      if (!g) { g = { title: c2.group, items: [] }; groups.push(g); }
+      g.items.push({ ...c2, pick: () => this.go(c2.screen) });
+    });
+
+    const reimb = REIMB[s.club].map(r => ({
+      ...r, amountLabel: rupee(r.amount),
+      tone: TONE[r.status].bg, toneFg: TONE[r.status].fg, statusLabel: TONE[r.status].label,
+      canAct: p.approve && r.status === 'pending' && !s.approvedIds.includes(r.id),
+      done: s.approvedIds.includes(r.id),
+      approve: () => this.setState({ confirm: { kind: 'reimb', id: r.id, title: 'Approve ' + rupee(r.amount) + '?', body: r.purpose + ' — filed by ' + r.by + '. The club budget will be debited immediately and ' + r.by + ' will be notified.', cta: 'Approve reimbursement' } }),
+    }));
+
+    const lines = BUDGET_LINES[s.club].map(l => ({
+      ...l, amountLabel: rupee(l.amount),
+      pct: Math.round((l.amount / c.budget_spent) * 100) + '%',
+      color: l.tone === 'accent' ? 'var(--color-accent-400)' : 'var(--color-accent-2-400)',
+    }));
+
+    return {
+      isLogin: !s.loggedIn && s.publicView === 'login', isLanding: !s.loggedIn && s.publicView === 'landing', isApp: s.loggedIn,
+      goLogin: () => this.setState({ publicView: 'login' }),
+      goLanding: () => this.setState({ publicView: 'landing' }),
+      loading: s.loading, showBody: !s.loading,
+      user: persona, moduleChip: meta.chip,
+      unread: NOTIFICATIONS.filter(n => n.unread && !s.readIds.includes(n.id)).length,
+      userMenu: s.userMenu, trayOpen: s.tray, paletteOpen: s.palette,
+      sheetOpen: s.sheet, confirm: s.confirm, toast: s.toast,
+      drawer: s.drawer ? { ...s.drawer, type: ({ member: 'Member', event: 'Event', claim: 'Attendance claim', review: 'Claim under review', pipeline: 'In the pipeline' })[s.drawer.type] || s.drawer.type } : null,
+      navSections: this.navSections(),
+      personas: PERSONAS.map(x => ({ ...x, active: x.id === s.role, pick: () => this.setState({ role: x.id, userMenu: false, loggedIn: true, publicView: 'landing', screen: 'inbox' }, () => this.toast('Now viewing as ' + x.name + ' — ' + x.role)) })),
+
+      goInbox: () => this.go('inbox'),
+      goTasks: () => this.go('clubs-tasks'),
+      goNewClaim: () => this.go('claims-new'),
+      goCalendar: () => this.go('faculty-calendar'),
+      saveSheet: () => this.setState({ sheet: false }, () => this.toast('Draft saved. Submit it for approval when you are ready.')),
+      openPalette: () => this.setState({ palette: true, paletteQuery: '' }),
+      closePalette: () => this.setState({ palette: false }),
+      toggleTray: () => this.setState(st => ({ tray: !st.tray, userMenu: false })),
+      closeTray: () => this.setState({ tray: false }),
+      toggleUserMenu: () => this.setState(st => ({ userMenu: !st.userMenu, tray: false })),
+      doLogout: () => this.setState({ loggedIn: false, userMenu: false, publicView: 'landing' }),
+      doLogin: (e) => { e.preventDefault(); this.setState({ loggedIn: true, screen: 'inbox' }); },
+      programmes: PROGRAMMES, showcase: SHOWCASE, publicStats: PUBLIC_STATS,
+      closeDrawer: () => this.setState({ drawer: null }),
+      closeSheet: () => this.setState({ sheet: false }),
+      openSheet: () => this.setState({ sheet: true }),
+      cancelConfirm: () => this.setState({ confirm: null }),
+      paletteQuery: s.paletteQuery,
+      onPaletteQuery: (e) => this.setState({ paletteQuery: e.target.value }),
+      commandGroups: groups,
+      noCommands: groups.length === 0,
+
+      notifications: NOTIFICATIONS.map(n => ({
+        ...n, isUnread: n.unread && !s.readIds.includes(n.id),
+        dot: n.unread && !s.readIds.includes(n.id) ? 'var(--color-accent)' : 'transparent',
+        read: () => this.setState(st => ({ readIds: st.readIds.concat([n.id]) })),
+      })),
+      markAllRead: () => this.setState({ readIds: NOTIFICATIONS.map(n => n.id) }, () => this.toast('All notifications marked as read.')),
+
+      isInbox: s.screen === 'inbox',
+      isClubDash: s.screen === 'clubs-dashboard',
+      isClubMembers: s.screen === 'clubs-members',
+      isClubTasks: s.screen === 'clubs-tasks',
+      isClubBudget: s.screen === 'clubs-budget',
+      isClubPlan: s.screen === 'clubs-plan',
+      isClaimsOverview: s.screen === 'claims-overview',
+      isClaimsNew: s.screen === 'claims-new',
+      isClaimsReview: s.screen === 'claims-review',
+      isFacultyDash: s.screen === 'faculty-dashboard',
+      isFacultyCal: s.screen === 'faculty-calendar',
+      isPipeline: s.screen === 'pipeline',
+
+      greeting: queue.length > 0 ? 'Waiting on you' : 'Good to see you, ' + persona.name.split(' ')[0],
+      queueLine: queue.length > 0
+        ? queue.length + (queue.length === 1 ? ' item needs' : ' items need') + ' your attention, most urgent first.'
+        : 'Nothing needs your attention right now.',
+      queue: queue.map((i, idx) => ({
+        ...i,
+        delay: (idx * 60) + 'ms',
+        icon: KIND_ICON[i.kind] || ICON.inbox,
+        urgencyLabel: URGENCY[i.urgency].label,
+        urgencyDot: URGENCY[i.urgency].dot,
+        urgencyFg: URGENCY[i.urgency].fg,
+        hasUrgency: !!URGENCY[i.urgency].label,
+        canApprove: i.approve && p.approve,
+        open: () => this.go(i.screen),
+        approveIt: () => this.setState({ confirm: { kind: 'queue', id: i.id, title: 'Approve this item?', body: i.title + ' — ' + i.sub + '. This is recorded against your name and moves the item to the next stage.', cta: 'Approve' } }),
+      })),
+      queueEmpty: queue.length === 0,
+      inboxFilters: ['All', 'Claim', 'Annual plan', 'Task', 'Reimbursement', 'Meeting'].map(f => ({
+        label: f, pick: () => this.setState({ inboxFilter: f }),
+        bg: s.inboxFilter === f ? 'var(--color-accent)' : 'var(--color-surface)',
+        fg: s.inboxFilter === f ? 'var(--color-bg)' : 'var(--color-text)',
+      })),
+      activity: ACTIVITY.map(a => ({ ...a, color: a.tone === 'accent' ? 'var(--color-accent-400)' : 'var(--color-accent-2-400)' })),
+      browse: NAV.workspaces.filter(m => p[m.id]).map(m => ({ ...m, go: () => this.go(m.screen) })),
+
+      club, clubName: club.name, clubTagline: club.tagline, clubCategory: club.category,
+      clubOptions: Object.values(CLUBS).map(cl => ({ ...cl, active: cl.id === s.club, pick: () => this.setState({ club: cl.id }, () => this.toast('Switched to ' + cl.name)) })),
+      clubTabs: CLUB_TABS.map(t => ({
+        ...t, go: () => this.go(t.id),
+        bg: s.screen === t.id ? 'var(--color-accent)' : 'transparent',
+        fg: s.screen === t.id ? 'var(--color-bg)' : 'color-mix(in srgb, var(--color-text) 70%, transparent)',
+        weight: s.screen === t.id ? 700 : 500,
+      })),
+      claimTabs: CLAIM_TABS_STUDENT.concat(p.approve ? [{ id: 'claims-review', label: 'Review Queue' }] : []).map(t => ({
+        ...t, go: () => this.go(t.id),
+        bg: s.screen === t.id ? 'var(--color-accent)' : 'transparent',
+        fg: s.screen === t.id ? 'var(--color-bg)' : 'color-mix(in srgb, var(--color-text) 70%, transparent)',
+        weight: s.screen === t.id ? 700 : 500,
+      })),
+      counters: {
+        members: c.members, events: c.events, tasks: c.open_tasks,
+        spent: rupee(c.budget_spent), allocated: rupee(c.allocated),
+        remaining: rupee(c.allocated - c.budget_spent), spentPct: spentPct + '%', spentPctNum: spentPct,
+        ring: Math.round((spentPct / 100) * 264) + ' 264',
+      },
+      events: EVENTS[s.club].map(e => ({
+        ...e, budgetLabel: rupee(e.budget),
+        tone: TONE[e.status].bg, toneFg: TONE[e.status].fg, statusLabel: TONE[e.status].label,
+        open: () => this.setState({ drawer: { type: 'event', title: e.title, sub: e.date + ' · ' + e.venue, body: e.desc, meta: 'Budget ' + rupee(e.budget), status: TONE[e.status].label } }),
+      })),
+      members: this.members(),
+      memberCount: this.members().length,
+      memberQuery: s.memberQuery,
+      onMemberQuery: (e) => this.setState({ memberQuery: e.target.value }),
+      roleFilter: s.roleFilter,
+      roleOptions: ['All roles', 'President', 'Vice President', 'Treasurer', 'Core Member', 'Volunteer'],
+      onRoleFilter: (e) => this.setState({ roleFilter: e.target.value }),
+      sortBy: (key) => this.setState(st => ({ sortKey: key, sortDir: st.sortKey === key && st.sortDir === 'asc' ? 'desc' : 'asc' })),
+      sortName: () => this.setState(st => ({ sortKey: 'name', sortDir: st.sortKey === 'name' && st.sortDir === 'asc' ? 'desc' : 'asc' })),
+      sortRole: () => this.setState(st => ({ sortKey: 'role', sortDir: st.sortKey === 'role' && st.sortDir === 'asc' ? 'desc' : 'asc' })),
+      sortYear: () => this.setState(st => ({ sortKey: 'year', sortDir: st.sortKey === 'year' && st.sortDir === 'asc' ? 'desc' : 'asc' })),
+      sortArrow: s.sortDir === 'asc' ? '↑' : '↓',
+      sortLabel: s.sortKey,
+      canManage: p.manage, canApprove: p.approve,
+
+      tasks: TASKS[s.club].map((t, idx) => ({
+        ...t,
+        delay: (idx * 55) + 'ms',
+        isDone: t.done || s.doneIds.includes(t.id),
+        check: () => this.setState(st => ({ doneIds: st.doneIds.includes(t.id) ? st.doneIds.filter(x => x !== t.id) : st.doneIds.concat([t.id]) })),
+        mark: t.done || s.doneIds.includes(t.id) ? 'line-through' : 'none',
+        opacity: t.done || s.doneIds.includes(t.id) ? 0.55 : 1,
+        tick: t.done || s.doneIds.includes(t.id) ? 'var(--color-accent-2-500)' : 'transparent',
+        prioBg: t.priority === 'high' ? 'var(--color-accent-200)' : t.priority === 'medium' ? 'var(--color-accent-2-200)' : 'var(--color-neutral-300)',
+        prioFg: t.priority === 'high' ? 'var(--color-accent-800)' : t.priority === 'medium' ? 'var(--color-accent-2-900)' : 'var(--color-neutral-900)',
+      })),
+      openTaskCount: TASKS[s.club].filter(t => !(t.done || s.doneIds.includes(t.id))).length,
+
+      reimb, budgetLines: lines,
+      reimbPending: REIMB[s.club].filter(r => r.status === 'pending' && !s.approvedIds.includes(r.id)).length,
+
+      planStages: PLAN_STAGES.map((st2, idx) => ({
+        ...st2,
+        fill: idx <= planIdx ? (idx === planIdx ? 'var(--color-accent)' : 'var(--color-accent-2-500)') : 'var(--color-neutral-300)',
+        fg: idx <= planIdx ? 'var(--color-text)' : 'color-mix(in srgb, var(--color-text) 45%, transparent)',
+        weight: idx === planIdx ? 700 : 500,
+      })),
+      planStageLabel: PLAN_STAGES[planIdx].label,
+      planApproved: s.planStage === 'approved',
+      planPending: s.planStage !== 'approved',
+      approvePlan: () => this.setState({ confirm: { kind: 'plan', id: 'plan', title: 'Approve the annual plan?', body: 'Commerce Club 2025-26 — vision, six objectives and Rs 50,000 requested. Approving moves it to ' + (PLAN_STAGES[planIdx + 1] ? PLAN_STAGES[planIdx + 1].label : 'Approved') + ' and notifies Rahul Sharma.', cta: 'Approve plan' } }),
+      returnPlan: () => this.setState({ confirm: { kind: 'return', id: 'plan', title: 'Send the plan back for changes?', body: 'Rahul Sharma will see your note on the plan and can resubmit. The plan returns to Draft.', cta: 'Request changes' } }),
+      confirmAction: () => {
+        const cf = s.confirm;
+        if (!cf) return;
+        if (cf.kind === 'plan') {
+          const next = PLAN_STAGES[planIdx + 1];
+          this.setState({ confirm: null, planStage: next ? next.id : 'approved' }, () => this.toast('Annual plan approved — now at ' + (next ? next.label : 'Approved') + '.'));
+        } else if (cf.kind === 'return') {
+          this.setState({ confirm: null, planStage: 'draft' }, () => this.toast('Sent back to Rahul Sharma with your note.'));
+        } else {
+          this.setState(st => ({ confirm: null, approvedIds: st.approvedIds.concat([cf.id]) }), () => this.toast('Approved. Everyone waiting on this has been notified.'));
+        }
+      },
+
+      myClaims: MY_CLAIMS.map(cl => ({
+        ...cl,
+        tone: TONE[cl.status].bg, toneFg: TONE[cl.status].fg, statusLabel: TONE[cl.status].label,
+        stageLabel: (CLAIM_STAGES.find(x => x.id === cl.stage) || {}).label,
+        stepPct: (((CLAIM_STAGES.findIndex(x => x.id === cl.stage) + 1) / CLAIM_STAGES.length) * 100) + '%',
+        open: () => this.setState({ drawer: { type: 'claim', title: cl.ref, sub: cl.category + ' · ' + cl.dates + ' · ' + cl.hours + ' hours', body: cl.reason, meta: 'Submitted ' + cl.submitted, status: TONE[cl.status].label } }),
+      })),
+      claimStats: [
+        { label: 'Submitted this year', value: '7', note: 'across two categories' },
+        { label: 'Under review', value: '1', note: 'at subject faculty' },
+        { label: 'Approved hours', value: '14', note: 'credited to attendance' },
+        { label: 'Returned', value: '1', note: 'needs a legible receipt' },
+      ],
+      reviewRows: REVIEW_QUEUE.map((r, idx) => ({
+        ...r,
+        delay: (idx * 55) + 'ms',
+        stageLabel: (CLAIM_STAGES.find(x => x.id === r.stage) || {}).label,
+        dayBg: r.breach ? 'var(--color-accent-200)' : 'var(--color-neutral-200)',
+        dayFg: r.breach ? 'var(--color-accent-800)' : 'var(--color-neutral-800)',
+        docsLabel: r.docs === 0 ? 'None' : r.docs + ' attached',
+        done: s.approvedIds.includes(r.id),
+        pending: !s.approvedIds.includes(r.id),
+        open: () => this.setState({ drawer: { type: 'review', title: r.ref, sub: r.student + ' · ' + r.programme, body: r.reason, meta: r.category + ' · ' + r.dates + ' · ' + r.hours + ' hours · ' + (r.docs === 0 ? 'no documents' : r.docs + ' document(s)'), status: r.days + ' days at ' + ((CLAIM_STAGES.find(x => x.id === r.stage) || {}).label || '') } }),
+        approve: () => this.setState({ confirm: { kind: 'claim', id: r.id, title: 'Approve ' + r.ref + '?', body: r.student + ' · ' + r.category.toLowerCase() + ' · ' + r.hours + ' hours. This clears your stage and routes the claim to the course coordinator.', cta: 'Approve claim' } }),
+      })),
+      breachCount: REVIEW_QUEUE.filter(r => r.breach).length,
+      reviewCount: REVIEW_QUEUE.filter(r => !s.approvedIds.includes(r.id)).length,
+
+      wizardStep: s.wizard,
+      wizardSteps: WIZARD_STEPS.map(w => ({
+        ...w,
+        bg: w.n < s.wizard ? 'var(--color-accent-2-500)' : w.n === s.wizard ? 'var(--color-accent)' : 'var(--color-neutral-300)',
+        fg: w.n <= s.wizard ? 'var(--color-bg)' : 'var(--color-neutral-800)',
+        labelFg: w.n === s.wizard ? 'var(--color-text)' : 'color-mix(in srgb, var(--color-text) 55%, transparent)',
+        weight: w.n === s.wizard ? 700 : 500,
+        go: () => this.setState({ wizard: w.n }),
+      })),
+      w1: s.wizard === 1, w2: s.wizard === 2, w3: s.wizard === 3, w4: s.wizard === 4, w5: s.wizard === 5,
+      notFirst: s.wizard > 1, notLast: s.wizard < 5,
+      next: () => this.setState(st => ({ wizard: Math.min(5, st.wizard + 1) })),
+      back: () => this.setState(st => ({ wizard: Math.max(1, st.wizard - 1) })),
+      submitClaim: () => this.setState({ wizard: 1 }, () => { this.toast('Claim submitted for initial review — reference ACP-2026-000118.'); this.go('claims-overview'); }),
+      claimCat: s.claimCat,
+      pickMedical: () => this.setState({ claimCat: 'medical' }),
+      pickCoCurricular: () => this.setState({ claimCat: 'co_curricular' }),
+      isMedical: s.claimCat === 'medical', isCoCurricular: s.claimCat === 'co_curricular',
+      medBorder: s.claimCat === 'medical' ? 'var(--color-accent)' : 'var(--color-divider)',
+      ccBorder: s.claimCat === 'co_curricular' ? 'var(--color-accent)' : 'var(--color-divider)',
+      timetableDays: ['Monday', 'Tuesday'].map(d => ({
+        day: d,
+        slots: TIMETABLE.filter(t => t.day === d).map(t => ({
+          ...t,
+          picked: s.hours.includes(t.id),
+          bg: s.hours.includes(t.id) ? 'var(--color-accent-200)' : 'var(--color-neutral-100)',
+          border: s.hours.includes(t.id) ? 'var(--color-accent)' : 'var(--color-divider)',
+          tick: s.hours.includes(t.id) ? 'var(--color-accent)' : 'transparent',
+          toggle: () => this.setState(st => ({ hours: st.hours.includes(t.id) ? st.hours.filter(x => x !== t.id) : st.hours.concat([t.id]) })),
+        })),
+      })),
+      pickedHours: s.hours.length,
+      pickedList: s.hours.map(id => TIMETABLE.find(t => t.id === id)).filter(Boolean),
+      reason: s.reason,
+      onReason: (e) => this.setState({ reason: e.target.value }),
+      reasonText: s.reason || 'Recovering from viral fever and advised absolute bed rest.',
+      catLabel: s.claimCat === 'medical' ? 'Medical' : 'Co-curricular',
+
+      week: WEEK.map(d => ({
+        ...d,
+        isEmpty: d.sessions.length === 0,
+        sessions: d.sessions.map(x => ({
+          ...x,
+          bg: x.tone === 'accent' ? 'var(--color-accent-200)' : x.tone === 'accent2' ? 'var(--color-accent-2-200)' : 'var(--color-neutral-200)',
+          fg: x.tone === 'accent' ? 'var(--color-accent-900)' : x.tone === 'accent2' ? 'var(--color-accent-2-900)' : 'var(--color-neutral-900)',
+        })),
+      })),
+      todaySessions: WEEK[0].sessions.map(x => ({
+        ...x,
+        bg: x.tone === 'accent' ? 'var(--color-accent-200)' : 'var(--color-accent-2-200)',
+      })),
+      facultyStats: [
+        { label: 'Claims awaiting you', value: '4', note: '1 past service level' },
+        { label: 'Tasks due this week', value: '3', note: '1 high priority' },
+        { label: 'Meetings scheduled', value: '2', note: '1 without minutes' },
+        { label: 'Documents shared', value: '11', note: '1 link live' },
+      ],
+      pipelineStages: PIPELINE.map(st2 => ({
+        ...st2,
+        count: st2.items.length,
+        oldest: Math.max.apply(null, st2.items.map(i => i.days)),
+        breaching: st2.items.filter(i => i.breach).length,
+        hasBreach: st2.items.some(i => i.breach),
+        items: st2.items.map(i => ({
+          ...i,
+          dayBg: i.breach ? 'var(--color-accent-200)' : 'var(--color-neutral-200)',
+          dayFg: i.breach ? 'var(--color-accent-800)' : 'var(--color-neutral-800)',
+          open: () => this.setState({ drawer: { type: 'pipeline', title: i.ref, sub: i.title, body: 'Waiting on ' + i.waiting + ' for ' + i.days + ' days. The service level for ' + st2.label + ' is ' + st2.sla + ' days.', meta: st2.label, status: i.breach ? 'Past service level' : 'Within service level' } }),
+        })),
+      })),
+      pipelineTotal: PIPELINE.reduce((n, st2) => n + st2.items.length, 0),
+      escalations: PIPELINE.flatMap(st2 => st2.items.filter(i => i.breach).map(i => ({ ...i, stage: st2.label }))).sort((a, b) => b.days - a.days),
+      escalationCount: PIPELINE.reduce((n, st2) => n + st2.items.filter(i => i.breach).length, 0),
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -21,6 +21,7 @@ class User(Base, TimestampMixin):
     semester = Column(String, nullable=True)            # e.g. "5"
     section = Column(String, nullable=True)             # e.g. "A"
     enrollment_no = Column(String, nullable=True, unique=True)
+    batch = Column(String, nullable=True)               # e.g. "Batch 1" — the split used for lab/tutorial slots
 
     # Faculty Directory fields (per Faculty PRD's own field list)
     designation = Column(String, nullable=True)         # e.g. "Assistant Professor"

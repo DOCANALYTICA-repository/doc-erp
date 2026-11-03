@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, Integer, ForeignKey, DateTime
+from sqlalchemy import Column, String, Float, Integer, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.models.base import Base, TimestampMixin
 
@@ -13,6 +13,15 @@ class Club(Base, TimestampMixin):
     brand_colors = Column(String, default="#000000", nullable=False)
     contact_email = Column(String, nullable=True)
     status = Column(String, default="active", nullable=False) # active, archived
+
+    # Per-club opt-in tiering. Default False preserves today's behavior for
+    # every club: any active member sees/writes everything, and a Faculty
+    # Coordinator is oversight-only. A club that turns these on gets: only
+    # its top hierarchy rank sees the full tab set (see _visible_tabs), and
+    # its assigned Faculty Coordinator gets full read/write instead of
+    # oversight-only (see _is_flagged_full_access_coordinator).
+    restrict_non_core_access = Column(Boolean, default=False, nullable=False)
+    faculty_coordinator_full_access = Column(Boolean, default=False, nullable=False)
 
     # Relationships
     members = relationship("ClubMember", back_populates="club", cascade="all, delete-orphan")

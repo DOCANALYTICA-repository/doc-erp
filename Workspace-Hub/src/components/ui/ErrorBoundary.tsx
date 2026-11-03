@@ -40,20 +40,20 @@ export class ErrorBoundary extends React.Component<Props, State> {
     if (this.props.fallback) return this.props.fallback(error, this.reset);
 
     return (
-      <div role="alert" className="m-6 max-w-xl rounded-xl border border-rose-200 bg-rose-50 p-6">
-        <h2 className="text-lg font-semibold text-rose-900">
+      <div role="alert" className="m-6 max-w-xl rounded-lg border border-error/25 bg-error-muted p-6">
+        <h2 className="text-lg font-semibold text-error">
           {this.props.label ?? 'This section'} didn't load
         </h2>
-        <p className="mt-1 text-sm text-rose-800">
+        <p className="mt-1 text-sm text-error">
           Something went wrong while rendering. The rest of the page is still usable.
         </p>
-        <pre className="mt-3 max-h-32 overflow-auto rounded bg-white/70 p-2 text-xs text-rose-900">
+        <pre className="mt-3 max-h-32 overflow-auto rounded bg-card/70 p-2 text-xs text-error">
           {error.message}
         </pre>
         <button
           type="button"
           onClick={this.reset}
-          className="mt-4 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700"
+          className="mt-4 rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90"
         >
           Try again
         </button>

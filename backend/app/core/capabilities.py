@@ -45,6 +45,12 @@ CAPABILITIES: Dict[str, Capability] = {
         "status": "coming_soon",
         "label": "Ask an Assistant",
     },
+    # Clubs file yellow forms (pre-approval + claim sheet); a student filing
+    # their own co-curricular claim is a later release.
+    "claims.individual_co_curricular": {
+        "status": "coming_soon",
+        "label": "Individual yellow forms",
+    },
     "faculty.offline_pwa": {
         "status": "coming_soon",
         "label": "Offline Access",

@@ -13,7 +13,7 @@ import pytest
 
 from .conftest import auth_headers
 
-STUDENT = ("student.regular@christuniversity.in", "student123")
+STUDENT = ("student.regular@christuniversity.in", "123")
 
 
 def _login(client, creds=STUDENT):
@@ -170,7 +170,7 @@ def test_the_database_never_stores_the_token_itself(client):
 def test_a_deactivated_account_cannot_refresh(client):
     """A short access lifetime only buys something if a disabled account stops
     being able to mint new ones."""
-    body = _login(client, ("student.regular2@christuniversity.in", "student123"))
+    body = _login(client, ("student.regular2@christuniversity.in", "123"))
 
     from app.core.database import SessionLocal
     from app.models.user import User

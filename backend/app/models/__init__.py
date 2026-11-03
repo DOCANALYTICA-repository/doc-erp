@@ -11,6 +11,9 @@ from app.models.faculty_assignment import FacultyAssignment
 from app.models.club import ClubHierarchyLevel
 from app.models.content import Programme, GalleryImage
 from app.models.refresh_token import RefreshToken
+from app.models.yellow_form import (
+    PreApprovalForm, PreApprovalStudent, ClubClaimSheet, ClubClaimStudent, ClubClaimEntry,
+)
 
 # Must come last: it attaches indexes to tables that the imports above define.
 from app.models.indexes import register_indexes
@@ -49,4 +52,9 @@ __all__ = [
     "Programme",
     "GalleryImage",
     "RefreshToken",
+    "PreApprovalForm",
+    "PreApprovalStudent",
+    "ClubClaimSheet",
+    "ClubClaimStudent",
+    "ClubClaimEntry",
 ]

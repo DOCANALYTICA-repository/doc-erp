@@ -80,7 +80,21 @@ ROLE_PERMISSIONS = {
         "events:approve",
         "budget:manage",
         "reimbursement:approve",
-        "claims:review_faculty_coordinator"  # Initial reviewer for club-submitted claims
+        "claims:review_faculty_coordinator",  # Initial reviewer for club-submitted claims
+        # Yellow-form pre-approvals, stage 1. Scope-checked per club
+        # (faculty_scope.is_club_faculty_coordinator_for) — see yellow_form_workflow.
+        "yellow_forms:approve_faculty_coordinator",
+    },
+    # Department-wide: final pre-approval of every club's yellow forms.
+    "Associate HOD": {
+        "yellow_forms:approve_associate_hod",
+        "yellow_forms:view_all",
+    },
+    # Department-wide: reviews every club's claim sheets and forwards the
+    # approved ones to the attendance office.
+    "Claims Coordinator": {
+        "yellow_forms:review_claim_sheet",
+        "yellow_forms:view_all",
     },
     "Cultural Coordinator": {
         "clubs:approve_plan",
@@ -102,6 +116,8 @@ ROLE_PERMISSIONS = {
         "claims:manage_timetable_all",
         # The public site is the department's front door; the HOD owns it.
         "content:manage",
+        # Oversight read of every club's yellow forms; acts on none of them.
+        "yellow_forms:view_all",
     }
 }
 

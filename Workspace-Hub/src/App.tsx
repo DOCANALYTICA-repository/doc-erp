@@ -37,29 +37,24 @@ import { RequireAuth } from './routes/RequireAuth';
 import { CLUBS_DEFAULT_TAB } from './modules/clubs/tabs';
 import { CLAIMS_DEFAULT_TAB } from './modules/claims/tabs';
 import { FACULTY_DEFAULT_TAB } from './modules/faculty/tabs';
-import { clearSession, readSession, setSessionEndedHandler } from './services/session';
+import { setSessionEndedHandler } from './services/session';
 import { queryClient } from './lib/queryClient';
 import { NotificationSettings } from './routes/NotificationSettings';
 import { PipelineBoard } from './modules/pipeline/PipelineBoard';
 
 export default function App() {
-  const login = useStore((state) => state.login);
   const logout = useStore((state) => state.logout);
-  const finishSessionRestore = useStore((state) => state.finishSessionRestore);
+  const restoreSession = useStore((state) => state.restoreSession);
   const navigate = useNavigate();
 
   // Restore session on load — real routes now mean this no longer needs to
   // decide "which screen to show," only "am I logged in." RequireAuth waits
   // on isSessionRestoring before redirecting, so a hard refresh on a valid
-  // session doesn't get bounced to /login before this effect runs.
+  // session doesn't get bounced to /login before this effect runs — and, as
+  // the profile is re-read from the server first, a deep link is not
+  // redirected on permissions cached before a release.
   useEffect(() => {
-    const saved = readSession();
-    if (saved?.user && saved.token) {
-      login(saved.user as never, saved.token, saved.capabilities ?? {}, saved.refreshToken ?? null);
-    } else if (saved) {
-      clearSession();
-    }
-    finishSessionRestore();
+    void restoreSession();
   }, []);
 
   /**

@@ -86,7 +86,7 @@ def get_workflow_pipeline(
     # Department oversight, not personal work: whoever approves plans or
     # coordinates a programme is who this is for.
     current_user: User = Depends(PermissionChecker(
-        ["claims:approve_coordinator", "clubs:approve_plan", "rbac:assign_roles"],
+        ["claims:approve_coordinator", "clubs:approve_plan", "rbac:assign_roles", "yellow_forms:view_all"],
         require_all=False,
     )),
 ):

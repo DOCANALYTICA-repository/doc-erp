@@ -1,4 +1,5 @@
 from typing import List, Dict, Any, Optional
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 from app.core import visibility
 from app.models.club import Event, ClubMember
@@ -79,19 +80,26 @@ class CalendarEngine:
             prog = academic_context.get("programme")
             sem = academic_context.get("semester")
             sec = academic_context.get("section")
+            batch = academic_context.get("batch")
             if prog and sem and sec:
-                sessions = db.query(TimetableSession).options(
-                    selectinload(TimetableSession.faculty)
+                # Same batch rule as GET /claims/timetable: own batch plus
+                # every unbatched slot, so the calendar and the claim wizard
+                # cannot disagree about which classes a student is in.
+                q = db.query(TimetableSession).options(
+                    selectinload(TimetableSession.faculty), selectinload(TimetableSession.co_faculty)
                 ).filter(
                     TimetableSession.programme == prog,
                     TimetableSession.semester == sem,
                     TimetableSession.section == sec
-                ).all()
+                )
+                if batch:
+                    q = q.filter(or_(TimetableSession.batch.is_(None), TimetableSession.batch == batch))
+                sessions = q.all()
                 for s in sessions:
                     events.append({
                         "id": s.id,
                         "title": f"[Class] {s.subject}",
-                        "description": f"Faculty: {s.faculty.name if s.faculty else 'Department'}",
+                        "description": f"Faculty: {' / '.join(n for n in (s.faculty_name, s.co_faculty_name) if n) or 'Department'}",
                         "start": s.day_of_week, # For scheduler mapping (e.g. Monday, 9:00)
                         "hour": s.hour,
                         "type": "timetable"

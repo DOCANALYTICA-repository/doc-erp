@@ -47,6 +47,21 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str = ""
     SUPABASE_STORAGE_BUCKET: str = "doc-portal-files"
 
+    # Where uploaded bytes go when Supabase is NOT configured (a developer
+    # machine, CI). Without this the engine had exactly one backend, so every
+    # upload on a local checkout reached a Supabase URL that does not answer
+    # and came back as a 502 — the file input looked broken rather than
+    # unconfigured. Same validation, same stored-path shape, just a different
+    # place to put the bytes.
+    LOCAL_STORAGE_DIR: Path = BACKEND_DIR / "var" / "uploads"
+
+    @property
+    def storage_backend(self) -> str:
+        """"supabase" once both credentials are present, else "local"."""
+        if self.SUPABASE_URL.strip() and self.SUPABASE_SERVICE_ROLE_KEY.strip():
+            return "supabase"
+        return "local"
+
     # --- Email delivery ----------------------------------------------------
     # Unset on a developer machine and in CI, where the engine logs what it
     # would have sent instead. That keeps the code path exercised everywhere
@@ -63,6 +78,30 @@ class Settings(BaseSettings):
     # Where a link in an email should point. A relative path in an email is
     # useless, so a notification carries no link at all unless this is set.
     PUBLIC_APP_URL: str = ""
+
+    # --- Demo personas (development only) ----------------------------------
+    # Lets a developer sign in as a seeded account without knowing its
+    # password, so the four role-specific views can be checked quickly.
+    #
+    # OFF BY DEFAULT, and it must stay off. This is impersonation: with it on,
+    # anyone who can reach the API can mint a valid token pair for a seeded
+    # account without a credential. The endpoint 404s when this is false —
+    # not 403 — so a production deployment does not even advertise that the
+    # route exists.
+    #
+    # `.env.production.example` sets it false explicitly; do not remove that
+    # line on the grounds that false is already the default.
+    ENABLE_DEMO_PERSONAS: bool = False
+
+    # The only accounts a demo persona may become. An allow-list rather than
+    # "any user", so the flag being wrongly enabled still cannot hand out a
+    # token for a real person's account — only for the seeded fixtures.
+    DEMO_PERSONA_EMAILS: List[str] = [
+        "hod.commerce@christuniversity.in",
+        "teacher.class@christuniversity.in",
+        "student.president@christuniversity.in",
+        "faculty.accounting@christuniversity.in",
+    ]
 
     # --- Department facts --------------------------------------------------
     # The one number on the public site that cannot be counted from the

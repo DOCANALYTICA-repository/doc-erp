@@ -33,6 +33,7 @@ class UserBase(BaseModel):
     programme: Optional[str] = None
     semester: Optional[str] = None
     section: Optional[str] = None
+    batch: Optional[str] = None
     enrollment_no: Optional[str] = None
     designation: Optional[str] = None
     phone: Optional[str] = None
@@ -53,6 +54,7 @@ class UserUpdate(BaseModel):
     programme: Optional[str] = None
     semester: Optional[str] = None
     section: Optional[str] = None
+    batch: Optional[str] = None
     enrollment_no: Optional[str] = None
     designation: Optional[str] = None
     phone: Optional[str] = None

@@ -1,4 +1,5 @@
 import React from 'react';
+import { z } from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@astryxdesign/core/Button';
 import { DateInput } from '@astryxdesign/core/DateInput';
@@ -12,9 +13,14 @@ import { asIsoDate } from '../../../lib/date';
 import { facultyKeys, platformKeys } from '../../../lib/queryKeys';
 import { useStore } from '../../../context/useStore';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { PageSkeleton } from '../../../components/ui/PageSkeleton';
+import { Card } from '../../../components/ui/Card';
 import { ErrorState } from '../../../components/ui/ErrorState';
-import { PageLoader } from '../../../components/ui/PageLoader';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
+import { useZodForm, withServerErrors } from '../../../lib/forms';
+import { TextField, DateField } from '../../../components/ui/form/fields';
+import { FormError } from '../../../components/ui/form/FormError';
+import { rootServerError } from '../../../components/ui/form/fieldStatus';
 import { StatusChip } from '../../../components/ui/StatusChip';
 import type { Meeting } from '../../../api/types';
 
@@ -74,9 +80,9 @@ const MinutesForm: React.FC<{ meeting: Meeting; onDone: () => void }> = ({ meeti
   };
 
   return (
-    <div className="mt-4 flex flex-col gap-4 border-t border-slate-100 pt-4">
+    <div className="mt-4 flex flex-col gap-4 border-t border-border pt-4">
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-slate-600" htmlFor={`minutes-${meeting.id}`}>
+        <label className="text-sm font-medium text-secondary" htmlFor={`minutes-${meeting.id}`}>
           Minutes
         </label>
         <textarea
@@ -85,12 +91,12 @@ const MinutesForm: React.FC<{ meeting: Meeting; onDone: () => void }> = ({ meeti
           value={minutes}
           onChange={e => setMinutes(e.target.value)}
           placeholder="What was discussed…"
-          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+          className="rounded-lg border border-border bg-body px-3 py-2 text-sm"
         />
       </div>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium text-slate-600">Decisions (at least one)</legend>
+        <legend className="text-sm font-medium text-secondary">Decisions (at least one)</legend>
         {decisions.map((d, i) => (
           <div key={i} className="flex gap-2">
             <label className="sr-only" htmlFor={`decision-${meeting.id}-${i}`}>Decision {i + 1}</label>
@@ -99,14 +105,14 @@ const MinutesForm: React.FC<{ meeting: Meeting; onDone: () => void }> = ({ meeti
               value={d}
               onChange={e => setDecisions(prev => prev.map((x, j) => (j === i ? e.target.value : x)))}
               placeholder="e.g. Approved the revised conclave budget"
-              className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+              className="flex-1 rounded-lg border border-border bg-body px-3 py-2 text-sm"
             />
             {decisions.length > 1 ? (
               <button
                 type="button"
                 onClick={() => setDecisions(prev => prev.filter((_, j) => j !== i))}
                 aria-label={`Remove decision ${i + 1}`}
-                className="rounded-lg px-2 text-slate-400 hover:text-rose-600"
+                className="rounded-lg px-2 text-secondary hover:text-error"
               >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -123,7 +129,7 @@ const MinutesForm: React.FC<{ meeting: Meeting; onDone: () => void }> = ({ meeti
       </fieldset>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium text-slate-600">
+        <legend className="text-sm font-medium text-secondary">
           Action items — each becomes a task for its assignee
         </legend>
         {actionItems.map((item, i) => (
@@ -134,14 +140,14 @@ const MinutesForm: React.FC<{ meeting: Meeting; onDone: () => void }> = ({ meeti
               value={item.title}
               onChange={e => setActionItems(prev => prev.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))}
               placeholder="What needs doing"
-              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+              className="rounded-lg border border-border bg-body px-3 py-2 text-sm"
             />
             <label className="sr-only" htmlFor={`ai-assignee-${meeting.id}-${i}`}>Action item {i + 1} assignee</label>
             <select
               id={`ai-assignee-${meeting.id}-${i}`}
               value={item.assignee_id}
               onChange={e => setActionItems(prev => prev.map((x, j) => (j === i ? { ...x, assignee_id: e.target.value } : x)))}
-              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+              className="rounded-lg border border-border bg-body px-3 py-2 text-sm"
             >
               <option value="">Assign to…</option>
               {(directory.data ?? []).map(f => (
@@ -158,7 +164,7 @@ const MinutesForm: React.FC<{ meeting: Meeting; onDone: () => void }> = ({ meeti
               type="button"
               onClick={() => setActionItems(prev => prev.filter((_, j) => j !== i))}
               aria-label={`Remove action item ${i + 1}`}
-              className="rounded-lg px-2 text-slate-400 hover:text-rose-600"
+              className="rounded-lg px-2 text-secondary hover:text-error"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -174,7 +180,7 @@ const MinutesForm: React.FC<{ meeting: Meeting; onDone: () => void }> = ({ meeti
       </fieldset>
 
       {!canSubmit ? (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-secondary">
           {minutes.trim() === ''
             ? 'Minutes are required.'
             : cleanDecisions.length === 0
@@ -195,37 +201,56 @@ const MinutesForm: React.FC<{ meeting: Meeting; onDone: () => void }> = ({ meeti
   );
 };
 
+/**
+ * All four fields required.
+ *
+ * The old form validated only the title in one place and all four in another,
+ * via a single toast listing every requirement at once — so a meeting could be
+ * (and was) created with no date, no time and no venue.
+ *
+ * `time` is a free-text string because that is what the API stores; the
+ * placeholder shows the expected shape rather than a format rule the server
+ * does not actually enforce.
+ */
+const meetingSchema = z.object({
+  title: z.string().trim().min(1, 'What is the meeting about?'),
+  date: z.string().min(1, 'Pick a date.'),
+  time: z.string().trim().min(1, 'Give a start time, e.g. 02:30 PM.'),
+  venue: z.string().trim().min(1, 'Say where it will be held.'),
+});
+
 export const MeetingsTab: React.FC = () => {
   const { data: meetings, isLoading, isError, error, refetch } = useMeetings();
   const user = useStore(s => s.user);
   const showToast = useToast();
   const queryClient = useQueryClient();
 
-  const [title, setTitle] = React.useState('');
-  const [date, setDate] = React.useState('');
-  const [time, setTime] = React.useState('');
-  const [venue, setVenue] = React.useState('');
   const [recordingFor, setRecordingFor] = React.useState<string | null>(null);
 
   const isReadOnly = user?.primary_role === 'super_admin';
 
-  const create = async () => {
-    // The form used to validate only the title, so a meeting could be created
-    // with no date, no time and no venue.
-    if (!title.trim() || !date || !time.trim() || !venue.trim()) {
-      showToast({ body: 'Title, date, time and venue are all required.', type: 'error' });
-      return;
-    }
-    try {
-      await api.post('/faculty/meetings', { title, date, time, venue });
-      setTitle(''); setDate(''); setTime(''); setVenue('');
-      showToast({ body: 'Meeting scheduled.', type: 'info' });
-      queryClient.invalidateQueries({ queryKey: facultyKeys.meetings() });
-      queryClient.invalidateQueries({ queryKey: platformKeys.actionQueue });
-    } catch (e) {
-      showToast({ body: `Could not schedule: ${describeError(e)}`, type: 'error' });
-    }
-  };
+  const form = useZodForm(meetingSchema, {
+    defaultValues: { title: '', date: '', time: '', venue: '' },
+  });
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = form;
+
+  const create = withServerErrors(form, async values => {
+    await api.post('/faculty/meetings', {
+      title: values.title,
+      date: values.date,
+      time: values.time,
+      venue: values.venue,
+    });
+    reset();
+    showToast({ body: 'Meeting scheduled.', type: 'info' });
+    queryClient.invalidateQueries({ queryKey: facultyKeys.meetings() });
+    queryClient.invalidateQueries({ queryKey: platformKeys.actionQueue });
+  });
 
   const afterMinutes = () => {
     setRecordingFor(null);
@@ -234,32 +259,47 @@ export const MeetingsTab: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: platformKeys.actionQueue });
   };
 
-  if (isLoading) return <PageLoader label="Loading meetings..." />;
+  if (isLoading) return <PageSkeleton variant="list" label="Loading meetings" />;
   if (isError) return <ErrorState title="Meetings didn't load" error={error} onRetry={() => void refetch()} />;
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <Card as="section">
         <SectionHeader title="Schedule a meeting" />
-        <div className="mt-4 flex flex-col gap-3 text-sm">
-          <label className="font-medium text-slate-600" htmlFor="meeting-title">Title</label>
-          <input id="meeting-title" value={title} onChange={e => setTitle(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2" />
-          <DateInput label="Date" value={asIsoDate(date)} onChange={v => setDate(v || '')} isRequired />
-          <label className="font-medium text-slate-600" htmlFor="meeting-time">Time</label>
-          <input id="meeting-time" placeholder="02:30 PM" value={time} onChange={e => setTime(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2" />
-          <label className="font-medium text-slate-600" htmlFor="meeting-venue">Venue</label>
-          <input id="meeting-venue" value={venue} onChange={e => setVenue(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2" />
-          <Button
-            label={isReadOnly ? 'Admin is view-only here' : 'Create meeting'}
-            variant="primary"
+        {/*
+          * A real <form>, so Enter submits. The four fields were validated by
+          * one toast that listed all of them at once, after the click; each
+          * now says what it needs, where it needs it.
+          */}
+        <form onSubmit={handleSubmit(create)} noValidate className="mt-4 flex flex-col gap-4 text-sm">
+          <TextField control={control} name="title" label="Title" isRequired isDisabled={isReadOnly} />
+          <DateField control={control} name="date" label="Date" isRequired isDisabled={isReadOnly} />
+          <TextField
+            control={control}
+            name="time"
+            label="Time"
+            placeholder="02:30 PM"
+            isRequired
             isDisabled={isReadOnly}
-            clickAction={create}
           />
-        </div>
-      </section>
+          <TextField control={control} name="venue" label="Venue" isRequired isDisabled={isReadOnly} />
+
+          <FormError message={rootServerError(errors)} />
+
+          <Button
+            label={
+              isReadOnly
+                ? 'Admin is view-only here'
+                : isSubmitting
+                  ? 'Creating…'
+                  : 'Create meeting'
+            }
+            variant="primary"
+            isDisabled={isReadOnly || isSubmitting}
+            type="submit"
+          />
+        </form>
+      </Card>
 
       <div className="flex flex-col gap-4 md:col-span-2">
         <SectionHeader title="Meetings" />
@@ -274,39 +314,39 @@ export const MeetingsTab: React.FC = () => {
             const actionItems = m.action_items ?? [];
             const isOrganizer = m.organizer_id === user?.id;
             return (
-              <article key={m.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <Card as="article" padding="md" key={m.id}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{m.type}</span>
-                    <h3 className="mt-0.5 font-semibold text-slate-900">{m.title}</h3>
-                    <p className="mt-1 text-sm text-slate-500">{m.date} · {m.time} · {m.venue}</p>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-secondary">{m.type}</span>
+                    <h3 className="mt-0.5 font-semibold text-primary">{m.title}</h3>
+                    <p className="mt-1 text-sm text-secondary">{m.date} · {m.time} · {m.venue}</p>
                   </div>
                   <StatusChip status={m.status} />
                 </div>
 
                 {hasMinutes ? (
-                  <div className="mt-4 border-t border-slate-100 pt-4">
-                    <h4 className="text-sm font-medium text-slate-600">Minutes</h4>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{m.minutes}</p>
+                  <div className="mt-4 border-t border-border pt-4">
+                    <h4 className="text-sm font-medium text-secondary">Minutes</h4>
+                    <p className="mt-1 text-sm leading-relaxed text-secondary">{m.minutes}</p>
                     {decisions.length > 0 ? (
                       <>
-                        <h4 className="mt-3 text-sm font-medium text-slate-600">Decisions</h4>
+                        <h4 className="mt-3 text-sm font-medium text-secondary">Decisions</h4>
                         {/* A real list from the server. It used to be one
                             comma-joined string, so "Rs 40,000" rendered as two
                             separate decisions. */}
-                        <ul className="mt-1 list-inside list-disc text-sm text-slate-600">
+                        <ul className="mt-1 list-inside list-disc text-sm text-secondary">
                           {decisions.map((d, i) => <li key={i}>{d}</li>)}
                         </ul>
                       </>
                     ) : null}
                     {actionItems.length > 0 ? (
                       <>
-                        <h4 className="mt-3 text-sm font-medium text-slate-600">Action items</h4>
-                        <ul className="mt-1 flex flex-col gap-1 text-sm text-slate-600">
+                        <h4 className="mt-3 text-sm font-medium text-secondary">Action items</h4>
+                        <ul className="mt-1 flex flex-col gap-1 text-sm text-secondary">
                           {actionItems.map((item, i) => (
                             <li key={i}>
                               {item.title}
-                              {item.due_date ? <span className="text-slate-400"> — due {item.due_date}</span> : null}
+                              {item.due_date ? <span className="text-secondary"> — due {item.due_date}</span> : null}
                             </li>
                           ))}
                         </ul>
@@ -317,7 +357,7 @@ export const MeetingsTab: React.FC = () => {
                   recordingFor === m.id ? (
                     <MinutesForm meeting={m} onDone={afterMinutes} />
                   ) : (
-                    <div className="mt-4 border-t border-slate-100 pt-4">
+                    <div className="mt-4 border-t border-border pt-4">
                       <Button
                         label="Record minutes"
                         variant="secondary"
@@ -327,7 +367,7 @@ export const MeetingsTab: React.FC = () => {
                     </div>
                   )
                 ) : null}
-              </article>
+              </Card>
             );
           })
         )}

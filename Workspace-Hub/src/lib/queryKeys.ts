@@ -26,12 +26,30 @@ export const clubKeys = {
 
 export const claimKeys = {
   all: ['claims'] as const,
-  list: (page = 1, pageSize = 25) => [...claimKeys.all, 'list', page, pageSize] as const,
+  list: (page = 1, pageSize = 25, view = 'pending') =>
+    [...claimKeys.all, 'list', view, page, pageSize] as const,
   detail: (claimId: string) => [...claimKeys.all, claimId] as const,
   documents: (claimId: string) => [...claimKeys.detail(claimId), 'documents'] as const,
   workflow: () => [...claimKeys.all, 'workflow'] as const,
   timetable: (programme?: string, semester?: string, section?: string) =>
     [...claimKeys.all, 'timetable', programme ?? '', semester ?? '', section ?? ''] as const,
+};
+
+export const yellowFormKeys = {
+  all: ['yellow-forms'] as const,
+  workflow: () => [...yellowFormKeys.all, 'workflow'] as const,
+  queue: () => [...yellowFormKeys.all, 'queue'] as const,
+  reviewed: () => [...yellowFormKeys.all, 'reviewed'] as const,
+  mine: () => [...yellowFormKeys.all, 'mine'] as const,
+  club: (clubId: string) => [...yellowFormKeys.all, 'club', clubId] as const,
+  clubPreApprovals: (clubId: string) =>
+    [...yellowFormKeys.club(clubId), 'pre-approvals'] as const,
+  clubClaimSheets: (clubId: string) =>
+    [...yellowFormKeys.club(clubId), 'claim-sheets'] as const,
+  eligibleStudents: (clubId: string) =>
+    [...yellowFormKeys.club(clubId), 'eligible-students'] as const,
+  preApproval: (id: string) => [...yellowFormKeys.all, 'pre-approval', id] as const,
+  claimSheet: (id: string) => [...yellowFormKeys.all, 'claim-sheet', id] as const,
 };
 
 export const facultyKeys = {

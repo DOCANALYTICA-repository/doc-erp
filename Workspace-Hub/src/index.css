@@ -1,20 +1,104 @@
+/*
+ * CASCADE LAYER ORDER — declare it first, and never let it be implicit.
+ *
+ * This one line is load-bearing for the entire Astryx component layer.
+ *
+ * Astryx ships its components as pre-compiled StyleX atomic classes inside
+ * `@layer astryx-base`, and the brand theme's component overrides inside
+ * `@layer astryx-theme`. Tailwind's preflight lives in `@layer base` and
+ * opens with:
+ *
+ *     *, ::before, ::after, ::backdrop { margin: 0; padding: 0; border: 0 solid }
+ *
+ * Layers beat specificity: whichever layer is declared LATER wins, no matter
+ * how specific the loser is. StyleX's `:not(#\#):not(#\#)` armour buys it
+ * nothing across a layer boundary.
+ *
+ * With no explicit order, layers are ordered by first appearance in the
+ * bundle. main.tsx used to import reset.css and astryx.css before index.css,
+ * which produced:
+ *
+ *     reset, astryx-base, properties, theme, base, components, utilities, astryx-theme
+ *      ↑ Astryx's box model                        ↑ preflight zeroes it all
+ *
+ * The measured result on /app: 147 of 153 Astryx-rendered elements computed
+ * `padding: 0`, and side-nav items, cards and inputs computed
+ * `border-width: 0` and `border-radius: 0` as well. Every layout style
+ * Astryx ships had never once applied in this app. Buttons were the visible
+ * case only because a theme override happened to cover them.
+ *
+ * The order below is the one `@astryxdesign/core/tailwind-theme.css`
+ * documents in its own usage block. `astryx-base` after `base` so preflight
+ * cannot flatten components; `components`/`utilities` after `astryx-theme` so
+ * a Tailwind utility on an Astryx component still wins, which is what every
+ * `className` pass-through in src/components/ui depends on.
+ *
+ * Consequence: ALL Astryx CSS must be @imported here, not from main.tsx.
+ * An import from JS lands in the bundle at an order Vite chooses, and any
+ * layer it registers that is not named below would be appended last.
+ */
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+
 @import "tailwindcss";
+
+/*
+ * Astryx's reset and its pre-compiled component CSS. These were imported from
+ * main.tsx until the layer-order fix above; they must be here now.
+ */
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+
+/*
+ * These three MUST be @imported here, not imported from main.tsx.
+ *
+ * This was a real, silent bug for the whole life of the token system.
+ * Tailwind v4 only processes the CSS module graph rooted at the file that
+ * carries `@import "tailwindcss"` — this one. `tailwind-theme.css` is a
+ * `@theme inline` block, i.e. a Tailwind DIRECTIVE, not plain CSS. Importing
+ * it from main.tsx handed its text to the browser as a stylesheet, where
+ * `@theme` means nothing at all, so Tailwind never generated a single utility
+ * from it.
+ *
+ * The observable symptom: `bg-card`, `bg-muted`, `text-primary`,
+ * `text-secondary` and `bg-error-muted` all resolved to nothing, and
+ * `rounded-lg` silently fell back to Tailwind's stock 0.5rem instead of the
+ * theme's --radius-container. No error, no warning — the classes simply did
+ * nothing.
+ *
+ * That is almost certainly why 52 of 62 source files reached for
+ * `bg-slate-100` and `text-rose-600`: the token utilities the project's own
+ * CLAUDE.md mandated did not work, so nobody could use them.
+ *
+ *   tailwind-theme.css — maps Astryx tokens onto Tailwind utility names
+ *   doc-portal.css     — @generated token VALUES, scoped to the theme attr
+ *   ramps.css          — the hand-written gold/sage/sand ramps
+ *
+ * Order matters: the bridge first so utility names exist, then the values.
+ */
+@import "@astryxdesign/core/tailwind-theme.css";
+@import "./theme/doc-portal.css";
+@import "./theme/ramps.css";
 
 /*
  * Design token cleanup (Phase 1C): this file used to declare a full
  * parallel shadcn-style token set (--background, --primary, --card, ...)
  * that no component in this codebase actually consumed via Tailwind
- * utilities (grep confirms zero `bg-background`/`text-foreground`/etc.
- * usages anywhere) — it existed alongside, not integrated with, the real
- * Astryx token system (astryx.css + tailwind-theme.css + theme-neutral,
- * now all imported in main.tsx). Removed rather than "migrated" since there
- * was nothing live depending on it; only --font-sans below is actually used.
+ * utilities — it existed alongside, not integrated with, the real Astryx
+ * token system (astryx.css + tailwind-theme.css + the built brand theme,
+ * all imported in main.tsx). Removed rather than "migrated" since there was
+ * nothing live depending on it.
+ *
+ * The last survivor was a `--font-sans` declaration, removed in the UI
+ * revamp because it was actively WRONG — not merely redundant.
+ *
+ * `@astryxdesign/core/tailwind-theme.css` registers
+ * `@theme inline { --font-sans: var(--font-family-body) }`, so the name was
+ * defined twice with two different meanings: the `font-sans` *utility*
+ * resolved to the theme's body face, while `body { font-family:
+ * var(--font-sans) }` resolved to SF Pro Display from here. Two fonts, one
+ * token name, no error. The theme owns typography now — see
+ * src/theme/docPortalTheme.ts.
  */
-@layer base {
-  :root {
-    --font-sans: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  }
-}
 
 @layer utilities {
   .glass-card {
@@ -61,10 +145,42 @@
  */
 :root { color-scheme: light; }
 
+/*
+ * Unlayered on purpose, like the color-scheme fix above.
+ *
+ * The colours are TOKENS now, not literals. They used to be hardcoded
+ * `rgb(248 250 252)` / `rgb(15 23 42)` — Tailwind slate-50 on slate-900 —
+ * which would fight the cream ground the theme now sets and leave a
+ * cool-grey page behind every warm surface.
+ */
+/*
+ * Heading letter-spacing, mirroring the design canvas's own rule:
+ *
+ *   h1, h2, h3, h4, h5, h6 { letter-spacing: -0.008em; }
+ *
+ * It lives here rather than in the theme because `defineTheme`'s `typography`
+ * config covers family, weight and scale but has no letter-spacing key — and
+ * the generated `doc-portal.css` is rewritten on every theme build, so it
+ * cannot be added there.
+ *
+ * Layered in `base` so a per-element `tracking-*` utility still wins: several
+ * headings in the app deliberately use `tracking-tight`.
+ */
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    letter-spacing: -0.008em;
+  }
+}
+
 body {
-  font-family: var(--font-sans);
-  background-color: rgb(248 250 252);
-  color: rgb(15 23 42);
+  font-family: var(--font-family-body);
+  background-color: var(--color-background-body);
+  color: var(--color-text-primary);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }

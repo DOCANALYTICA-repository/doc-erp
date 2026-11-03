@@ -17,13 +17,13 @@ export const ErrorState: React.FC<{
 }> = ({ title = "This didn't load", error, onRetry }) => (
   <div
     role="alert"
-    className="flex flex-col items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-6"
+    className="flex flex-col items-start gap-3 rounded-lg border border-error/25 bg-error-muted p-6"
   >
     <div className="flex items-center gap-2">
-      <AlertTriangle className="h-4 w-4 text-rose-600" aria-hidden="true" />
-      <h3 className="font-semibold text-rose-900">{title}</h3>
+      <AlertTriangle className="h-4 w-4 text-error" aria-hidden="true" />
+      <h3 className="font-heading font-semibold text-error">{title}</h3>
     </div>
-    <p className="text-sm text-rose-800">{describeError(error)}</p>
+    <p className="text-sm text-primary">{describeError(error)}</p>
     {onRetry ? <Button label="Try again" variant="secondary" clickAction={onRetry} /> : null}
   </div>
 );

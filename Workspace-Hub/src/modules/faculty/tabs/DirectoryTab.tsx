@@ -4,6 +4,7 @@ import { Users } from 'lucide-react';
 
 import { useDirectory } from '../../../api/hooks';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { Card } from '../../../components/ui/Card';
 import { ErrorState } from '../../../components/ui/ErrorState';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
 import { STATUS_CLASSES } from '../../../components/ui/status';
@@ -33,7 +34,7 @@ export const DirectoryTab: React.FC = () => {
               placeholder="Search by name, designation or role…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-64 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm"
+              className="w-64 rounded-lg border border-border bg-body px-3 py-1.5 text-sm"
             />
           </>
         }
@@ -59,21 +60,21 @@ export const DirectoryTab: React.FC = () => {
               ? STATUS_CLASSES.approved
               : STATUS_CLASSES.closed;
             return (
-              <article key={f.id} className="flex flex-col gap-1.5 rounded-xl border border-slate-200 bg-white p-5 text-sm shadow-sm">
-                <h3 className="font-semibold text-slate-900">{f.name}</h3>
-                <p className="font-medium text-slate-600">
+              <Card as="article" padding="md" className="flex flex-col gap-1.5 text-sm shadow-sm" key={f.id}>
+                <h3 className="font-semibold text-primary">{f.name}</h3>
+                <p className="font-medium text-secondary">
                   {f.designation || f.role_tags_str || 'Faculty'}
                 </p>
-                <a href={`mailto:${f.email}`} className="text-slate-500 hover:underline">{f.email}</a>
+                <a href={`mailto:${f.email}`} className="text-secondary hover:underline">{f.email}</a>
                 {/* Students do not receive phone or office details — the
                     server omits them rather than the UI hiding them. */}
-                {f.office_location ? <p className="text-slate-500">{f.office_location}</p> : null}
-                {f.office_hours ? <p className="text-slate-500">Office hours: {f.office_hours}</p> : null}
+                {f.office_location ? <p className="text-secondary">{f.office_location}</p> : null}
+                {f.office_hours ? <p className="text-secondary">Office hours: {f.office_hours}</p> : null}
                 <span className={`mt-1 inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${tone.chip}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} aria-hidden="true" />
                   {f.availability_status}
                 </span>
-              </article>
+              </Card>
             );
           })}
         </div>

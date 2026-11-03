@@ -3,9 +3,10 @@ import { FileBarChart } from 'lucide-react';
 
 import { useClubReport } from '../../../api/hooks';
 import { BarList, StatRow } from '../../../components/ui/charts';
+import { PageSkeleton } from '../../../components/ui/PageSkeleton';
+import { Card } from '../../../components/ui/Card';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
-import { PageLoader } from '../../../components/ui/PageLoader';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
 import { useClubWorkspace } from '../ClubWorkspaceContext';
 
@@ -64,7 +65,7 @@ function ReportBody({ data }: { data: Record<string, unknown> }) {
 
         return (
           <div key={key}>
-            <h4 className="mb-3 text-sm font-medium text-slate-600">{humanize(key)}</h4>
+            <h4 className="mb-3 text-sm font-medium text-secondary">{humanize(key)}</h4>
             <BarList
               items={items}
               formatValue={looksLikeMoney(key) ? rupees : undefined}
@@ -103,8 +104,8 @@ export const ReportsTab: React.FC = () => {
             onClick={() => setReportType(r.id)}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
               reportType === r.id
-                ? 'bg-slate-900 text-white'
-                : 'border border-slate-200 bg-white text-slate-600 hover:text-slate-900'
+                ? 'bg-sand-900 text-white'
+                : 'border border-border bg-card text-secondary hover:text-primary'
             }`}
           >
             {r.label}
@@ -112,15 +113,15 @@ export const ReportsTab: React.FC = () => {
         ))}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <Card>
         {isLoading ? (
-          <PageLoader label="Generating report..." />
+          <PageSkeleton variant="stats" label="Generating report" />
         ) : isError ? (
           <ErrorState title="Report didn't load" error={error} onRetry={() => void refetch()} />
         ) : (
           <ReportBody data={(data as Record<string, unknown>) ?? {}} />
         )}
-      </div>
+      </Card>
     </div>
   );
 };

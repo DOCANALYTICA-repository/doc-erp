@@ -1,4 +1,5 @@
 import React from 'react';
+import { z } from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@astryxdesign/core/Button';
 import { useToast } from '@astryxdesign/core/Toast';
@@ -10,12 +11,17 @@ import { describeError } from '../../../services/errors';
 import { clubKeys } from '../../../lib/queryKeys';
 import { useStore } from '../../../context/useStore';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { PageSkeleton } from '../../../components/ui/PageSkeleton';
+import { Card } from '../../../components/ui/Card';
 import { ErrorState } from '../../../components/ui/ErrorState';
-import { PageLoader } from '../../../components/ui/PageLoader';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
 import { StatusChip } from '../../../components/ui/StatusChip';
 import type { AnnualPlan } from '../../../api/types';
 import { useClubWorkspace } from '../ClubWorkspaceContext';
+import { useZodForm, withServerErrors } from '../../../lib/forms';
+import { TextAreaField, NumberField } from '../../../components/ui/form/fields';
+import { FormError } from '../../../components/ui/form/FormError';
+import { rootServerError } from '../../../components/ui/form/fieldStatus';
 
 const CURRENT_ACADEMIC_YEAR = '2025-2026';
 
@@ -47,7 +53,7 @@ function PlanTimeline({ status }: { status: string }) {
       {STAGES.map((stage, idx) => (
         <li key={stage} className="flex-1">
           <div
-            className={`h-1.5 rounded-full ${idx <= current ? 'bg-emerald-500' : 'bg-slate-200'}`}
+            className={`h-1.5 rounded-full ${idx <= current ? 'bg-success' : 'bg-sand-300'}`}
             title={STAGE_LABEL[stage]}
           />
           <span className="sr-only">
@@ -59,6 +65,28 @@ function PlanTimeline({ status }: { status: string }) {
   );
 }
 
+/**
+ * The annual plan is the document a club's whole year of spending is approved
+ * against, and it travels Draft → Faculty Coordinator → Cultural Coordinator →
+ * HOD. A number that is wrong here stays wrong all year.
+ *
+ * `budget_allocation` was `Number(budget) || 0` on a field with no `required`
+ * attribute — so leaving it blank silently submitted a plan allocating zero
+ * rupees, and three reviewers would then approve it. It is now required and
+ * typed as a number; 0 is still a legitimate answer, but a deliberate one.
+ *
+ * Note the four REVIEW actions above are untouched. They are not a form —
+ * there is no field for a failure to attach to — so a toast remains the right
+ * channel for "you are not scoped for this club".
+ */
+const planSchema = z.object({
+  vision: z.string().trim().min(1, "Describe the club's vision for the year."),
+  objectives: z.string().trim().optional(),
+  budget_allocation: z
+    .number({ message: 'Enter the budget for the year — use 0 to request nothing.' })
+    .min(0, 'A budget cannot be negative.'),
+});
+
 export const AnnualPlanTab: React.FC = () => {
   const { clubId, bootstrap, refreshShell } = useClubWorkspace();
   const { data: plans, isLoading, isError, error, refetch } = useClubAnnualPlans(clubId);
@@ -68,9 +96,6 @@ export const AnnualPlanTab: React.FC = () => {
   const invalidatePlanReview = usePlanReviewInvalidator();
 
   const [isOpen, setIsOpen] = React.useState(false);
-  const [vision, setVision] = React.useState('');
-  const [objectives, setObjectives] = React.useState('');
-  const [budget, setBudget] = React.useState('');
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [rejectingId, setRejectingId] = React.useState<string | null>(null);
   const [rejectReason, setRejectReason] = React.useState('');
@@ -96,22 +121,30 @@ export const AnnualPlanTab: React.FC = () => {
     }
   };
 
-  const createPlan = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await api.post(`/clubs/${clubId}/annual-plans`, {
-        academic_year: CURRENT_ACADEMIC_YEAR,
-        vision, objectives, budget_allocation: Number(budget) || 0,
-      });
-      setVision(''); setObjectives(''); setBudget(''); setIsOpen(false);
-      showToast({ body: 'Draft plan saved.', type: 'info' });
-      refresh();
-    } catch (err) {
-      showToast({ body: `Could not save the plan: ${describeError(err)}`, type: 'error' });
-    }
-  };
+  const form = useZodForm(planSchema, {
+    defaultValues: { vision: '', objectives: '', budget_allocation: undefined },
+  });
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = form;
 
-  if (isLoading) return <PageLoader label="Loading annual plans..." />;
+  const createPlan = withServerErrors(form, async values => {
+    await api.post(`/clubs/${clubId}/annual-plans`, {
+      academic_year: CURRENT_ACADEMIC_YEAR,
+      vision: values.vision,
+      objectives: values.objectives,
+      budget_allocation: values.budget_allocation,
+    });
+    reset();
+    setIsOpen(false);
+    showToast({ body: 'Draft plan saved.', type: 'info' });
+    refresh();
+  });
+
+  if (isLoading) return <PageSkeleton variant="list" label="Loading annual plans" />;
   if (isError) return <ErrorState title="Annual plans didn't load" error={error} onRetry={() => void refetch()} />;
 
   const canReview = (plan: AnnualPlan) => {
@@ -132,20 +165,28 @@ export const AnnualPlanTab: React.FC = () => {
       />
 
       {isOpen ? (
-        <form onSubmit={createPlan} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 text-sm shadow-sm">
-          <label className="font-medium text-slate-600" htmlFor="plan-vision">Vision</label>
-          <textarea id="plan-vision" required rows={2} value={vision} onChange={e => setVision(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2" />
-          <label className="font-medium text-slate-600" htmlFor="plan-objectives">Objectives</label>
-          <textarea id="plan-objectives" rows={2} value={objectives} onChange={e => setObjectives(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2" />
-          <label className="font-medium text-slate-600" htmlFor="plan-budget">Budget allocation (Rs)</label>
-          <input id="plan-budget" type="number" min="0" value={budget} onChange={e => setBudget(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2" />
+        <Card as="form" padding="md" className="flex flex-col gap-4 text-sm shadow-sm" onSubmit={handleSubmit(createPlan)} noValidate>
+          <TextAreaField control={control} name="vision" label="Vision" rows={2} isRequired />
+          <TextAreaField control={control} name="objectives" label="Objectives" rows={2} />
+          <NumberField
+            control={control}
+            name="budget_allocation"
+            label="Budget allocation (Rs)"
+            min={0}
+            isRequired
+          />
+
+          <FormError message={rootServerError(errors)} />
+
           <div>
-            <Button label={`Save as draft (${CURRENT_ACADEMIC_YEAR})`} variant="primary" type="submit" />
+            <Button
+              label={isSubmitting ? 'Saving…' : `Save as draft (${CURRENT_ACADEMIC_YEAR})`}
+              variant="primary"
+              isDisabled={isSubmitting}
+              type="submit"
+            />
           </div>
-        </form>
+        </Card>
       ) : null}
 
       {plans && plans.length === 0 ? (
@@ -157,20 +198,20 @@ export const AnnualPlanTab: React.FC = () => {
       ) : (
         <div className="flex flex-col gap-4">
           {plans?.map(plan => (
-            <article key={plan.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <Card as="article" padding="md" key={plan.id}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-semibold text-slate-900">Academic year {plan.academic_year}</h3>
+                <h3 className="font-semibold text-primary">Academic year {plan.academic_year}</h3>
                 <StatusChip status={plan.status} />
               </div>
 
               <PlanTimeline status={plan.status} />
 
               {plan.vision ? (
-                <p className="mt-4 text-sm leading-relaxed text-slate-600">{plan.vision}</p>
+                <p className="mt-4 text-sm leading-relaxed text-secondary">{plan.vision}</p>
               ) : null}
 
               {plan.review_comments ? (
-                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <p className="mt-3 rounded-lg bg-warning-muted px-3 py-2 text-sm text-warning">
                   Reviewer comment: {plan.review_comments}
                 </p>
               ) : null}
@@ -209,16 +250,16 @@ export const AnnualPlanTab: React.FC = () => {
               </div>
 
               {rejectingId === plan.id ? (
-                <div className="mt-4 flex flex-col gap-2 rounded-lg bg-slate-50 p-4">
+                <div className="mt-4 flex flex-col gap-2 rounded-lg bg-body p-4">
                   {/* Rejection previously sent a hardcoded "Please revise." with
                       no way for the reviewer to say what was actually wrong. */}
-                  <label className="text-sm font-medium text-slate-600" htmlFor={`reject-${plan.id}`}>
+                  <label className="text-sm font-medium text-secondary" htmlFor={`reject-${plan.id}`}>
                     Why is this being sent back? (shown to the club)
                   </label>
                   <textarea
                     id={`reject-${plan.id}`} rows={2} value={rejectReason}
                     onChange={e => setRejectReason(e.target.value)}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+                    className="rounded-lg border border-border bg-card px-3 py-2 text-sm"
                   />
                   <div>
                     <Button
@@ -233,7 +274,7 @@ export const AnnualPlanTab: React.FC = () => {
                   </div>
                 </div>
               ) : null}
-            </article>
+            </Card>
           ))}
         </div>
       )}

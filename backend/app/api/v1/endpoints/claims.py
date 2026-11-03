@@ -5,8 +5,9 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.schemas.pagination import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, Page
 from app.core.rbac import PermissionChecker, get_current_user, get_resolved_permissions
-from app.core import claim_workflow, faculty_scope
-from app.repositories.claim import claim_repo, claim_participant_repo, attendance_entry_repo, timetable_repo, doc_repo
+from app.core import capabilities, claim_workflow, faculty_scope
+from app.core.claim_reviewers import ReviewerDirectory
+from app.repositories.claim import CLAIM_OUT_LOADERS, claim_repo, claim_participant_repo, attendance_entry_repo, timetable_repo, doc_repo
 from app.schemas.claim import (
     ClaimOut, ClaimCreate, ClaimResubmit, TimetableSessionOut, TimetableSessionCreate,
     SupportingDocumentOut, DuplicateClaimWarning,
@@ -28,10 +29,28 @@ def get_student_timetable(
     programme: str,
     semester: str,
     section: str,
+    batch: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return timetable_repo.get_by_academic_context(db, prog=programme, sem=semester, sec=section)
+    """The class's timetable, narrowed to the caller's batch by default.
+
+    A student is only ever shown slots they actually sit in: their own batch's,
+    plus every unbatched slot. Left unfiltered, the claim wizard offered the
+    other batch's hours, and a claim raised against one routed to a faculty
+    member who does not teach that student — which no reviewer could sensibly
+    approve or refuse.
+
+    Anyone who is not a student (Class Teacher, HOD, admin) gets the whole grid
+    unless they ask for a batch explicitly, since maintaining a timetable means
+    seeing all of it.
+    """
+    effective_batch = batch if batch is not None else (
+        current_user.batch if current_user.primary_role == "student" else None
+    )
+    return timetable_repo.get_by_academic_context(
+        db, prog=programme, sem=semester, sec=section, batch=effective_batch,
+    )
 
 
 # 1a. Timetable administration (Class Teacher / HOD / super_admin) — this
@@ -126,8 +145,26 @@ def submit_attendance_claim(
     db: Session = Depends(get_db),
     current_user: User = Depends(PermissionChecker(["claims:submit"]))
 ):
-    if claim_in.submission_type == "club" and not claim_in.club_id:
-        raise HTTPException(status_code=400, detail="club_id is required when submission_type is 'club'")
+    # Clubs file co-curricular claims as yellow forms (pre-approval, then a
+    # claim sheet) from their club workspace; this route is individual-only.
+    if claim_in.submission_type == "club":
+        raise HTTPException(
+            status_code=400,
+            detail="Club claims are filed as yellow forms from the club workspace: "
+                   "a pre-approval before the event, then a claim sheet once it is over.",
+        )
+    if claim_in.club_id or any(s != current_user.id for s in claim_in.student_ids or []):
+        raise HTTPException(
+            status_code=400,
+            detail="A claim is filed by the student it is for — clubs claim for their members "
+                   "with yellow forms from the club workspace.",
+        )
+    if claim_in.category == "co_curricular" and not capabilities.is_live("claims.individual_co_curricular"):
+        raise HTTPException(
+            status_code=403,
+            detail="Individual co-curricular claims (yellow forms) are not available yet — "
+                   "clubs file yellow forms from their club workspace.",
+        )
 
     claim_id = f"cl_{uuid.uuid4().hex[:12]}"
     ref_num = f"ACP-{datetime.now().year}-{uuid.uuid4().hex[:6].upper()}"
@@ -168,8 +205,8 @@ def submit_attendance_claim(
     db_claim = Claim(**claim_dict)
     db.add(db_claim)
 
-    # Group submission: multiple students, else just the submitter
-    student_ids = claim_in.student_ids or [current_user.id]
+    co_teachers = _co_teachers(db, claim_in.programme, claim_in.semester, claim_in.section)
+    student_ids = [current_user.id]
     for s_id in student_ids:
         cp_id = f"cp_{uuid.uuid4().hex[:12]}"
         db_participant = ClaimParticipant(
@@ -187,9 +224,11 @@ def submit_attendance_claim(
                 id=entry_id,
                 claim_participant_id=cp_id,
                 subject=mc.subject,
+                course_code=mc.course_code,
                 date=mc.date,
                 hour=mc.hour,
                 subject_faculty_id=mc.subject_faculty_id,
+                co_faculty_id=_co_teacher_for(co_teachers, mc),
                 status="pending"
             )
             db.add(db_entry)
@@ -204,16 +243,65 @@ def submit_attendance_claim(
             source_module="claims", entity_type="claim", entity_id=claim_id,
         )
 
-    return _to_claim_out(db_claim)
+    return _to_claim_out(db_claim, ReviewerDirectory(db))
 
 
-def _to_claim_out(claim: Claim) -> ClaimOut:
+def _co_teachers(db: Session, programme, semester, section) -> dict:
+    """(weekday, hour, faculty_id) -> co-teacher, for every co-taught slot.
+
+    Looked up on the server rather than taken from the client: a student
+    must not be able to name who signs off their absence.
+    """
+    return {
+        (s.day_of_week, s.hour, s.faculty_id): s.co_faculty_id
+        for s in db.query(TimetableSession).filter(
+            TimetableSession.programme == programme,
+            TimetableSession.semester == semester,
+            TimetableSession.section == section,
+            TimetableSession.co_faculty_id.isnot(None),
+        ).all()
+    }
+
+
+def _co_teacher_for(co_teachers: dict, mc) -> Optional[str]:
+    try:
+        weekday = datetime.strptime(mc.date, "%Y-%m-%d").strftime("%A")
+    except ValueError:
+        return None
+    return co_teachers.get((weekday, mc.hour, mc.subject_faculty_id))
+
+def _to_claim_out(claim: Claim, reviewers: Optional[ReviewerDirectory] = None) -> ClaimOut:
     """Attach the real submitter name via the existing relationship instead
     of trusting any client-supplied value — fixes the hardcoded
-    'Vikram Aditya' display bug that existed purely on the frontend."""
+    'Vikram Aditya' display bug that existed purely on the frontend.
+
+    `reviewers` adds who the claim is waiting on. It is optional only so that
+    a caller with no Session to hand can still serialise a claim; every route
+    passes one.
+    """
     out = ClaimOut.model_validate(claim)
     out.submitter_name = claim.submitter.name if claim.submitter else "Unknown"
+    if reviewers is not None:
+        out.pending_approvals = reviewers.pending_for(claim)
     return out
+
+
+#: What a reviewer is looking at. "pending" is their to-do list — only claims
+#: their own decision is holding up. "actioned" is everything they have already
+#: decided, whether it has since been fully approved or merely moved on.
+#:
+#: One list used to serve both, so a claim a reviewer had already approved sat
+#: in their queue next to ones they had not, with nothing but the stage column
+#: to tell them apart.
+VIEW_PENDING = "pending"
+VIEW_ACTIONED = "actioned"
+CLAIM_VIEWS = (VIEW_PENDING, VIEW_ACTIONED)
+
+#: Every stage after the Class Teacher has approved.
+_PAST_INITIAL_REVIEW = ("subject_faculty", "course_coordinator", "attendance_office")
+
+#: Claim statuses whose next move belongs to the student, not to any reviewer.
+_AWAITING_THE_STUDENT = ("draft", "returned", "rejected")
 
 
 def _claims_pending_for_subject_faculty(db: Session, faculty_id: str) -> List[Claim]:
@@ -251,10 +339,115 @@ def _paginate(items: List[ClaimOut], page: int, page_size: int) -> Page[ClaimOut
     )
 
 
+def _faculty_pending(db: Session, user: User) -> dict:
+    """Claims whose next move is THIS reviewer's.
+
+    A draft is excluded everywhere below. A draft has not been submitted to
+    anyone — it sat in the Class Teacher's queue purely because it carries the
+    initial_review stage from the moment it is created, and there was nothing
+    they could usefully do with it.
+
+    So is a claim that has been sent back or rejected: the next move there is
+    the student's, and listing it under "awaiting your decision" asks the
+    reviewer to decide something they have already decided.
+    """
+    permissions = get_resolved_permissions(user)
+    tags = set(user.role_tags_list)
+    results = {}
+
+    if "Class Teacher" in tags:
+        for c in db.query(Claim).options(*CLAIM_OUT_LOADERS).filter(
+            Claim.current_workflow_stage == "initial_review",
+            Claim.submission_type == "individual",
+            Claim.status.notin_(_AWAITING_THE_STUDENT),
+        ).all():
+            if faculty_scope.is_class_teacher_for(db, user.id, c.programme, c.semester, c.section):
+                results[c.id] = c
+
+    if "Club Faculty Coordinator" in tags:
+        for c in db.query(Claim).options(*CLAIM_OUT_LOADERS).filter(
+            Claim.current_workflow_stage == "initial_review",
+            Claim.submission_type == "club",
+            Claim.status.notin_(_AWAITING_THE_STUDENT),
+        ).all():
+            if faculty_scope.is_club_faculty_coordinator_for(db, user.id, c.club_id):
+                results[c.id] = c
+
+    if "claims:review_faculty" in permissions:
+        # Already narrowed to the subject_faculty stage AND to entries of
+        # theirs that are still pending, which is exactly "pending for me".
+        for c in _claims_pending_for_subject_faculty(db, user.id):
+            results[c.id] = c
+
+    if "Course Coordinator" in tags or "HOD" in tags:
+        # course_coordinator ONLY. attendance_office is terminal — it belongs
+        # in the actioned view, not in anyone's to-do list.
+        for c in db.query(Claim).options(*CLAIM_OUT_LOADERS).filter(
+            Claim.current_workflow_stage == "course_coordinator",
+        ).all():
+            if "HOD" in tags or faculty_scope.is_course_coordinator_for(db, user.id, c.programme):
+                results[c.id] = c
+
+    return results
+
+
+def _faculty_actioned(db: Session, user: User) -> dict:
+    """Claims this reviewer has already decided.
+
+    Deliberately includes claims that have since moved on as well as ones now
+    fully approved: from the reviewer's side both are the same fact — they
+    have signed, and there is nothing left for them to do — and a reviewer who
+    wants to check what they approved last week should not have to know which
+    desk it is sitting on now.
+
+    A claim they sent back or rejected is here too, found by last_revised_by:
+    a rejection is a decision, and it would otherwise vanish the moment it was
+    made.
+    """
+    permissions = get_resolved_permissions(user)
+    tags = set(user.role_tags_list)
+    results = {}
+
+    if "Class Teacher" in tags:
+        for c in db.query(Claim).options(*CLAIM_OUT_LOADERS).filter(
+            Claim.current_workflow_stage.in_(_PAST_INITIAL_REVIEW),
+            Claim.submission_type == "individual",
+        ).all():
+            if faculty_scope.is_class_teacher_for(db, user.id, c.programme, c.semester, c.section):
+                results[c.id] = c
+
+    if "Club Faculty Coordinator" in tags:
+        for c in db.query(Claim).options(*CLAIM_OUT_LOADERS).filter(
+            Claim.current_workflow_stage.in_(_PAST_INITIAL_REVIEW),
+            Claim.submission_type == "club",
+        ).all():
+            if faculty_scope.is_club_faculty_coordinator_for(db, user.id, c.club_id):
+                results[c.id] = c
+
+    if "claims:review_faculty" in permissions:
+        for c in claim_repo.get_decided_by_subject_faculty(db, faculty_id=user.id):
+            results[c.id] = c
+
+    if "Course Coordinator" in tags or "HOD" in tags:
+        for c in db.query(Claim).options(*CLAIM_OUT_LOADERS).filter(
+            Claim.current_workflow_stage == "attendance_office",
+        ).all():
+            if "HOD" in tags or faculty_scope.is_course_coordinator_for(db, user.id, c.programme):
+                results[c.id] = c
+
+    for c in db.query(Claim).options(*CLAIM_OUT_LOADERS).filter(
+        Claim.last_revised_by == user.id,
+    ).all():
+        results[c.id] = c
+
+    return results
+
+
 @router.get("", response_model=Page[ClaimOut])
 def list_claims(
     page: int = Query(1, ge=1),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    view: str = Query(VIEW_PENDING),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -267,53 +460,39 @@ def list_claims(
 
     Scoping happens first and pagination second, on purpose: paging a list and
     then filtering it would produce short pages and a meaningless total.
+
+    `view` splits a reviewer's claims into what still needs them and what they
+    have already decided. It does nothing for a student: their own claims are
+    their own claims whatever state they are in.
     """
+    if view not in CLAIM_VIEWS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown view '{view}'. Expected one of: {', '.join(CLAIM_VIEWS)}",
+        )
+
+    reviewers = ReviewerDirectory(db)
+
     if current_user.primary_role == "super_admin":
-        return _paginate([_to_claim_out(c) for c in claim_repo.get_multi(db)], page, page_size)
+        claims = claim_repo.get_multi(db)
+        if view == VIEW_PENDING:
+            claims = [c for c in claims if c.status not in _AWAITING_THE_STUDENT]
+        return _paginate([_to_claim_out(c, reviewers) for c in claims], page, page_size)
 
     if current_user.primary_role == "faculty":
-        permissions = get_resolved_permissions(current_user)
-        tags = set(current_user.role_tags_list)
-        results = {}
+        found = _faculty_pending(db, current_user) if view == VIEW_PENDING \
+            else _faculty_actioned(db, current_user)
+        ordered = sorted(
+            found.values(), key=lambda c: (c.submission_date, c.id), reverse=True,
+        )
+        return _paginate([_to_claim_out(c, reviewers) for c in ordered], page, page_size)
 
-        if "Class Teacher" in tags:
-            for c in db.query(Claim).filter(
-                Claim.current_workflow_stage == "initial_review",
-                Claim.submission_type == "individual",
-            ).all():
-                if faculty_scope.is_class_teacher_for(db, current_user.id, c.programme, c.semester, c.section):
-                    results[c.id] = c
-
-        if "Club Faculty Coordinator" in tags:
-            for c in db.query(Claim).filter(
-                Claim.current_workflow_stage == "initial_review",
-                Claim.submission_type == "club",
-            ).all():
-                if faculty_scope.is_club_faculty_coordinator_for(db, current_user.id, c.club_id):
-                    results[c.id] = c
-
-        if "claims:review_faculty" in permissions:
-            for c in _claims_pending_for_subject_faculty(db, current_user.id):
-                results[c.id] = c
-
-        if "Course Coordinator" in tags or "HOD" in tags:
-            # attendance_office belongs here too. Omitting it meant that the
-            # moment a Course Coordinator approved a claim, it disappeared
-            # from EVERY review queue permanently — there is no other route
-            # that lists claims at that stage, so nothing could ever close.
-            # get_claim already grants read access at this stage; only the
-            # list query was missing it.
-            for c in db.query(Claim).filter(
-                Claim.current_workflow_stage.in_(["course_coordinator", "attendance_office"])
-            ).all():
-                if "HOD" in tags or faculty_scope.is_course_coordinator_for(db, current_user.id, c.programme):
-                    results[c.id] = c
-
-        return _paginate([_to_claim_out(c) for c in results.values()], page, page_size)
-
-    # Students (and club accounts, once modeled) see their own submitted claims
+    # Students (and club accounts, once modeled) see their own claims.
     return _paginate(
-        [_to_claim_out(c) for c in claim_repo.get_by_submitter(db, user_id=current_user.id)],
+        [
+            _to_claim_out(c, reviewers)
+            for c in claim_repo.get_by_submitter(db, user_id=current_user.id)
+        ],
         page, page_size,
     )
 
@@ -341,12 +520,22 @@ def get_claim(claim_id: str, db: Session = Depends(get_db), current_user: User =
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
+    reviewers = ReviewerDirectory(db)
+
     if current_user.primary_role == "super_admin":
-        return _to_claim_out(claim)
+        return _to_claim_out(claim, reviewers)
     if claim.submitted_by == current_user.id:
-        return _to_claim_out(claim)
+        return _to_claim_out(claim, reviewers)
     if any(p.student_id == current_user.id for p in claim.participants):
-        return _to_claim_out(claim)
+        return _to_claim_out(claim, reviewers)
+
+    # A draft belongs to the student alone. It carries the initial_review
+    # stage from the moment it is created, which is the only reason a Class
+    # Teacher could open one — an unsubmitted form nobody has been asked to
+    # look at yet.
+    if claim.status == "draft":
+        raise HTTPException(status_code=403, detail="You do not have access to this claim")
+
     if current_user.primary_role == "faculty":
         tags = set(current_user.role_tags_list)
         permissions = get_resolved_permissions(current_user)
@@ -366,17 +555,24 @@ def get_claim(claim_id: str, db: Session = Depends(get_db), current_user: User =
                 and faculty_scope.is_course_coordinator_for(db, current_user.id, claim.programme)
             )
             or (
+                # Subject faculty: only once the Class Teacher has let it
+                # through, and only for a claim carrying one of their hours.
+                # They keep that access after the claim moves on — they have
+                # to be able to reopen what they approved.
                 "claims:review_faculty" in permissions
-                and claim.current_workflow_stage == "subject_faculty"
+                and claim.current_workflow_stage != "initial_review"
                 and any(
-                    entry.subject_faculty_id == current_user.id
+                    entry.is_taught_by(current_user.id)
                     for participant in claim.participants
                     for entry in participant.entries
                 )
             )
+            # Whoever sent it back can still read it. Otherwise a reviewer who
+            # rejected a claim could not answer a question about it.
+            or claim.last_revised_by == current_user.id
         )
         if is_reviewer:
-            return _to_claim_out(claim)
+            return _to_claim_out(claim, reviewers)
 
     raise HTTPException(status_code=403, detail="You do not have access to this claim")
 
@@ -447,7 +643,9 @@ def approve_claim_stage(
             for participant in claim.participants
             for entry in participant.entries
             if entry.status == "pending"
-            and (is_super_admin or entry.subject_faculty_id == current_user.id)
+            # Either teacher of a co-taught hour may sign it, and one
+            # signature clears it for both.
+            and (is_super_admin or entry.is_taught_by(current_user.id))
         ]
         if not my_pending:
             raise HTTPException(
@@ -481,11 +679,16 @@ def approve_claim_stage(
     db.add(claim)
     db.commit()
 
+    new_spec = claim_workflow.STAGES.get(claim.current_workflow_stage)
+    stage_label = (
+        claim_workflow.label_for(new_spec, claim.submission_type)
+        if new_spec else claim.current_workflow_stage
+    )
     participant_ids = {p.student_id for p in claim.participants}
     for s_id in participant_ids:
         notification_engine.send_notification(
             db, user_id=s_id, title=f"Claim {claim.reference_number} update",
-            content=f"Your claim moved to stage '{claim.current_workflow_stage}' (status: {claim.status}).",
+            content=f"Your claim is now at: {stage_label} (status: {claim.status}).",
             source_module="claims", entity_type="claim", entity_id=claim.id,
         )
     # The stage that just approved forward to Subject Faculty review is the
@@ -493,10 +696,12 @@ def approve_claim_stage(
     # known — each attendance entry names its own subject_faculty_id.
     if stage == "initial_review" and claim.current_workflow_stage == "subject_faculty":
         faculty_ids = {
-            entry.subject_faculty_id
+            f_id
             for participant in claim.participants
             for entry in participant.entries
             if entry.status == "pending"
+            for f_id in (entry.subject_faculty_id, entry.co_faculty_id)
+            if f_id
         }
         for f_id in faculty_ids:
             notification_engine.send_notification(
@@ -546,6 +751,7 @@ def resubmit_claim(
             for entry in list(participant.entries):
                 db.delete(entry)
         db.flush()
+        co_teachers = _co_teachers(db, claim.programme, claim.semester, claim.section)
         new_labels = []
         for participant in claim.participants:
             for mc in resubmit_in.missed_classes:
@@ -554,9 +760,11 @@ def resubmit_claim(
                     id=entry_id,
                     claim_participant_id=participant.id,
                     subject=mc.subject,
+                    course_code=mc.course_code,
                     date=mc.date,
                     hour=mc.hour,
                     subject_faculty_id=mc.subject_faculty_id,
+                    co_faculty_id=_co_teacher_for(co_teachers, mc),
                     status="pending",
                 ))
                 new_labels.append(f"{mc.subject} ({mc.date} {mc.hour})")
@@ -632,7 +840,7 @@ def resubmit_claim(
             email_recipient=True,
         )
 
-    return _to_claim_out(claim)
+    return _to_claim_out(claim, ReviewerDirectory(db))
 
 
 # 4c. List Supporting Documents — every reviewer who can see the claim can

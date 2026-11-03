@@ -3,10 +3,11 @@ import { BarChart3 } from 'lucide-react';
 
 import { useClubAnalytics } from '../../../api/hooks';
 import { BarList, ColumnChart, Gauge, GroupedColumnChart, StatRow } from '../../../components/ui/charts';
+import { PageSkeleton } from '../../../components/ui/PageSkeleton';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
-import { PageLoader } from '../../../components/ui/PageLoader';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
+import { Card } from '../../../components/ui/Card';
 import { useClubWorkspace } from '../ClubWorkspaceContext';
 
 const CURRENT_ACADEMIC_YEAR = '2025-2026';
@@ -21,10 +22,10 @@ interface Widget {
 const Panel: React.FC<{ title: string; children: React.ReactNode; wide?: boolean }> = ({
   title, children, wide,
 }) => (
-  <section className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm ${wide ? 'sm:col-span-2' : ''}`}>
-    <h3 className="mb-4 text-sm font-semibold text-slate-900">{title}</h3>
+  <Card as="section" padding="md" className={wide ? 'sm:col-span-2' : undefined}>
+    <h3 className="mb-4 font-heading text-sm font-semibold text-primary">{title}</h3>
     {children}
-  </section>
+  </Card>
 );
 
 /**
@@ -146,14 +147,14 @@ function renderWidget(widget: Widget): React.ReactNode {
       // The server says explicitly that this is not implemented rather than
       // fabricating numbers. Say so, rather than rendering {"available": false}.
       return (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-secondary">
           {String(d.reason ?? 'Not available yet.')}
         </p>
       );
 
     default:
       return (
-        <pre className="overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+        <pre className="overflow-x-auto rounded-lg bg-body p-3 text-xs text-secondary">
           {JSON.stringify(widget.data, null, 2)}
         </pre>
       );
@@ -164,7 +165,7 @@ export const AnalyticsTab: React.FC = () => {
   const { clubId } = useClubWorkspace();
   const { data, isLoading, isError, error, refetch } = useClubAnalytics(clubId, CURRENT_ACADEMIC_YEAR);
 
-  if (isLoading) return <PageLoader label="Computing analytics..." />;
+  if (isLoading) return <PageSkeleton variant="stats" label="Computing analytics" />;
   if (isError) return <ErrorState title="Analytics didn't load" error={error} onRetry={() => void refetch()} />;
 
   const widgets = ((data as Record<string, unknown> | undefined)?.widgets as Widget[]) ?? [];

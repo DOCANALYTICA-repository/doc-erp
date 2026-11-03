@@ -7,26 +7,26 @@ def test_claim_detail_requires_auth(client):
 
 
 def test_unrelated_student_cannot_view_claim_detail(client):
-    h = auth_headers(client, "student.regular2@christuniversity.in", "student123")
+    h = auth_headers(client, "student.regular2@christuniversity.in", "123")
     r = client.get("/api/v1/claims/cl_med_1", headers=h)
     assert r.status_code == 403
 
 
 def test_submitter_can_view_own_claim_and_name_is_real(client):
-    h = auth_headers(client, "student.regular@christuniversity.in", "student123")
+    h = auth_headers(client, "student.regular@christuniversity.in", "123")
     r = client.get("/api/v1/claims/cl_med_1", headers=h)
     assert r.status_code == 200
     assert r.json()["submitter_name"] == "Vikram Aditya"
 
 
 def test_student_cannot_approve_a_claim_stage(client):
-    h = auth_headers(client, "student.regular@christuniversity.in", "student123")
+    h = auth_headers(client, "student.regular@christuniversity.in", "123")
     r = client.post("/api/v1/claims/cl_med_1/approve-stage?action=approve", headers=h)
     assert r.status_code == 403
 
 
 def test_full_submit_and_approval_chain(client):
-    student_h = auth_headers(client, "student.regular@christuniversity.in", "student123")
+    student_h = auth_headers(client, "student.regular@christuniversity.in", "123")
     tt = client.get(
         "/api/v1/claims/timetable?programme=B.Com (Hons)&semester=5&section=A", headers=student_h
     ).json()
@@ -49,21 +49,21 @@ def test_full_submit_and_approval_chain(client):
     cid = claim["id"]
     assert claim["current_workflow_stage"] == "initial_review"
 
-    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "faculty123")
+    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "123")
     r = client.post(f"/api/v1/claims/{cid}/approve-stage?action=approve", headers=teacher_h)
     assert r.status_code == 200
     assert r.json()["new_stage"] == "subject_faculty"
 
     # An unrelated faculty member with no entries on this claim must be denied
-    hod_h = auth_headers(client, "hod.commerce@christuniversity.in", "faculty123")
+    hod_h = auth_headers(client, "hod.commerce@christuniversity.in", "123")
     r = client.post(f"/api/v1/claims/{cid}/approve-stage?action=approve", headers=hod_h)
     assert r.status_code == 403
 
     detail = client.get(f"/api/v1/claims/{cid}", headers=teacher_h).json()
     assigned_faculty_id = detail["participants"][0]["entries"][0]["subject_faculty_id"]
     assigned_h = {
-        "fac_subject_1": auth_headers(client, "faculty.finance@christuniversity.in", "faculty123"),
-        "fac_subject_2": auth_headers(client, "faculty.accounting@christuniversity.in", "faculty123"),
+        "fac_subject_1": auth_headers(client, "faculty.finance@christuniversity.in", "123"),
+        "fac_subject_2": auth_headers(client, "faculty.accounting@christuniversity.in", "123"),
     }[assigned_faculty_id]
     r = client.post(f"/api/v1/claims/{cid}/approve-stage?action=approve", headers=assigned_h)
     assert r.status_code == 200
@@ -71,20 +71,20 @@ def test_full_submit_and_approval_chain(client):
 
 
 def test_duplicate_claim_check_is_a_soft_warning(client):
-    h = auth_headers(client, "student.regular@christuniversity.in", "student123")
+    h = auth_headers(client, "student.regular@christuniversity.in", "123")
     r = client.get("/api/v1/claims/duplicate-check?date_range=2026-07-05 to 2026-07-06", headers=h)
     assert r.status_code == 200
     assert r.json()["has_potential_duplicate"] is True
 
 
 def test_faculty_ai_summary_denied_to_students(client):
-    h = auth_headers(client, "student.regular@christuniversity.in", "student123")
+    h = auth_headers(client, "student.regular@christuniversity.in", "123")
     r = client.get("/api/v1/claims/cl_med_1/ai-summary", headers=h)
     assert r.status_code == 403
 
 
 def test_timetable_admin_requires_permission(client):
-    student_h = auth_headers(client, "student.regular@christuniversity.in", "student123")
+    student_h = auth_headers(client, "student.regular@christuniversity.in", "123")
     body = {
         "day_of_week": "Thursday", "subject": "X", "hour": "X", "faculty_id": "fac_subject_1",
         "programme": "B.Com (Hons)", "semester": "5", "section": "A",
@@ -93,7 +93,7 @@ def test_timetable_admin_requires_permission(client):
     assert r.status_code == 403
 
     # fac_class_teacher is the Class Teacher for exactly B.Com (Hons) / 5 / A.
-    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "faculty123")
+    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "123")
     r = client.post("/api/v1/claims/timetable", json=body, headers=teacher_h)
     assert r.status_code == 200, r.text
 
@@ -104,7 +104,7 @@ def test_class_teacher_cannot_touch_another_classs_timetable(client):
     Any Class Teacher could rewrite or delete any class's timetable — and the
     entire claims workflow is built on that data.
     """
-    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "faculty123")
+    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "123")
     foreign = {
         "day_of_week": "Friday", "subject": "Not Mine", "hour": "1", "faculty_id": "fac_subject_1",
         "programme": "BBA", "semester": "3", "section": "C",
@@ -113,7 +113,7 @@ def test_class_teacher_cannot_touch_another_classs_timetable(client):
     assert r.status_code == 403, r.text
 
     # HOD holds claims:manage_timetable_all and stays department-wide.
-    hod_h = auth_headers(client, "hod.commerce@christuniversity.in", "faculty123")
+    hod_h = auth_headers(client, "hod.commerce@christuniversity.in", "123")
     r = client.post("/api/v1/claims/timetable", json=foreign, headers=hod_h)
     assert r.status_code == 200, r.text
     foreign_id = r.json()["id"]

@@ -46,6 +46,7 @@ const capabilitiesSchema = z.object({
   can_assign_tasks: z.boolean(),
   can_approve_plan: z.boolean(),
   can_manage_members: z.boolean(),
+  can_file_yellow_forms: z.boolean(),
 });
 
 /**
@@ -67,7 +68,22 @@ export const parseClubBootstrap = lenient(
     relationship: z.string(),
     capabilities: capabilitiesSchema,
     visible_tabs: z.array(z.string()).min(1),
-    counters: z.object({ members: z.number(), events: z.number() }).loose(),
+    /*
+     * All four counters, not just two.
+     *
+     * `DashboardTab` dereferences `counters.budget_spent.toLocaleString()` and
+     * `counters.open_tasks`, so a backend that stopped sending either would
+     * CRASH the tab rather than raise the contract warning this file exists to
+     * raise — which is the exact failure mode it was written to prevent. The
+     * gap surfaced while writing a test mock, which had to supply both fields
+     * to stop the tab throwing.
+     */
+    counters: z.object({
+      members: z.number(),
+      events: z.number(),
+      budget_spent: z.number(),
+      open_tasks: z.number(),
+    }).loose(),
     hierarchy: z.array(z.unknown()),
     members: z.array(z.unknown()),
   }).loose(),

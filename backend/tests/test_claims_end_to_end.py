@@ -1,4 +1,4 @@
-"""A claim must be able to reach 'closed', and must survive a revision round trip.
+"""A claim must be able to run to completion, and survive a revision round trip.
 
 Neither was possible. Five separate defects, one of them terminal:
 
@@ -8,16 +8,20 @@ Neither was possible. Five separate defects, one of them terminal:
   * resubmit_claim only reset entries when new missed_classes were supplied,
     so resubmitting a corrected reason left them rejected and the subject
     faculty got a permanent 403.
-  * the attendance_office branch ignored `action` and closed the claim as a
-    success even when called with reject.
+  * the final branch ignored `action` and recorded the claim as a success even
+    when called with reject.
   * super_admin was stuck at subject_faculty with an empty entry list.
+
+Course Coordinator approval is now the LAST action in the workflow: the
+attendance office is where an approved claim is sent, not another approver,
+and modelling it as a stage made the coordinator approve the same claim twice.
 """
 from .conftest import auth_headers
 
-STUDENT = ("student.regular@christuniversity.in", "student123")
-CLASS_TEACHER = ("teacher.class@christuniversity.in", "faculty123")
-HOD = ("hod.commerce@christuniversity.in", "faculty123")
-ADMIN = ("admin@christuniversity.in", "admin123")
+STUDENT = ("student.regular@christuniversity.in", "123")
+CLASS_TEACHER = ("teacher.class@christuniversity.in", "123")
+HOD = ("hod.commerce@christuniversity.in", "123")
+ADMIN = ("admin@christuniversity.in", "123")
 
 
 def _submit(client, date_range):
@@ -70,7 +74,7 @@ def test_timetable_sessions_name_the_faculty_who_teach_them(client):
     assert all(s["faculty_name"] for s in tt), tt
 
 
-def test_claim_walks_all_the_way_to_closed(client):
+def test_claim_walks_all_the_way_to_approved(client):
     claim = _submit(client, "2026-08-03 to 2026-08-03")
     cid = claim["id"]
 
@@ -81,19 +85,42 @@ def test_claim_walks_all_the_way_to_closed(client):
     assert _act(client, ADMIN, cid, "approve").status_code == 200
     assert _stage(client, ADMIN, cid)[0] == "course_coordinator"
 
+    # ONE approval from the Course Coordinator finishes it.
     assert _act(client, HOD, cid, "approve").status_code == 200
     stage, status = _stage(client, ADMIN, cid)
     assert (stage, status) == ("attendance_office", "approved")
 
     # THE terminal bug: at this point the claim used to be invisible to every
-    # reviewer, so it could never be closed by anyone.
-    hod_queue = client.get("/api/v1/claims", headers=auth_headers(client, *HOD)).json()["items"]
-    assert cid in {c["id"] for c in hod_queue}, (
-        "an approved claim is invisible to every review queue — it can never close"
+    # reviewer, so nobody could see what they had approved. It is no longer in
+    # the to-do list — the coordinator has nothing left to do with it — but it
+    # must still be findable in what they HAVE actioned.
+    h = auth_headers(client, *HOD)
+    pending = client.get("/api/v1/claims?view=pending", headers=h).json()["items"]
+    actioned = client.get("/api/v1/claims?view=actioned", headers=h).json()["items"]
+    assert cid not in {c["id"] for c in pending}, "an approved claim is still a to-do"
+    assert cid in {c["id"] for c in actioned}, (
+        "an approved claim is invisible to the reviewer who approved it"
     )
 
+
+def test_a_forwarded_claim_cannot_be_approved_a_second_time(client):
+    """The attendance office does not use this system, so nobody may act for
+    it. Asking the Course Coordinator to approve again was asking them to
+    rubber-stamp their own decision."""
+    claim = _submit(client, "2026-08-06 to 2026-08-06")
+    cid = claim["id"]
+
+    _act(client, CLASS_TEACHER, cid, "approve")
+    _act(client, ADMIN, cid, "approve")
     assert _act(client, HOD, cid, "approve").status_code == 200
-    assert _stage(client, ADMIN, cid) == ("closed", "closed")
+    assert _stage(client, ADMIN, cid) == ("attendance_office", "approved")
+
+    for creds in (HOD, ADMIN):
+        r = _act(client, creds, cid, "approve")
+        assert r.status_code == 403, r.text
+        assert "attendance office" in r.json()["detail"]
+    # ...and it stays exactly where it was.
+    assert _stage(client, ADMIN, cid) == ("attendance_office", "approved")
 
 
 def test_claim_survives_revise_then_resubmit_then_approve(client):
@@ -125,8 +152,7 @@ def test_rejecting_at_the_final_stage_is_not_recorded_as_success(client):
 
     _act(client, CLASS_TEACHER, cid, "approve")
     _act(client, ADMIN, cid, "approve")
-    _act(client, HOD, cid, "approve")
-    assert _stage(client, ADMIN, cid)[0] == "attendance_office"
+    assert _stage(client, ADMIN, cid)[0] == "course_coordinator"
 
     assert _act(client, HOD, cid, "reject", feedback="Certificate not genuine").status_code == 200
     stage, status = _stage(client, ADMIN, cid)

@@ -1,4 +1,5 @@
 import React from 'react';
+import { z } from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@astryxdesign/core/Button';
 import { useToast } from '@astryxdesign/core/Toast';
@@ -10,10 +11,25 @@ import { describeError } from '../../../services/errors';
 import { facultyKeys } from '../../../lib/queryKeys';
 import { useStore } from '../../../context/useStore';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { PageSkeleton } from '../../../components/ui/PageSkeleton';
+import { Card } from '../../../components/ui/Card';
 import { ErrorState } from '../../../components/ui/ErrorState';
-import { PageLoader } from '../../../components/ui/PageLoader';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
+import { useZodForm, withServerErrors } from '../../../lib/forms';
+import { TextField, TextAreaField } from '../../../components/ui/form/fields';
+import { FormError } from '../../../components/ui/form/FormError';
+import { rootServerError } from '../../../components/ui/form/fieldStatus';
 import type { Note } from '../../../api/types';
+
+/**
+ * `title` was guarded by an imperative toast ("A note needs a title.") that
+ * fired only after the user clicked Save. The rule is the same; it now appears
+ * on the title field, on blur, before they reach the button.
+ */
+const noteSchema = z.object({
+  title: z.string().trim().min(1, 'A note needs a title.'),
+  content: z.string().optional(),
+});
 
 export const NotesTab: React.FC = () => {
   const { data: notes, isLoading, isError, error, refetch } = useNotes();
@@ -21,33 +37,24 @@ export const NotesTab: React.FC = () => {
   const showToast = useToast();
   const queryClient = useQueryClient();
 
-  const [title, setTitle] = React.useState('');
-  const [content, setContent] = React.useState('');
-  const [isSaving, setIsSaving] = React.useState(false);
 
   const isReadOnly = user?.primary_role === 'super_admin';
   const invalidate = () => queryClient.invalidateQueries({ queryKey: facultyKeys.notes() });
 
-  const add = async () => {
-    if (!title.trim()) {
-      showToast({ body: 'A note needs a title.', type: 'error' });
-      return;
-    }
-    setIsSaving(true);
-    try {
-      await api.post('/faculty/notes', { title, content });
-      setTitle(''); setContent('');
-      showToast({ body: 'Note saved.', type: 'info' });
-      invalidate();
-    } catch (e) {
-      // This handler used to await the write, clear nothing, and call
-      // setActiveSubTab to the tab it was already on — a no-op, so the new
-      // note simply never appeared.
-      showToast({ body: `Could not save the note: ${describeError(e)}`, type: 'error' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const form = useZodForm(noteSchema, { defaultValues: { title: '', content: '' } });
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = form;
+
+  const add = withServerErrors(form, async values => {
+    await api.post('/faculty/notes', { title: values.title, content: values.content });
+    reset();
+    showToast({ body: 'Note saved.', type: 'info' });
+    invalidate();
+  });
 
   const togglePin = async (note: Note) => {
     try {
@@ -58,28 +65,33 @@ export const NotesTab: React.FC = () => {
     }
   };
 
-  if (isLoading) return <PageLoader label="Loading notes..." />;
+  if (isLoading) return <PageSkeleton variant="list" label="Loading notes" />;
   if (isError) return <ErrorState title="Notes didn't load" error={error} onRetry={() => void refetch()} />;
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <Card as="section">
         <SectionHeader title="Add a note" />
-        <div className="mt-4 flex flex-col gap-3 text-sm">
-          <label className="font-medium text-slate-600" htmlFor="note-title">Title</label>
-          <input id="note-title" value={title} onChange={e => setTitle(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2" />
-          <label className="font-medium text-slate-600" htmlFor="note-content">Content</label>
-          <textarea id="note-content" rows={4} value={content} onChange={e => setContent(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2" />
+        {/*
+          * A real <form>, so Enter submits. This was a <div> of inputs with a
+          * click handler on the button — pressing Enter in the title field did
+          * nothing at all, which on a note-taking screen is the single most
+          * likely thing a user tries.
+          */}
+        <form onSubmit={handleSubmit(add)} noValidate className="mt-4 flex flex-col gap-4 text-sm">
+          <TextField control={control} name="title" label="Title" isRequired isDisabled={isReadOnly} />
+          <TextAreaField control={control} name="content" label="Content" rows={4} isDisabled={isReadOnly} />
+
+          <FormError message={rootServerError(errors)} />
+
           <Button
-            label={isReadOnly ? 'Admin is view-only here' : isSaving ? 'Saving…' : 'Save note'}
+            label={isReadOnly ? 'Admin is view-only here' : isSubmitting ? 'Saving…' : 'Save note'}
             variant="primary"
-            isDisabled={isReadOnly || isSaving}
-            clickAction={add}
+            isDisabled={isReadOnly || isSubmitting}
+            type="submit"
           />
-        </div>
-      </section>
+        </form>
+      </Card>
 
       <div className="flex flex-col gap-4 md:col-span-2">
         <SectionHeader title="Your notes" />
@@ -88,23 +100,23 @@ export const NotesTab: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {notes?.map(note => (
-              <article key={note.id} className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <Card as="article" padding="md" className="flex flex-col justify-between" key={note.id}>
                 <div>
-                  <h3 className="font-medium text-slate-900">{note.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600">{note.content}</p>
+                  <h3 className="font-medium text-primary">{note.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-secondary">{note.content}</p>
                 </div>
-                <div className="mt-4 flex justify-end border-t border-slate-100 pt-3">
+                <div className="mt-4 flex justify-end border-t border-border pt-3">
                   <button
                     type="button"
                     onClick={() => togglePin(note)}
                     aria-label={note.is_pinned ? `Unpin ${note.title}` : `Pin ${note.title}`}
                     aria-pressed={Boolean(note.is_pinned)}
-                    className="rounded p-1 hover:bg-slate-50"
+                    className="rounded p-1 hover:bg-body"
                   >
-                    <Pin className={`h-4 w-4 ${note.is_pinned ? 'fill-amber-500 text-amber-500' : 'text-slate-300'}`} aria-hidden="true" />
+                    <Pin className={`h-4 w-4 ${note.is_pinned ? 'fill-warning text-warning' : 'text-sand-400'}`} aria-hidden="true" />
                   </button>
                 </div>
-              </article>
+              </Card>
             ))}
           </div>
         )}

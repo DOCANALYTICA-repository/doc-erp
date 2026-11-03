@@ -10,8 +10,9 @@ import { describeError } from '../../../services/errors';
 import { facultyKeys } from '../../../lib/queryKeys';
 import { useStore } from '../../../context/useStore';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { PageSkeleton } from '../../../components/ui/PageSkeleton';
+import { Card } from '../../../components/ui/Card';
 import { ErrorState } from '../../../components/ui/ErrorState';
-import { PageLoader } from '../../../components/ui/PageLoader';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
 import type { FacultyDocument } from '../../../api/types';
 
@@ -68,22 +69,22 @@ export const DocumentsTab: React.FC = () => {
     }
   };
 
-  if (isLoading) return <PageLoader label="Loading documents..." />;
+  if (isLoading) return <PageSkeleton variant="list" label="Loading documents" />;
   if (isError) return <ErrorState title="Documents didn't load" error={error} onRetry={() => void refetch()} />;
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-      <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <Card as="section">
         <SectionHeader title="Upload" />
         <div className="mt-4 flex flex-col gap-3 text-sm">
-          <label className="font-medium text-slate-600" htmlFor="faculty-doc-file">File</label>
+          <label className="font-medium text-secondary" htmlFor="faculty-doc-file">File</label>
           <input
             id="faculty-doc-file"
             type="file"
             onChange={e => setFile(e.target.files?.[0] ?? null)}
-            className="text-sm text-slate-500 file:mr-4 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
+            className="text-sm text-secondary file:mr-4 file:rounded-md file:border-0 file:bg-sand-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
           />
-          <p className="text-xs text-slate-400">PDF, image, Office document or plain text, up to 10 MB.</p>
+          <p className="text-xs text-secondary">PDF, image, Office document or plain text, up to 10 MB.</p>
           <Button
             label={isReadOnly ? 'Admin is view-only here' : isUploading ? 'Uploading…' : 'Upload'}
             variant="primary"
@@ -91,7 +92,7 @@ export const DocumentsTab: React.FC = () => {
             clickAction={upload}
           />
         </div>
-      </section>
+      </Card>
 
       <div className="flex flex-col gap-4 md:col-span-2">
         <SectionHeader title="Document locker" />
@@ -100,26 +101,26 @@ export const DocumentsTab: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {docs?.map(doc => (
-              <article key={doc.id} className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <Card as="article" padding="md" className="flex flex-col justify-between" key={doc.id}>
                 <div>
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-secondary">
                     {doc.folder_path}
                   </span>
-                  <h3 className="mt-1 font-medium text-slate-900">{doc.name}</h3>
+                  <h3 className="mt-1 font-medium text-primary">{doc.name}</h3>
                 </div>
-                <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
+                <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm">
                   <button
                     type="button"
                     onClick={() => copyShareLink(doc)}
-                    className="inline-flex items-center gap-1.5 text-sky-700 hover:underline"
+                    className="inline-flex items-center gap-1.5 text-accent hover:underline"
                   >
                     <Share2 className="h-3.5 w-3.5" aria-hidden="true" /> Copy share link
                   </button>
-                  <button type="button" onClick={() => download(doc)} className="text-slate-500 hover:underline">
+                  <button type="button" onClick={() => download(doc)} className="text-secondary hover:underline">
                     Download
                   </button>
                 </div>
-              </article>
+              </Card>
             ))}
           </div>
         )}

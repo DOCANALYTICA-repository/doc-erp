@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.rbac import PermissionChecker, get_current_user, get_resolved_permissions
-from app.core import faculty_scope
+from app.core import faculty_scope, yellow_form_access
 from app.repositories.faculty_assignment import faculty_assignment_repo
 from app.repositories.club import (
     club_repo, member_repo, event_repo, budget_repo, reimbursement_repo, sponsorship_repo,
@@ -143,6 +143,46 @@ class ClubViewerFacts:
         return self.rank() == max(orders)
 
 
+def _is_flagged_full_access_coordinator(db: Session, current_user: User, club_id: str) -> bool:
+    """Is this the assigned Faculty Coordinator of a club that opted into
+    `faculty_coordinator_full_access`?
+
+    A Faculty Coordinator is, by definition, not a ClubMember — so every gate
+    below that checks membership would otherwise reject them even on a club
+    that explicitly wants them to have full access (DOC Analytica). Default
+    is False on every club, so this is a no-op everywhere else.
+    """
+    if current_user.primary_role != "faculty":
+        return False
+    club = club_repo.get(db, club_id)
+    if not club or not club.faculty_coordinator_full_access:
+        return False
+    return faculty_scope.is_club_faculty_coordinator_for(db, current_user.id, club_id)
+
+
+def _require_permission_or_flagged_coordinator(
+    db: Session, current_user: User, club_id: str, required_permission: str,
+) -> None:
+    """Same check as `PermissionChecker([required_permission])`, plus a
+    bypass for the assigned Faculty Coordinator of a club with
+    `faculty_coordinator_full_access`.
+
+    `PermissionChecker` is a FastAPI dependency resolved before the route
+    body runs, and it only ever sees the user — it has no `club_id`, so it
+    can never grant a club-scoped exception on its own. These routes swap
+    `Depends(PermissionChecker([...]))` for `Depends(get_current_user)` and
+    call this instead, so a flagged club's coordinator (who holds none of
+    these permissions globally, by design — see _is_flagged_full_access_coordinator)
+    isn't rejected before `_require_active_club_member` ever gets a say.
+    """
+    perms = get_resolved_permissions(current_user)
+    if "*" in perms or required_permission in perms:
+        return
+    if _is_flagged_full_access_coordinator(db, current_user, club_id):
+        return
+    raise HTTPException(status_code=403, detail=f"Not enough permissions. Missing: {required_permission}")
+
+
 def _require_active_club_member(db: Session, current_user: User, club_id: str) -> None:
     """
     Every write scoped to a specific club must verify the caller actually
@@ -153,8 +193,11 @@ def _require_active_club_member(db: Session, current_user: User, club_id: str) -
     if current_user.primary_role == "super_admin":
         return
     membership = member_repo.get_by_student_and_club(db, student_id=current_user.id, club_id=club_id)
-    if not membership or membership.status != "active":
-        raise HTTPException(status_code=403, detail="You are not an active member of this club")
+    if membership and membership.status == "active":
+        return
+    if _is_flagged_full_access_coordinator(db, current_user, club_id):
+        return
+    raise HTTPException(status_code=403, detail="You are not an active member of this club")
 
 
 # Department-wide plan reviewers. These roles sit ABOVE any single club in the
@@ -212,6 +255,8 @@ def _require_club_head_or_admin(db: Session, current_user: User, club_id: str) -
     """
     if current_user.primary_role == "super_admin":
         return
+    if _is_flagged_full_access_coordinator(db, current_user, club_id):
+        return
     if current_user.primary_role == "faculty":
         perms = get_resolved_permissions(current_user)
         if "clubs:approve_plan" in perms:
@@ -229,6 +274,8 @@ def _require_task_assigner(db: Session, current_user: User, club_id: str) -> Non
     rank (per product decision — "anyone with a tag other than associate,
     the lowest level")."""
     if current_user.primary_role == "super_admin":
+        return
+    if _is_flagged_full_access_coordinator(db, current_user, club_id):
         return
     membership = member_repo.get_by_student_and_club(db, student_id=current_user.id, club_id=club_id)
     if not membership or membership.status != "active":
@@ -389,21 +436,30 @@ def _viewer_capabilities(db: Session, current_user: User, club_id: str) -> dict:
 # that the backend will 403 — the UI promising something the API refuses.
 MEMBER_ONLY_TABS = frozenset({"recruitment", "reimbursements", "sponsorships"})
 
+# Tabs hidden from a non-top-rank member on a club that opts into
+# `restrict_non_core_access` (e.g. DOC Analytica's Directors/Associates).
+# Every other club ignores this — see _visible_tabs.
+RESTRICTED_MEMBER_TABS = frozenset({"budget", "sponsorships", "recruitment", "settings"})
+
 ALL_CLUB_TABS = [
     "dashboard", "members", "structure", "tasks", "recruitment", "events",
-    "announcements", "budget", "reimbursements", "sponsorships", "annual-plan",
+    "yellow-forms", "announcements", "budget", "reimbursements", "sponsorships", "annual-plan",
     "documents", "reports", "analytics", "settings",
 ]
 
 
-def _club_capabilities(db: Session, current_user: User, club_id: str) -> ClubCapabilities:
+def _club_capabilities(facts: ClubViewerFacts, club: Club) -> ClubCapabilities:
     """Resolve all seven flags from ONE shared set of facts.
 
     This used to call the seven _require_* gates and catch their exceptions,
     which meant re-running the same membership and hierarchy lookups five and
     six times each — 25 queries to open a workspace, most of them identical.
+
+    Takes `facts` built by the caller (rather than constructing its own) so a
+    caller that also needs e.g. `facts.is_top_rank` for tab visibility gets it
+    from the same cached lookups instead of paying for them twice.
     """
-    facts = ClubViewerFacts(db, current_user, club_id)
+    db, current_user, club_id = facts._db, facts._user, facts._club_id
 
     is_head = (
         facts.is_super_admin
@@ -423,14 +479,21 @@ def _club_capabilities(db: Session, current_user: User, club_id: str) -> ClubCap
 
     return ClubCapabilities(
         can_read=can_read,
-        can_write=facts.is_super_admin or facts.is_active_member,
+        can_write=(
+            facts.is_super_admin
+            or facts.is_active_member
+            or (facts.is_club_coordinator and club.faculty_coordinator_full_access)
+        ),
         can_edit_hierarchy=facts.is_super_admin or facts.is_club_coordinator,
-        can_manage_settings=is_head,
+        can_manage_settings=is_head or (facts.is_club_coordinator and club.faculty_coordinator_full_access),
         can_assign_tasks=(
-            facts.is_super_admin or (facts.is_active_member and not facts.is_bottom_rank)
+            facts.is_super_admin
+            or (facts.is_active_member and not facts.is_bottom_rank)
+            or (facts.is_club_coordinator and club.faculty_coordinator_full_access)
         ),
         can_approve_plan=_can_approve_any_plan_stage(db, current_user, club_id),
-        can_manage_members=is_head,
+        can_manage_members=is_head or (facts.is_club_coordinator and club.faculty_coordinator_full_access),
+        can_file_yellow_forms=yellow_form_access.can_file_with_facts(facts, club),
     )
 
 
@@ -457,8 +520,14 @@ def _can_approve_any_plan_stage(db: Session, current_user: User, club_id: str) -
     return False
 
 
-def _visible_tabs(relationship: str, caps: ClubCapabilities) -> List[str]:
-    if relationship in ("member", "super_admin"):
+def _visible_tabs(relationship: str, club: Club, is_top_rank: bool) -> List[str]:
+    if relationship == "super_admin":
+        return list(ALL_CLUB_TABS)
+    if relationship == "member":
+        if club.restrict_non_core_access and not is_top_rank:
+            return [t for t in ALL_CLUB_TABS if t not in RESTRICTED_MEMBER_TABS]
+        return list(ALL_CLUB_TABS)
+    if relationship == "faculty_coordinator" and club.faculty_coordinator_full_access:
         return list(ALL_CLUB_TABS)
     # Coordinators and department reviewers get everything they can actually
     # act on or audit, minus the member-only operational tabs.
@@ -498,7 +567,8 @@ def get_club_bootstrap(
         raise HTTPException(status_code=404, detail="Club not found")
 
     relationship = _club_relationship(db, current_user, club_id)
-    caps = _club_capabilities(db, current_user, club_id)
+    facts = ClubViewerFacts(db, current_user, club_id)
+    caps = _club_capabilities(facts, club)
 
     members = member_repo.get_club_members(db, club_id=club_id)
     hierarchy = club_hierarchy_engine.ensure_default_hierarchy(db, club_id)
@@ -534,7 +604,7 @@ def get_club_bootstrap(
         club=detail,
         relationship=relationship,
         capabilities=caps,
-        visible_tabs=_visible_tabs(relationship, caps),
+        visible_tabs=_visible_tabs(relationship, club, facts.is_top_rank),
         counters=counters,
         hierarchy=hierarchy,
         members=members,
@@ -567,8 +637,9 @@ def create_club_event(
     club_id: str,
     event_in: EventCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(PermissionChecker(["events:create"]))
+    current_user: User = Depends(get_current_user),
 ):
+    _require_permission_or_flagged_coordinator(db, current_user, club_id, "events:create")
     _require_active_club_member(db, current_user, club_id)
     event_dict = event_in.dict()
     event_dict["id"] = f"evt_{uuid.uuid4().hex[:12]}"
@@ -602,15 +673,22 @@ def get_club_budgets(club_id: str, db: Session = Depends(get_db), current_user: 
 @router.get("/{club_id}/reimbursements", response_model=List[ReimbursementOut])
 def get_club_reimbursements(club_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     _require_club_reader(db, current_user, club_id)
-    return reimbursement_repo.get_by_club(db, club_id=club_id)
+    reimbursements = reimbursement_repo.get_by_club(db, club_id=club_id)
+    club = club_repo.get(db, club_id)
+    if club and club.restrict_non_core_access:
+        facts = ClubViewerFacts(db, current_user, club_id)
+        if facts.is_active_member and not facts.is_top_rank:
+            reimbursements = [r for r in reimbursements if r.requested_by == current_user.id]
+    return reimbursements
 
 @router.post("/{club_id}/reimbursements", response_model=ReimbursementOut)
 def request_reimbursement(
     club_id: str,
     reimb_in: ReimbursementCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(PermissionChecker(["reimbursement:request"]))
+    current_user: User = Depends(get_current_user),
 ):
+    _require_permission_or_flagged_coordinator(db, current_user, club_id, "reimbursement:request")
     _require_active_club_member(db, current_user, club_id)
     reimb_dict = reimb_in.dict()
     reimb_dict["id"] = f"reimb_{uuid.uuid4().hex[:12]}"
@@ -630,8 +708,9 @@ def create_sponsorship(
     club_id: str,
     spons_in: SponsorshipCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(PermissionChecker(["sponsorship:manage"]))
+    current_user: User = Depends(get_current_user),
 ):
+    _require_permission_or_flagged_coordinator(db, current_user, club_id, "sponsorship:manage")
     _require_active_club_member(db, current_user, club_id)
     spons_dict = spons_in.dict()
     spons_dict["id"] = f"spons_{uuid.uuid4().hex[:12]}"
@@ -741,8 +820,9 @@ def create_annual_plan(
     club_id: str,
     plan_in: AnnualPlanCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(PermissionChecker(["annual_plan:manage"])),
+    current_user: User = Depends(get_current_user),
 ):
+    _require_permission_or_flagged_coordinator(db, current_user, club_id, "annual_plan:manage")
     _require_active_club_member(db, current_user, club_id)
     existing = annual_plan_repo.get_current(db, club_id=club_id, academic_year=plan_in.academic_year)
     if existing:
@@ -760,13 +840,14 @@ def update_annual_plan(
     plan_id: str,
     plan_in: AnnualPlanUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(PermissionChecker(["annual_plan:manage"])),
+    current_user: User = Depends(get_current_user),
 ):
     plan = annual_plan_repo.get(db, plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Annual plan not found")
     if plan.status != "draft":
         raise HTTPException(status_code=400, detail="Only a Draft annual plan may be edited")
+    _require_permission_or_flagged_coordinator(db, current_user, plan.club_id, "annual_plan:manage")
     _require_active_club_member(db, current_user, plan.club_id)
     return annual_plan_repo.update(db, db_obj=plan, obj_in=plan_in.model_dump(exclude_unset=True))
 
@@ -826,13 +907,14 @@ def _notify_plan_reviewers(db: Session, *, plan, stage: str) -> None:
 def submit_annual_plan(
     plan_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(PermissionChecker(["annual_plan:manage"])),
+    current_user: User = Depends(get_current_user),
 ):
     plan = annual_plan_repo.get(db, plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail="Annual plan not found")
     if plan.status != "draft":
         raise HTTPException(status_code=400, detail="Only a Draft annual plan may be submitted for review")
+    _require_permission_or_flagged_coordinator(db, current_user, plan.club_id, "annual_plan:manage")
     _require_active_club_member(db, current_user, plan.club_id)
     updated = annual_plan_repo.update(db, db_obj=plan, obj_in={
         "status": "faculty_coordinator_review", "review_comments": None,
@@ -949,8 +1031,9 @@ async def upload_club_document(
     category: str = Form("Templates"),
     tags: str = Form(""),
     db: Session = Depends(get_db),
-    current_user: User = Depends(PermissionChecker(["documents:manage_club"])),
+    current_user: User = Depends(get_current_user),
 ):
+    _require_permission_or_flagged_coordinator(db, current_user, club_id, "documents:manage_club")
     _require_active_club_member(db, current_user, club_id)
     stored_path = await storage_engine.upload_file(file, folder=f"club_documents/{club_id}")
     doc_dict = {
@@ -972,11 +1055,12 @@ async def upload_new_document_version(
     document_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(PermissionChecker(["documents:manage_club"])),
+    current_user: User = Depends(get_current_user),
 ):
     previous = club_document_repo.get(db, document_id)
     if not previous:
         raise HTTPException(status_code=404, detail="Document not found")
+    _require_permission_or_flagged_coordinator(db, current_user, previous.club_id, "documents:manage_club")
     _require_active_club_member(db, current_user, previous.club_id)
     stored_path = await storage_engine.upload_file(file, folder=f"club_documents/{previous.club_id}")
     doc_dict = {
@@ -1022,7 +1106,7 @@ def mark_event_attendance(
     event_id: str,
     records: List[EventAttendanceRecord],
     db: Session = Depends(get_db),
-    current_user: User = Depends(PermissionChecker(["events:create"])),
+    current_user: User = Depends(get_current_user),
 ):
     """Record who attended an event.
 
@@ -1033,6 +1117,7 @@ def mark_event_attendance(
     that depend on this data, so the numbers drifted the first time anyone
     edited a register.
     """
+    _require_permission_or_flagged_coordinator(db, current_user, club_id, "events:create")
     _require_active_club_member(db, current_user, club_id)
 
     event = event_repo.get(db, event_id)

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from app.models.base import Base, TimestampMixin
@@ -56,15 +58,42 @@ class AttendanceEntry(Base, TimestampMixin):
     id = Column(String, primary_key=True, index=True)
     claim_participant_id = Column(String, ForeignKey("claim_participants.id"), nullable=False)
     subject = Column(String, nullable=False)
+    # Copied from the timetable slot at submission time rather than looked up
+    # later: a claim is a record of what was missed, and a subject that is
+    # re-coded next semester must not rewrite last semester's claims.
+    course_code = Column(String, nullable=True)
     date = Column(String, nullable=False)
     hour = Column(String, nullable=False) # e.g. "09:00 AM - 10:00 AM"
     subject_faculty_id = Column(String, ForeignKey("users.id"), nullable=False)
+    # The second teacher of a co-taught slot, copied from the timetable at
+    # submission like course_code. Either of the two may sign the hour; one
+    # signature clears it. NULL for the usual single-teacher slot.
+    co_faculty_id = Column(String, ForeignKey("users.id"), nullable=True)
     status = Column(String, default="pending", nullable=False) # pending, approved, rejected
     feedback = Column(String, nullable=True)
 
     # Relationships
     participant = relationship("ClaimParticipant", back_populates="entries")
     subject_faculty = relationship("User", foreign_keys=[subject_faculty_id])
+    co_faculty = relationship("User", foreign_keys=[co_faculty_id])
+
+    def is_taught_by(self, user_id: str) -> bool:
+        """Whether this user may sign the hour — either teacher of the slot."""
+        return user_id in (self.subject_faculty_id, self.co_faculty_id)
+
+    @property
+    def co_faculty_name(self) -> Optional[str]:
+        return self.co_faculty.name if self.co_faculty else None
+
+    @property
+    def subject_faculty_name(self) -> str:
+        """Whose approval this hour is waiting on.
+
+        Same shape as TimetableSession.faculty_name, and the same caveat:
+        callers MUST eager-load subject_faculty or this is one SELECT per
+        entry. CLAIM_OUT_LOADERS does.
+        """
+        return self.subject_faculty.name if self.subject_faculty else ""
 
 
 class SupportingDocument(Base, TimestampMixin):
@@ -85,14 +114,28 @@ class TimetableSession(Base, TimestampMixin):
     id = Column(String, primary_key=True, index=True)
     day_of_week = Column(String, nullable=False) # Monday, Tuesday...
     subject = Column(String, nullable=False)
+    course_code = Column(String, nullable=True)  # e.g. "COAF202-5"; NULL for non-credit slots like Mentoring
     hour = Column(String, nullable=False)
+    # Which lab/tutorial batch this slot is for, e.g. "Batch 1". NULL means the
+    # whole class sits in it, which is true of most slots.
+    #
+    # Without this the timetable was filtered by programme/semester/section
+    # alone, so a student was offered — and could raise a claim against — the
+    # other batch's hours, taught by a faculty member who has never seen them.
+    batch = Column(String, nullable=True)
     faculty_id = Column(String, ForeignKey("users.id"), nullable=False)
+    # A slot the sheet lists as "Nisha / Thirunavukkarasu" is taught by two
+    # people, either of whom can vouch for a student's absence. One extra
+    # column rather than a join table: the department's sheet never names
+    # more than two, and every reader of faculty_id keeps working unchanged.
+    co_faculty_id = Column(String, ForeignKey("users.id"), nullable=True)
     programme = Column(String, nullable=False)
     semester = Column(String, nullable=False)
     section = Column(String, nullable=False)
 
     # Relationships
     faculty = relationship("User", foreign_keys=[faculty_id])
+    co_faculty = relationship("User", foreign_keys=[co_faculty_id])
 
     @property
     def faculty_name(self) -> str:
@@ -104,3 +147,7 @@ class TimetableSession(Base, TimestampMixin):
         this becomes one SELECT per slot.
         """
         return self.faculty.name if self.faculty else ""
+
+    @property
+    def co_faculty_name(self) -> Optional[str]:
+        return self.co_faculty.name if self.co_faculty else None

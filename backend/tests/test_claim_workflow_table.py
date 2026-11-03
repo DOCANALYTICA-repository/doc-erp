@@ -12,7 +12,7 @@ from app.core import claim_workflow
 
 from .conftest import auth_headers
 
-ADMIN = ("admin@christuniversity.in", "admin123")
+ADMIN = ("admin@christuniversity.in", "123")
 
 
 def test_workflow_route_is_not_shadowed_by_the_claim_id_route(client):
@@ -23,7 +23,11 @@ def test_workflow_route_is_not_shadowed_by_the_claim_id_route(client):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["stage_order"][0] == "initial_review"
-    assert body["stage_order"][-1] == "closed"
+    # The chain ends where this application's authority ends: an approved
+    # claim forwarded to the attendance office. "closed" is a stage, but it is
+    # where a REJECTED claim lands, not a step towards approval.
+    assert body["stage_order"][-1] == "attendance_office"
+    assert body["stages"][-1]["is_terminal"] is True
 
 
 def test_served_table_matches_the_table_the_endpoint_enforces(client):
@@ -50,7 +54,7 @@ def test_every_stage_is_completely_specified(stage_id):
         assert spec.denial, "a terminal stage still needs a refusal message"
         return
 
-    # Somewhere to go — the attendance_office branch used to hardcode 'closed'
+    # Somewhere to go — the final-stage branch used to hardcode 'closed'
     # inline and ignore `action` entirely.
     assert spec.on_approve, f"{stage_id} has no on_approve"
     assert spec.on_approve in claim_workflow.STAGES

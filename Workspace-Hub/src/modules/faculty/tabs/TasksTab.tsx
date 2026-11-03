@@ -3,9 +3,9 @@ import { ClipboardList } from 'lucide-react';
 
 import { useTasks } from '../../../api/hooks';
 import { DataTable, type Column } from '../../../components/ui/DataTable';
+import { PageSkeleton } from '../../../components/ui/PageSkeleton';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
-import { PageLoader } from '../../../components/ui/PageLoader';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
 import { StatusChip } from '../../../components/ui/StatusChip';
 import type { Task } from '../../../api/types';
@@ -13,16 +13,16 @@ import type { Task } from '../../../api/types';
 export const TasksTab: React.FC = () => {
   const { data: tasks, isLoading, isError, error, refetch } = useTasks();
 
-  if (isLoading) return <PageLoader label="Loading tasks..." />;
+  if (isLoading) return <PageSkeleton variant="table" label="Loading tasks" />;
   if (isError) return <ErrorState title="Tasks didn't load" error={error} onRetry={() => void refetch()} />;
 
   const columns: Column<Task>[] = [
-    { key: 'title', header: 'Task', render: t => <span className="font-medium text-slate-900">{t.title}</span> },
+    { key: 'title', header: 'Task', render: t => <span className="font-medium text-primary">{t.title}</span> },
     { key: 'due', header: 'Due', secondary: true, render: t => t.due_date ?? '—' },
     {
       key: 'priority', header: 'Priority', secondary: true,
       render: t => (
-        <span className={t.priority === 'high' ? 'font-medium text-rose-700' : 'text-slate-500'}>
+        <span className={t.priority === 'high' ? 'font-medium text-error' : 'text-secondary'}>
           {t.priority}
         </span>
       ),

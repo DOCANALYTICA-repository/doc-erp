@@ -13,7 +13,7 @@ import pytest
 
 from .conftest import auth_headers
 
-FACULTY = ("teacher.class@christuniversity.in", "faculty123")
+FACULTY = ("teacher.class@christuniversity.in", "123")
 
 
 class _FakeBucket:

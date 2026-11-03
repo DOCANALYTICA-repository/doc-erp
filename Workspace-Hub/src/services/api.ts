@@ -58,7 +58,14 @@ export class ApiError extends Error {
 /** Endpoints that must never trigger a refresh-and-retry. */
 const AUTH_ENDPOINTS = ['/auth/login', '/auth/refresh', '/auth/logout'];
 
-async function request<T>(endpoint: string, options?: RequestInit, isRetry = false): Promise<T> {
+type ResponseKind = 'json' | 'blob';
+
+async function request<T>(
+  endpoint: string,
+  options?: RequestInit,
+  isRetry = false,
+  responseKind: ResponseKind = 'json',
+): Promise<T> {
   let headers: HeadersInit = {};
 
   // FormData must NOT get an explicit Content-Type — the browser sets the
@@ -97,7 +104,8 @@ async function request<T>(endpoint: string, options?: RequestInit, isRetry = fal
     // ./api.mocks is never even parsed, let alone bundled. That matters — the
     // mock login accepted ANY password and handed back a super_admin session
     // with permissions: ['*'], and it used to ship.
-    if (import.meta.env.DEV) {
+    // The fixtures are JSON; there is no offline file to hand back for a download.
+    if (import.meta.env.DEV && responseKind === 'json') {
       console.warn(`Backend unreachable for ${endpoint}. Falling back to client-side mocks (dev only).`);
       const { mockHandler } = await import('./api.mocks');
       return mockHandler<T>(endpoint, options);
@@ -129,7 +137,7 @@ async function request<T>(endpoint: string, options?: RequestInit, isRetry = fal
   ) {
     const refreshed = await refreshAccessToken(BASE_URL);
     if (refreshed) {
-      return request<T>(endpoint, options, true);
+      return request<T>(endpoint, options, true, responseKind);
     }
   }
 
@@ -145,6 +153,10 @@ async function request<T>(endpoint: string, options?: RequestInit, isRetry = fal
 
   // 204 and friends have no body; response.json() would throw on the empty
   // string. Endpoints like /auth/logout legitimately return nothing.
+  if (responseKind === 'blob') {
+    return (await response.blob()) as T;
+  }
+
   if (response.status === 204 || response.headers.get('content-length') === '0') {
     return undefined as T;
   }
@@ -175,4 +187,23 @@ export const api = {
   // Claims supporting-document upload, both backed by the real Storage Engine.
   upload: <T>(endpoint: string, formData: FormData) =>
     request<T>(endpoint, { method: 'POST', body: formData }),
+  /**
+   * Save an authenticated file (e.g. a claim sheet CSV) to the user's disk.
+   *
+   * A plain `<a href>` cannot carry the Bearer token, so the file is fetched
+   * through `request` — same auth, same one-shot refresh on 401, same
+   * ApiError on failure — and handed to the browser as an object URL.
+   */
+  download: async (endpoint: string, filename: string): Promise<void> => {
+    const blob = await request<Blob>(endpoint, { method: 'GET' }, false, 'blob');
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    // Revoking in the same tick can cancel the save in some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  },
 };

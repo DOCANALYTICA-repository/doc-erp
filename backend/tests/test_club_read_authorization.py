@@ -12,9 +12,9 @@ import pytest
 
 from .conftest import auth_headers
 
-OUTSIDER = ("student.regular2@christuniversity.in", "student123")
-MEMBER = ("student.president@christuniversity.in", "student123")
-FACULTY_COORDINATOR = ("faculty.accounting@christuniversity.in", "faculty123")
+OUTSIDER = ("student.regular2@christuniversity.in", "123")
+MEMBER = ("student.president@christuniversity.in", "123")
+FACULTY_COORDINATOR = ("faculty.accounting@christuniversity.in", "123")
 
 PREVIOUSLY_UNGATED = [
     "/api/v1/clubs/club_commerce/members",

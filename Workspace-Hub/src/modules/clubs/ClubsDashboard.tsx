@@ -26,7 +26,10 @@ import { SettingsTab } from './tabs/SettingsTab';
 import { SponsorshipsTab } from './tabs/SponsorshipsTab';
 import { StructureTab } from './tabs/StructureTab';
 import { TasksTab } from './tabs/TasksTab';
+import { YellowFormsTab } from './tabs/YellowFormsTab';
 import { TabStrip } from '../../components/ui/TabStrip';
+import { PageShell } from '../../components/ui/PageShell';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 /**
  * The Clubs workspace shell.
@@ -55,6 +58,7 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
   tasks: TasksTab,
   recruitment: RecruitmentTab,
   events: EventsTab,
+  'yellow-forms': YellowFormsTab,
   announcements: AnnouncementsTab,
   budget: BudgetTab,
   reimbursements: ReimbursementsTab,
@@ -141,57 +145,64 @@ export const ClubsDashboard: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] w-full flex-col bg-slate-50">
-      {clubs.length > 1 ? (
-        <div className="flex w-full items-center gap-2 border-b border-slate-200 bg-white px-6 py-2">
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-400" htmlFor="club-selector">
-            Club
-          </label>
-          <select
-            id="club-selector"
-            value={clubId ?? ''}
-            onChange={e => switchClub(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-sm text-slate-900"
-          >
-            {clubs.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.relationship === 'faculty_coordinator' ? ' (you oversee this club)' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
+    <PageShell
+      maxWidth="5xl"
+      toolbar={
+        <>
+          {/*
+            * The club switcher writes to the ?club= SEARCH PARAM, never to the
+            * path. Tab and club are orthogonal by design — switching club must
+            * keep you on the tab you were reading — and every deep link anyone
+            * has saved depends on it. See the contract test in
+            * src/routes/routes.smoke.test.tsx.
+            */}
+          {clubs.length > 1 ? (
+            <div className="flex w-full items-center gap-2 border-b border-border bg-card px-6 py-2">
+              <label
+                className="text-xs font-semibold uppercase tracking-wide text-secondary"
+                htmlFor="club-selector"
+              >
+                Club
+              </label>
+              <select
+                id="club-selector"
+                value={clubId ?? ''}
+                onChange={e => switchClub(e.target.value)}
+                className="rounded-full border border-border bg-card px-3 py-1 text-sm text-primary"
+              >
+                {clubs.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                    {c.relationship === 'faculty_coordinator' ? ' (you oversee this club)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
-      <TabStrip
-        label="Club workspace sections"
-        activeId={tab}
-        items={tabsForViewer.map(item => ({
-          id: item.id,
-          label: item.label,
-          to: `/app/clubs/${item.id}?${searchParams.toString()}`,
-          onHover: () => (TAB_RESOURCES[item.id] ?? []).forEach(prefetch),
-        }))}
+          <TabStrip
+            label="Club workspace sections"
+            activeId={tab}
+            items={tabsForViewer.map(item => ({
+              id: item.id,
+              label: item.label,
+              to: `/app/clubs/${item.id}?${searchParams.toString()}`,
+              onHover: () => (TAB_RESOURCES[item.id] ?? []).forEach(prefetch),
+            }))}
+          />
+        </>
+      }
+    >
+      <PageHeader
+        leading={<ClubAvatar name={club.name} logo={club.logo} />}
+        eyebrow={`${club.category} club`}
+        title={club.name}
+        description={club.description ?? undefined}
       />
 
-      <main className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto p-6 md:p-8">
-        <header className="mb-8 flex items-center gap-4">
-          <ClubAvatar name={club.name} logo={club.logo} />
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wide text-sky-600">
-              {club.category} club
-            </span>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{club.name}</h1>
-            {club.description ? (
-              <p className="mt-1 text-sm text-slate-500">{club.description}</p>
-            ) : null}
-          </div>
-        </header>
-
-        <ClubWorkspaceProvider value={{ clubId: club.id, bootstrap: bootstrap.data, refreshShell }}>
-          <ActiveTab />
-        </ClubWorkspaceProvider>
-      </main>
-    </div>
+      <ClubWorkspaceProvider value={{ clubId: club.id, bootstrap: bootstrap.data, refreshShell }}>
+        <ActiveTab />
+      </ClubWorkspaceProvider>
+    </PageShell>
   );
 };

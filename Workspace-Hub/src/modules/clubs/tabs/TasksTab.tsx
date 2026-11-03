@@ -1,23 +1,38 @@
 import React from 'react';
+import { z } from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@astryxdesign/core/Button';
-import { DateInput } from '@astryxdesign/core/DateInput';
 import { useToast } from '@astryxdesign/core/Toast';
 import { ClipboardList, Plus } from 'lucide-react';
 
 import { useClubTasks } from '../../../api/hooks';
 import { api } from '../../../services/api';
 import { describeError } from '../../../services/errors';
-import { asIsoDate } from '../../../lib/date';
 import { clubKeys, platformKeys } from '../../../lib/queryKeys';
 import { DataTable, type Column } from '../../../components/ui/DataTable';
+import { PageSkeleton } from '../../../components/ui/PageSkeleton';
+import { Card } from '../../../components/ui/Card';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
-import { PageLoader } from '../../../components/ui/PageLoader';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
 import { StatusChip } from '../../../components/ui/StatusChip';
 import type { Task } from '../../../api/types';
 import { useClubWorkspace } from '../ClubWorkspaceContext';
+import { useZodForm, withServerErrors } from '../../../lib/forms';
+import { TextField, SelectField, DateField } from '../../../components/ui/form/fields';
+import { FormError } from '../../../components/ui/form/FormError';
+import { rootServerError } from '../../../components/ui/form/fieldStatus';
+
+/**
+ * A task with no assignee is a task nobody does, so `assignee_id` is required
+ * rather than defaulting to the empty string the old form happily posted.
+ */
+const taskSchema = z.object({
+  title: z.string().trim().min(1, 'Describe the task.'),
+  due_date: z.string().min(1, 'Pick a due date.'),
+  priority: z.enum(['low', 'medium', 'high']),
+  assignee_id: z.string().min(1, 'Choose who is doing this.'),
+});
 
 export const TasksTab: React.FC = () => {
   const { clubId, bootstrap, refreshShell } = useClubWorkspace();
@@ -26,10 +41,6 @@ export const TasksTab: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [isOpen, setIsOpen] = React.useState(false);
-  const [title, setTitle] = React.useState('');
-  const [dueDate, setDueDate] = React.useState('');
-  const [priority, setPriority] = React.useState('medium');
-  const [assigneeId, setAssigneeId] = React.useState('');
   const [busyId, setBusyId] = React.useState<string | null>(null);
 
   const activeMembers = bootstrap.members.filter(m => m.status === 'active');
@@ -54,29 +65,39 @@ export const TasksTab: React.FC = () => {
     }
   };
 
-  const createTask = async () => {
-    try {
-      await api.post(`/clubs/${clubId}/tasks`, {
-        title, due_date: dueDate, priority, assignee_id: assigneeId,
-      });
-      setTitle(''); setDueDate(''); setAssigneeId(''); setIsOpen(false);
-      showToast({ body: 'Task assigned.', type: 'info' });
-      refresh();
-    } catch (e) {
-      showToast({ body: `Could not assign the task: ${describeError(e)}`, type: 'error' });
-    }
-  };
+  const form = useZodForm(taskSchema, {
+    defaultValues: { title: '', due_date: '', priority: 'medium', assignee_id: '' },
+  });
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = form;
 
-  if (isLoading) return <PageLoader label="Loading tasks..." />;
+  const createTask = withServerErrors(form, async values => {
+    await api.post(`/clubs/${clubId}/tasks`, {
+      title: values.title,
+      due_date: values.due_date,
+      priority: values.priority,
+      assignee_id: values.assignee_id,
+    });
+    reset();
+    setIsOpen(false);
+    showToast({ body: 'Task assigned.', type: 'info' });
+    refresh();
+  });
+
+  if (isLoading) return <PageSkeleton variant="table" label="Loading tasks" />;
   if (isError) return <ErrorState title="Tasks didn't load" error={error} onRetry={() => void refetch()} />;
 
   const columns: Column<Task>[] = [
-    { key: 'title', header: 'Task', render: t => <span className="font-medium text-slate-900">{t.title}</span> },
+    { key: 'title', header: 'Task', render: t => <span className="font-medium text-primary">{t.title}</span> },
     { key: 'due', header: 'Due', secondary: true, render: t => t.due_date ?? '—' },
     {
       key: 'priority', header: 'Priority', secondary: true,
       render: t => (
-        <span className={`text-sm font-medium ${t.priority === 'high' ? 'text-rose-700' : 'text-slate-500'}`}>
+        <span className={`text-sm font-medium ${t.priority === 'high' ? 'text-error' : 'text-secondary'}`}>
           {t.priority}
         </span>
       ),
@@ -130,36 +151,55 @@ export const TasksTab: React.FC = () => {
         }
       />
 
+      {/*
+        * A real <form>, so Enter submits — and real labels instead of
+        * `sr-only` ones over placeholders, which vanish as soon as you type.
+        *
+        * The submit button was disabled until title, due date AND assignee
+        * were all set: three reasons it might be dead, none of them stated,
+        * and a disabled button cannot even be focused to ask. The schema now
+        * names whichever field is missing.
+        */}
       {isOpen ? (
-        <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-5 text-sm shadow-sm sm:grid-cols-4">
-          <label className="sr-only" htmlFor="task-title">Task title</label>
-          <input id="task-title" required placeholder="Task title" value={title}
-            onChange={e => setTitle(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2" />
-          <DateInput label="Due date" isLabelHidden value={asIsoDate(dueDate)} onChange={v => setDueDate(v || '')} isRequired />
-          <label className="sr-only" htmlFor="task-priority">Priority</label>
-          <select id="task-priority" value={priority} onChange={e => setPriority(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-          <label className="sr-only" htmlFor="task-assignee">Assignee</label>
-          <select id="task-assignee" value={assigneeId} onChange={e => setAssigneeId(e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            <option value="">Select assignee</option>
-            {activeMembers.map(m => (
-              <option key={m.id} value={m.student_id}>{m.student_name ?? m.student_id}</option>
-            ))}
-          </select>
-          <div className="sm:col-span-4">
-            <Button
-              label="Assign" variant="primary"
-              isDisabled={!title || !dueDate || !assigneeId}
-              clickAction={createTask}
+        <Card as="form" padding="md" className="flex flex-col gap-4 text-sm shadow-sm" onSubmit={handleSubmit(createTask)} noValidate>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TextField control={control} name="title" label="Task title" isRequired />
+            <DateField control={control} name="due_date" label="Due date" isRequired />
+            <SelectField
+              control={control}
+              name="priority"
+              label="Priority"
+              options={[
+                { value: 'low', label: 'Low' },
+                { value: 'medium', label: 'Medium' },
+                { value: 'high', label: 'High' },
+              ]}
+              isRequired
+            />
+            <SelectField
+              control={control}
+              name="assignee_id"
+              label="Assignee"
+              placeholder="Select assignee"
+              options={activeMembers.map(m => ({
+                value: m.student_id,
+                label: m.student_name ?? m.student_id,
+              }))}
+              isRequired
             />
           </div>
-        </div>
+
+          <FormError message={rootServerError(errors)} />
+
+          <div>
+            <Button
+              label={isSubmitting ? 'Assigning…' : 'Assign'}
+              variant="primary"
+              isDisabled={isSubmitting}
+              type="submit"
+            />
+          </div>
+        </Card>
       ) : null}
 
       <DataTable

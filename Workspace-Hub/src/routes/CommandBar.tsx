@@ -1,12 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CommandPalette } from '@astryxdesign/core/CommandPalette';
+import { CommandPalette, CommandPaletteInput } from '@astryxdesign/core/CommandPalette';
 import type { SearchableItem, SearchSource } from '@astryxdesign/core/Typeahead';
-import { Award, Compass, FileText, FolderOpen, Inbox, User, Users } from 'lucide-react';
+import { Award, FileText, Inbox, User, Users } from 'lucide-react';
 
 import { api } from '../services/api';
 import type { SearchResults } from '../api/types';
 import { useStore } from '../context/useStore';
+import { MODULES } from '../lib/navigation';
 
 /**
  * ⌘K as the primary navigation.
@@ -29,9 +30,15 @@ const ICONS = { club: Award, person: User, meeting: Users, task: FileText };
 function commandsFor(hasPermission: (p: string) => boolean): Item[] {
   const all: (Item & { perm?: string })[] = [
     { id: 'go:inbox', label: 'Go to inbox', auxiliaryData: { group: 'Actions', href: '/app', icon: Inbox } },
-    { id: 'go:clubs', label: 'Go to clubs', perm: 'clubs:view', auxiliaryData: { group: 'Actions', href: '/app/clubs', icon: Award } },
-    { id: 'go:claims', label: 'Go to claims', perm: 'claims:view_own', auxiliaryData: { group: 'Actions', href: '/app/claims', icon: Compass } },
-    { id: 'go:faculty', label: 'Go to faculty workspace', perm: 'faculty:dashboard', auxiliaryData: { group: 'Actions', href: '/app/faculty', icon: FolderOpen } },
+    // Derived from the shared vocabulary rather than restated. These four
+    // entries were the fourth hardcoded copy of the module list, and the only
+    // one that phrased the labels as instructions — hence `commandLabel`.
+    ...MODULES.map(m => ({
+      id: `go:${m.id}`,
+      label: m.commandLabel,
+      perm: m.permission,
+      auxiliaryData: { group: 'Actions', href: m.path, icon: m.icon },
+    })),
     { id: 'do:new-claim', label: 'File a new attendance claim', perm: 'claims:submit', auxiliaryData: { group: 'Actions', href: '/app/claims/new_claim', icon: FileText } },
     { id: 'do:review-queue', label: 'Open my review queue', perm: 'claims:review_faculty', auxiliaryData: { group: 'Actions', href: '/app/claims/review_queue', icon: FileText } },
     { id: 'do:meetings', label: 'Record meeting minutes', perm: 'meetings:manage', auxiliaryData: { group: 'Actions', href: '/app/faculty/meetings', icon: Users } },
@@ -112,6 +119,24 @@ export const CommandBar: React.FC<{ isOpen: boolean; onOpenChange: (open: boolea
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       label="Search and commands"
+      /*
+       * The `label` prop above names the DIALOG. It does not name the input
+       * inside it, and Astryx's default `<CommandPaletteInput />` ships with
+       * a placeholder and nothing else — so the `role="combobox"` a screen
+       * reader lands on announced as unnamed.
+       *
+       * Filling the `input` slot explicitly is the supported fix:
+       * CommandPaletteInputProps extends BaseProps, which keeps `aria-*`, and
+       * the component spreads them onto the real <input>. Everything else
+       * about the default input (context wiring, autofocus, the search icon,
+       * useCombobox keyboard handling) is unchanged — this only adds a name.
+       */
+      input={
+        <CommandPaletteInput
+          aria-label="Search clubs, people, meetings and tasks, or run a command"
+          placeholder="Search or jump to…"
+        />
+      }
       searchSource={source}
       emptyBootstrapText="Type to search clubs, people, meetings and tasks"
       emptySearchText="Nothing matched"
@@ -125,7 +150,7 @@ export const CommandBar: React.FC<{ isOpen: boolean; onOpenChange: (open: boolea
         const Icon = item.auxiliaryData?.icon ?? Inbox;
         return (
           <span className="flex items-center gap-2.5">
-            <Icon className="h-4 w-4 text-slate-400" aria-hidden="true" />
+            <Icon className="h-4 w-4 text-secondary" aria-hidden="true" />
             <span>{item.label}</span>
           </span>
         );

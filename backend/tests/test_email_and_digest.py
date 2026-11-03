@@ -11,10 +11,10 @@ from app.services.engines import email as email_module
 
 from .conftest import auth_headers
 
-PRESIDENT = ("student.president@christuniversity.in", "student123")
-COORDINATOR = ("faculty.accounting@christuniversity.in", "faculty123")
-HOD = ("hod.commerce@christuniversity.in", "faculty123")
-STUDENT = ("student.regular@christuniversity.in", "student123")
+PRESIDENT = ("student.president@christuniversity.in", "123")
+COORDINATOR = ("faculty.accounting@christuniversity.in", "123")
+HOD = ("hod.commerce@christuniversity.in", "123")
+STUDENT = ("student.regular@christuniversity.in", "123")
 
 
 @pytest.fixture
@@ -126,7 +126,7 @@ def test_digest_is_not_sent_to_someone_with_an_empty_queue(client, outbox):
         db.close()
 
     outbox.clear()
-    r = client.post("/api/v1/me/send-daily-digests", headers=auth_headers(client, "admin@christuniversity.in", "admin123"))
+    r = client.post("/api/v1/me/send-daily-digests", headers=auth_headers(client, "admin@christuniversity.in", "123"))
     assert r.status_code == 200, r.text
 
     assert "student.regular2@christuniversity.in" not in {m.to for m in outbox}
@@ -149,7 +149,7 @@ def test_digest_summarises_what_is_waiting(client, outbox):
     outbox.clear()
     r = client.post(
         "/api/v1/me/send-daily-digests",
-        headers=auth_headers(client, "admin@christuniversity.in", "admin123"),
+        headers=auth_headers(client, "admin@christuniversity.in", "123"),
     )
     assert r.status_code == 200, r.text
 

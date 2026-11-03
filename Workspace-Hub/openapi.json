@@ -47,6 +47,72 @@
         }
       }
     },
+    "/api/v1/auth/demo-persona": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List Demo Personas",
+        "description": "The accounts a developer may become. Development only; 404 when off.\n\nThis exists so the client does not have to keep its own copy of the\nallow-list \u2014 the server owns it, and the UI renders whatever it is told.\n\nIt also solves a problem the POST cannot: that endpoint answers 404 both\nwhen the flag is off AND when the address is not allow-listed, on purpose,\nso a caller cannot enumerate the personas from it. Which means the POST is\nuseless for asking \"is this feature available?\". This is that question,\nasked once.\n\nListing the fixtures when the flag is on is not a leak: they are seeded\ntest accounts, and anything that can read this can already mint tokens for\nthem.",
+        "operationId": "list_demo_personas_api_v1_auth_demo_persona_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DemoPersonaOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Demo Personas Api V1 Auth Demo Persona Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Demo Persona",
+        "description": "Sign in as a seeded demo account WITHOUT a password. Development only.\n\nThis is impersonation, so it is fenced in four ways:\n\n1. `settings.ENABLE_DEMO_PERSONAS` defaults to False, and this returns\n   **404** when it is off rather than 401 or 403, with byte-identical\n   body to FastAPI's own 404 \u2014 so probing for the route learns nothing.\n\n   Two holes in that claim were found in review and closed here. The\n   detail string was \"Not found\" against FastAPI's \"Not Found\", which\n   distinguished a disabled route from an absent one on capitalisation\n   alone. And `include_in_schema` was left at its default, so\n   `/api/v1/openapi.json` \u2014 which this app serves unconditionally, in\n   every environment \u2014 published the route, its request model and its\n   response model regardless of the flag. Masking the response while\n   publishing the schema is not masking.\n\n   NOTE: `include_in_schema` is evaluated at import time, so flipping the\n   flag needs a restart to change what the schema shows. That is correct\n   for a deploy-time flag and would be wrong for a runtime one.\n2. The target must appear in `settings.DEMO_PERSONA_EMAILS`, an explicit\n   allow-list of seeded fixtures. Even with the flag wrongly enabled, this\n   cannot mint a token for a real person's account.\n3. The account must still exist and be active, so a disabled fixture stays\n   disabled.\n4. Rate-limited on the same budget as /login, so it is no cheaper to abuse.\n\nIt issues a genuine token pair through `session_service.issue`, exactly as\n/login does. That is deliberate: a parallel token path would be a second\nthing to get wrong, and the resulting session must be revocable and\nrefreshable like any other.",
+        "operationId": "demo_persona_api_v1_auth_demo_persona_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoPersonaRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/refresh": {
       "post": {
         "tags": [
@@ -2925,6 +2991,7 @@
           "claims"
         ],
         "summary": "Get Student Timetable",
+        "description": "The class's timetable, narrowed to the caller's batch by default.\n\nA student is only ever shown slots they actually sit in: their own batch's,\nplus every unbatched slot. Left unfiltered, the claim wizard offered the\nother batch's hours, and a claim raised against one routed to a faculty\nmember who does not teach that student \u2014 which no reviewer could sensibly\napprove or refuse.\n\nAnyone who is not a student (Class Teacher, HOD, admin) gets the whole grid\nunless they ask for a batch explicitly, since maintaining a timetable means\nseeing all of it.",
         "operationId": "get_student_timetable_api_v1_claims_timetable_get",
         "security": [
           {
@@ -2957,6 +3024,22 @@
             "schema": {
               "type": "string",
               "title": "Section"
+            }
+          },
+          {
+            "name": "batch",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Batch"
             }
           }
         ],
@@ -3229,7 +3312,7 @@
           "claims"
         ],
         "summary": "List Claims",
-        "description": "Claims scoped to what this caller may see, one page at a time.\n\nReturns an envelope with a TOTAL rather than a bare array. The previous\n100-row cap was invisible: a super_admin with 300 claims saw 100 and no\nindication the rest existed. An explicit page with a total is the opposite\nfailure mode \u2014 the user can see there is more.\n\nScoping happens first and pagination second, on purpose: paging a list and\nthen filtering it would produce short pages and a meaningless total.",
+        "description": "Claims scoped to what this caller may see, one page at a time.\n\nReturns an envelope with a TOTAL rather than a bare array. The previous\n100-row cap was invisible: a super_admin with 300 claims saw 100 and no\nindication the rest existed. An explicit page with a total is the opposite\nfailure mode \u2014 the user can see there is more.\n\nScoping happens first and pagination second, on purpose: paging a list and\nthen filtering it would produce short pages and a meaningless total.\n\n`view` splits a reviewer's claims into what still needs them and what they\nhave already decided. It does nothing for a student: their own claims are\ntheir own claims whatever state they are in.",
         "operationId": "list_claims_api_v1_claims_get",
         "security": [
           {
@@ -3258,6 +3341,16 @@
               "minimum": 1,
               "default": 25,
               "title": "Page Size"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "pending",
+              "title": "View"
             }
           }
         ],
@@ -5479,6 +5572,1036 @@
         ]
       }
     },
+    "/api/v1/files/{file_path}": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Get Local File",
+        "operationId": "get_local_file_api_v1_files__file_path__get",
+        "parameters": [
+          {
+            "name": "file_path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Path"
+            }
+          },
+          {
+            "name": "expires",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Expires"
+            }
+          },
+          {
+            "name": "signature",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Signature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/yellow-forms/workflow": {
+      "get": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Get Yellow Form Workflow",
+        "operationId": "get_yellow_form_workflow_api_v1_yellow_forms_workflow_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/yellow-forms/queue": {
+      "get": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Get Review Queue",
+        "description": "What is waiting on the caller's decision right now, oldest first.\n\nScoped in SQL, the same way the review endpoints authorize, so the count is\nhonest: a Faculty Coordinator sees only their own clubs' forms, and a form\nwhose event has started is gone \u2014 nobody can act on it any more.",
+        "operationId": "get_review_queue_api_v1_yellow_forms_queue_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YellowFormBundle"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/yellow-forms/reviewed": {
+      "get": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Get Reviewed By Me",
+        "description": "Everything the caller has approved, sent back or rejected, newest first.\n\nOnly what they may still read: a reviewer who has lost the role, or a\nFaculty Coordinator moved off the club, keeps no window onto the forms.",
+        "operationId": "get_reviewed_by_me_api_v1_yellow_forms_reviewed_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YellowFormBundle"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/yellow-forms/mine": {
+      "get": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Get My Yellow Forms",
+        "description": "Forms and claim sheets the caller is listed on, once the club has submitted them.",
+        "operationId": "get_my_yellow_forms_api_v1_yellow_forms_mine_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YellowFormBundle"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/yellow-forms/clubs/{club_id}/pre-approvals": {
+      "get": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "List Club Pre Approvals",
+        "operationId": "list_club_pre_approvals_api_v1_yellow_forms_clubs__club_id__pre_approvals_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "club_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Club Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PreApprovalOut"
+                  },
+                  "title": "Response List Club Pre Approvals Api V1 Yellow Forms Clubs  Club Id  Pre Approvals Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Create Pre Approval",
+        "operationId": "create_pre_approval_api_v1_yellow_forms_clubs__club_id__pre_approvals_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "club_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Club Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreApprovalCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreApprovalOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/yellow-forms/clubs/{club_id}/claim-sheets": {
+      "get": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "List Club Claim Sheets",
+        "operationId": "list_club_claim_sheets_api_v1_yellow_forms_clubs__club_id__claim_sheets_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "club_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Club Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClaimSheetOut"
+                  },
+                  "title": "Response List Club Claim Sheets Api V1 Yellow Forms Clubs  Club Id  Claim Sheets Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/yellow-forms/clubs/{club_id}/eligible-students": {
+      "get": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "List Eligible Students",
+        "description": "The club's active members, ready to drop onto a pre-approval.",
+        "operationId": "list_eligible_students_api_v1_yellow_forms_clubs__club_id__eligible_students_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "club_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Club Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EligibleStudentOut"
+                  },
+                  "title": "Response List Eligible Students Api V1 Yellow Forms Clubs  Club Id  Eligible Students Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/yellow-forms/clubs/{club_id}/student-lookup": {
+      "get": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Lookup Student",
+        "operationId": "lookup_student_api_v1_yellow_forms_clubs__club_id__student_lookup_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "club_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Club Id"
+            }
+          },
+          {
+            "name": "register_number",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20,
+              "title": "Register Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentLookupOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/yellow-forms/pre-approvals/{form_id}": {
+      "get": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Get Pre Approval",
+        "operationId": "get_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Form Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreApprovalOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Update Pre Approval",
+        "operationId": "update_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Form Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreApprovalUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreApprovalOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Delete Pre Approval",
+        "operationId": "delete_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Form Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/yellow-forms/pre-approvals/{form_id}/submit": {
+      "post": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Submit Pre Approval",
+        "description": "Send to the Faculty Coordinator. A returned form restarts from the\nFaculty Coordinator: both earlier approvals are cleared, because the form\nthey approved is not the form being resubmitted.",
+        "operationId": "submit_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__submit_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Form Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreApprovalOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/yellow-forms/pre-approvals/{form_id}/review": {
+      "post": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Review Pre Approval",
+        "operationId": "review_pre_approval_api_v1_yellow_forms_pre_approvals__form_id__review_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Form Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewAction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreApprovalOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/yellow-forms/pre-approvals/{form_id}/claim-sheet": {
+      "post": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Create Claim Sheet",
+        "operationId": "create_claim_sheet_api_v1_yellow_forms_pre_approvals__form_id__claim_sheet_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "form_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Form Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimSheetUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimSheetOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/yellow-forms/claim-sheets/{sheet_id}": {
+      "get": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Get Claim Sheet",
+        "operationId": "get_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sheet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sheet Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimSheetOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Update Claim Sheet",
+        "operationId": "update_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sheet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sheet Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimSheetUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimSheetOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Delete Claim Sheet",
+        "operationId": "delete_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sheet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sheet Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/yellow-forms/claim-sheets/{sheet_id}/submit": {
+      "post": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Submit Claim Sheet",
+        "operationId": "submit_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__submit_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sheet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sheet Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimSheetOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/yellow-forms/claim-sheets/{sheet_id}/review": {
+      "post": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Review Claim Sheet",
+        "operationId": "review_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__review_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sheet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sheet Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewAction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimSheetOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/yellow-forms/claim-sheets/{sheet_id}/export.csv": {
+      "get": {
+        "tags": [
+          "yellow-forms"
+        ],
+        "summary": "Export Claim Sheet",
+        "description": "The claim sheet as the department's template lays it out: one row per\nstudent per date, a period column holding its own label when missed.",
+        "operationId": "export_claim_sheet_api_v1_yellow_forms_claim_sheets__sheet_id__export_csv_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sheet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Sheet Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The claim sheet in the department's column layout.",
+            "content": {
+              "text/csv": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "summary": "Root Endpoint",
@@ -5528,7 +6651,11 @@
               "annual_plan_review",
               "task_due",
               "meeting_without_minutes",
-              "reimbursement_review"
+              "reimbursement_review",
+              "pre_approval_review",
+              "claim_sheet_review",
+              "claim_sheet_due",
+              "yellow_form_returned"
             ],
             "title": "Kind"
           },
@@ -6051,6 +7178,17 @@
             "type": "string",
             "title": "Subject"
           },
+          "course_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Code"
+          },
           "date": {
             "type": "string",
             "title": "Date"
@@ -6078,6 +7216,17 @@
           "subject": {
             "type": "string",
             "title": "Subject"
+          },
+          "course_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Code"
           },
           "date": {
             "type": "string",
@@ -6113,6 +7262,33 @@
               }
             ],
             "title": "Feedback"
+          },
+          "subject_faculty_name": {
+            "type": "string",
+            "title": "Subject Faculty Name",
+            "default": ""
+          },
+          "co_faculty_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Co Faculty Id"
+          },
+          "co_faculty_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Co Faculty Name"
           }
         },
         "type": "object",
@@ -6468,6 +7644,10 @@
         "properties": {
           "category": {
             "type": "string",
+            "enum": [
+              "medical",
+              "co_curricular"
+            ],
             "title": "Category"
           },
           "academic_year": {
@@ -6488,6 +7668,10 @@
           },
           "submission_type": {
             "type": "string",
+            "enum": [
+              "individual",
+              "club"
+            ],
             "title": "Submission Type",
             "default": "individual"
           },
@@ -6677,6 +7861,14 @@
             "type": "array",
             "title": "Participants",
             "default": []
+          },
+          "pending_approvals": {
+            "items": {
+              "$ref": "#/components/schemas/PendingApprovalOut"
+            },
+            "type": "array",
+            "title": "Pending Approvals",
+            "default": []
           }
         },
         "type": "object",
@@ -6790,6 +7982,388 @@
         "title": "ClaimResubmit",
         "description": "PUT /claims/{claim_id}/resubmit body \u2014 edits a returned claim in\nplace. Only fields the student actually changed need be supplied."
       },
+      "ClaimSheetEntryIn": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "periods": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Periods"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "periods"
+        ],
+        "title": "ClaimSheetEntryIn"
+      },
+      "ClaimSheetEntryOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "periods": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Periods"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "date",
+          "periods"
+        ],
+        "title": "ClaimSheetEntryOut"
+      },
+      "ClaimSheetOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "reference_number": {
+            "type": "string",
+            "title": "Reference Number"
+          },
+          "pre_approval_id": {
+            "type": "string",
+            "title": "Pre Approval Id"
+          },
+          "pre_approval_reference": {
+            "type": "string",
+            "title": "Pre Approval Reference"
+          },
+          "club_id": {
+            "type": "string",
+            "title": "Club Id"
+          },
+          "club_name": {
+            "type": "string",
+            "title": "Club Name"
+          },
+          "event_name": {
+            "type": "string",
+            "title": "Event Name"
+          },
+          "event_start_date": {
+            "type": "string",
+            "title": "Event Start Date"
+          },
+          "event_end_date": {
+            "type": "string",
+            "title": "Event End Date"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "status_label": {
+            "type": "string",
+            "title": "Status Label"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_by_name": {
+            "type": "string",
+            "title": "Created By Name"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "late_submission_flag": {
+            "type": "boolean",
+            "title": "Late Submission Flag",
+            "default": false
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "reviewed_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By Name"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "review_comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Comments"
+          },
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimSheetStudentOut"
+            },
+            "type": "array",
+            "title": "Students",
+            "default": []
+          },
+          "student_count": {
+            "type": "integer",
+            "title": "Student Count",
+            "default": 0
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count",
+            "default": 0
+          },
+          "pre_approval": {
+            "$ref": "#/components/schemas/PreApprovalSummary"
+          },
+          "attendance_redacted": {
+            "type": "boolean",
+            "title": "Attendance Redacted",
+            "default": false
+          },
+          "viewer_can_edit": {
+            "type": "boolean",
+            "title": "Viewer Can Edit",
+            "default": false
+          },
+          "viewer_can_submit": {
+            "type": "boolean",
+            "title": "Viewer Can Submit",
+            "default": false
+          },
+          "viewer_can_delete": {
+            "type": "boolean",
+            "title": "Viewer Can Delete",
+            "default": false
+          },
+          "viewer_can_review": {
+            "type": "boolean",
+            "title": "Viewer Can Review",
+            "default": false
+          },
+          "viewer_can_export": {
+            "type": "boolean",
+            "title": "Viewer Can Export",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "reference_number",
+          "pre_approval_id",
+          "pre_approval_reference",
+          "club_id",
+          "club_name",
+          "event_name",
+          "event_start_date",
+          "event_end_date",
+          "status",
+          "status_label",
+          "created_by",
+          "created_by_name",
+          "pre_approval"
+        ],
+        "title": "ClaimSheetOut"
+      },
+      "ClaimSheetStudentIn": {
+        "properties": {
+          "pre_approval_student_id": {
+            "type": "string",
+            "title": "Pre Approval Student Id"
+          },
+          "attendance_with_claims": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance With Claims"
+          },
+          "attendance_without_claims": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Without Claims"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimSheetEntryIn"
+            },
+            "type": "array",
+            "title": "Entries",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "pre_approval_student_id"
+        ],
+        "title": "ClaimSheetStudentIn"
+      },
+      "ClaimSheetStudentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "pre_approval_student_id": {
+            "type": "string",
+            "title": "Pre Approval Student Id"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          },
+          "register_number": {
+            "type": "string",
+            "title": "Register Number"
+          },
+          "student_name": {
+            "type": "string",
+            "title": "Student Name"
+          },
+          "class_name": {
+            "type": "string",
+            "title": "Class Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "attendance_with_claims": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance With Claims"
+          },
+          "attendance_without_claims": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Without Claims"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimSheetEntryOut"
+            },
+            "type": "array",
+            "title": "Entries",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "pre_approval_student_id",
+          "register_number",
+          "student_name",
+          "class_name",
+          "role"
+        ],
+        "title": "ClaimSheetStudentOut"
+      },
+      "ClaimSheetUpsert": {
+        "properties": {
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimSheetStudentIn"
+            },
+            "type": "array",
+            "title": "Students",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "ClaimSheetUpsert"
+      },
       "ClubBootstrap": {
         "properties": {
           "club": {
@@ -6875,6 +8449,11 @@
           "can_manage_members": {
             "type": "boolean",
             "title": "Can Manage Members",
+            "default": false
+          },
+          "can_file_yellow_forms": {
+            "type": "boolean",
+            "title": "Can File Yellow Forms",
             "default": false
           }
         },
@@ -7464,6 +9043,49 @@
         ],
         "title": "DashboardWidgetPreferenceOut"
       },
+      "DemoPersonaOut": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "primary_role": {
+            "type": "string",
+            "title": "Primary Role"
+          },
+          "role_tags_str": {
+            "type": "string",
+            "title": "Role Tags Str"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "name",
+          "primary_role",
+          "role_tags_str"
+        ],
+        "title": "DemoPersonaOut",
+        "description": "One account a developer may switch into."
+      },
+      "DemoPersonaRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "DemoPersonaRequest",
+        "description": "Which seeded account to become."
+      },
       "DocumentOut": {
         "properties": {
           "name": {
@@ -7568,6 +9190,39 @@
         ],
         "title": "DuplicateClaimWarning",
         "description": "Soft warning only \u2014 per the Claims PRD, duplicate detection must\nnever block submission, only surface a warning."
+      },
+      "EligibleStudentOut": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "title": "Student Id"
+          },
+          "register_number": {
+            "type": "string",
+            "title": "Register Number"
+          },
+          "student_name": {
+            "type": "string",
+            "title": "Student Name"
+          },
+          "class_name_suggestion": {
+            "type": "string",
+            "title": "Class Name Suggestion"
+          },
+          "default_role": {
+            "type": "string",
+            "title": "Default Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id",
+          "register_number",
+          "student_name",
+          "class_name_suggestion",
+          "default_role"
+        ],
+        "title": "EligibleStudentOut"
       },
       "EventAttendanceOut": {
         "properties": {
@@ -8636,6 +10291,91 @@
         ],
         "title": "Page[ClaimOut]"
       },
+      "PendingApprovalOut": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "faculty_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faculty Id"
+          },
+          "faculty_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faculty Name"
+          },
+          "co_faculty_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Co Faculty Id"
+          },
+          "co_faculty_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Co Faculty Name"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "course_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "role"
+        ],
+        "title": "PendingApprovalOut",
+        "description": "One decision a claim is still waiting on.\n\nThe stepper could say WHICH DESK a claim sat on but never WHO, and at the\nsubject-faculty stage that is the only useful question \u2014 the claim waits\non every subject faculty member independently, so \"under review\" could\nmean one signature outstanding or four."
+      },
       "PermissionTemplateAssign": {
         "properties": {
           "permission_template": {
@@ -8800,6 +10540,631 @@
           "breaching"
         ],
         "title": "PipelineStage"
+      },
+      "PreApprovalCreate": {
+        "properties": {
+          "event_name": {
+            "type": "string",
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Event Name"
+          },
+          "event_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Description"
+          },
+          "venue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 150,
+                "minLength": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue"
+          },
+          "event_start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Event Start Date"
+          },
+          "event_end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Event End Date"
+          },
+          "academic_year": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "minLength": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Academic Year"
+          },
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/PreApprovalStudentIn"
+            },
+            "type": "array",
+            "title": "Students",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_name",
+          "event_start_date",
+          "event_end_date"
+        ],
+        "title": "PreApprovalCreate"
+      },
+      "PreApprovalOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "reference_number": {
+            "type": "string",
+            "title": "Reference Number"
+          },
+          "club_id": {
+            "type": "string",
+            "title": "Club Id"
+          },
+          "club_name": {
+            "type": "string",
+            "title": "Club Name"
+          },
+          "academic_year": {
+            "type": "string",
+            "title": "Academic Year"
+          },
+          "event_name": {
+            "type": "string",
+            "title": "Event Name"
+          },
+          "event_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Description"
+          },
+          "venue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue"
+          },
+          "event_start_date": {
+            "type": "string",
+            "title": "Event Start Date"
+          },
+          "event_end_date": {
+            "type": "string",
+            "title": "Event End Date"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "status_label": {
+            "type": "string",
+            "title": "Status Label"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_by_name": {
+            "type": "string",
+            "title": "Created By Name"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          },
+          "faculty_coordinator_approved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faculty Coordinator Approved By"
+          },
+          "faculty_coordinator_approved_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faculty Coordinator Approved By Name"
+          },
+          "faculty_coordinator_approved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faculty Coordinator Approved At"
+          },
+          "associate_hod_approved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Associate Hod Approved By"
+          },
+          "associate_hod_approved_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Associate Hod Approved By Name"
+          },
+          "associate_hod_approved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Associate Hod Approved At"
+          },
+          "review_comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Comments"
+          },
+          "last_reviewed_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reviewed By Name"
+          },
+          "last_reviewed_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reviewed Stage"
+          },
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/PreApprovalStudentOut"
+            },
+            "type": "array",
+            "title": "Students",
+            "default": []
+          },
+          "student_count": {
+            "type": "integer",
+            "title": "Student Count",
+            "default": 0
+          },
+          "approval_deadline": {
+            "type": "string",
+            "title": "Approval Deadline"
+          },
+          "is_expired": {
+            "type": "boolean",
+            "title": "Is Expired",
+            "default": false
+          },
+          "event_completed": {
+            "type": "boolean",
+            "title": "Event Completed",
+            "default": false
+          },
+          "pending_with": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending With"
+          },
+          "claim_sheet_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Sheet Id"
+          },
+          "claim_sheet_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Sheet Status"
+          },
+          "claim_sheet_reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claim Sheet Reference"
+          },
+          "viewer_can_edit": {
+            "type": "boolean",
+            "title": "Viewer Can Edit",
+            "default": false
+          },
+          "viewer_can_submit": {
+            "type": "boolean",
+            "title": "Viewer Can Submit",
+            "default": false
+          },
+          "submit_blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submit Blocked Reason"
+          },
+          "viewer_can_delete": {
+            "type": "boolean",
+            "title": "Viewer Can Delete",
+            "default": false
+          },
+          "viewer_can_review": {
+            "type": "boolean",
+            "title": "Viewer Can Review",
+            "default": false
+          },
+          "viewer_can_file_claim_sheet": {
+            "type": "boolean",
+            "title": "Viewer Can File Claim Sheet",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "reference_number",
+          "club_id",
+          "club_name",
+          "academic_year",
+          "event_name",
+          "event_start_date",
+          "event_end_date",
+          "status",
+          "status_label",
+          "created_by",
+          "created_by_name",
+          "approval_deadline"
+        ],
+        "title": "PreApprovalOut"
+      },
+      "PreApprovalStudentIn": {
+        "properties": {
+          "register_number": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Register Number"
+          },
+          "student_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Student Name"
+          },
+          "class_name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Class Name"
+          },
+          "role": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "register_number",
+          "student_name",
+          "class_name",
+          "role"
+        ],
+        "title": "PreApprovalStudentIn"
+      },
+      "PreApprovalStudentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          },
+          "register_number": {
+            "type": "string",
+            "title": "Register Number"
+          },
+          "student_name": {
+            "type": "string",
+            "title": "Student Name"
+          },
+          "class_name": {
+            "type": "string",
+            "title": "Class Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "register_number",
+          "student_name",
+          "class_name",
+          "role"
+        ],
+        "title": "PreApprovalStudentOut"
+      },
+      "PreApprovalSummary": {
+        "properties": {
+          "reference_number": {
+            "type": "string",
+            "title": "Reference Number"
+          },
+          "faculty_coordinator_approved_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faculty Coordinator Approved By Name"
+          },
+          "faculty_coordinator_approved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Faculty Coordinator Approved At"
+          },
+          "associate_hod_approved_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Associate Hod Approved By Name"
+          },
+          "associate_hod_approved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Associate Hod Approved At"
+          },
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/PreApprovalStudentOut"
+            },
+            "type": "array",
+            "title": "Students",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "reference_number"
+        ],
+        "title": "PreApprovalSummary",
+        "description": "The pre-approved list a claim sheet is filed against."
+      },
+      "PreApprovalUpdate": {
+        "properties": {
+          "event_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 150,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Name"
+          },
+          "event_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "minLength": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Description"
+          },
+          "venue": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 150,
+                "minLength": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Venue"
+          },
+          "event_start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Start Date"
+          },
+          "event_end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event End Date"
+          },
+          "academic_year": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20,
+                "minLength": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Academic Year"
+          },
+          "students": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PreApprovalStudentIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Students"
+          }
+        },
+        "type": "object",
+        "title": "PreApprovalUpdate",
+        "description": "Every field optional. The merged result is validated by the endpoint,\nsince a new end date alone can only be checked against the stored start."
       },
       "ProgrammeIn": {
         "properties": {
@@ -9504,6 +11869,35 @@
         "type": "object",
         "title": "ReminderUpdate"
       },
+      "ReviewAction": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "revise",
+              "reject"
+            ],
+            "title": "Action"
+          },
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "ReviewAction"
+      },
       "ShowcaseClubOut": {
         "properties": {
           "id": {
@@ -9642,6 +12036,57 @@
           "club_id"
         ],
         "title": "SponsorshipOut"
+      },
+      "StudentLookupOut": {
+        "properties": {
+          "found": {
+            "type": "boolean",
+            "title": "Found"
+          },
+          "student_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Id"
+          },
+          "register_number": {
+            "type": "string",
+            "title": "Register Number"
+          },
+          "student_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Student Name"
+          },
+          "class_name_suggestion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Name Suggestion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "found",
+          "register_number"
+        ],
+        "title": "StudentLookupOut"
       },
       "SupportingDocumentOut": {
         "properties": {
@@ -9886,13 +12331,46 @@
             "type": "string",
             "title": "Subject"
           },
+          "course_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Code"
+          },
           "hour": {
             "type": "string",
             "title": "Hour"
           },
+          "batch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch"
+          },
           "faculty_id": {
             "type": "string",
             "title": "Faculty Id"
+          },
+          "co_faculty_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Co Faculty Id"
           },
           "programme": {
             "type": "string",
@@ -9929,13 +12407,46 @@
             "type": "string",
             "title": "Subject"
           },
+          "course_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course Code"
+          },
           "hour": {
             "type": "string",
             "title": "Hour"
           },
+          "batch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch"
+          },
           "faculty_id": {
             "type": "string",
             "title": "Faculty Id"
+          },
+          "co_faculty_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Co Faculty Id"
           },
           "programme": {
             "type": "string",
@@ -9957,6 +12468,17 @@
             "type": "string",
             "title": "Faculty Name",
             "default": ""
+          },
+          "co_faculty_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Co Faculty Name"
           }
         },
         "type": "object",
@@ -10159,6 +12681,17 @@
             ],
             "title": "Section"
           },
+          "batch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch"
+          },
           "enrollment_no": {
             "anyOf": [
               {
@@ -10300,6 +12833,28 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "YellowFormBundle": {
+        "properties": {
+          "pre_approvals": {
+            "items": {
+              "$ref": "#/components/schemas/PreApprovalOut"
+            },
+            "type": "array",
+            "title": "Pre Approvals",
+            "default": []
+          },
+          "claim_sheets": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimSheetOut"
+            },
+            "type": "array",
+            "title": "Claim Sheets",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "YellowFormBundle"
       }
     },
     "securitySchemes": {

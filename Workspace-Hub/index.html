@@ -4,11 +4,36 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- Fonts. Astryx sets the font-family TOKEN but never loads the face —
+         "font loading is the consumer's responsibility". Without these links
+         Source Serif 4 falls back to Georgia and Figtree to system-ui,
+         silently, and the whole design reads subtly wrong with no error.
+         display=swap so text paints in the fallback rather than blocking. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400;600;700&family=Figtree:wght@400;500;600;700&display=swap"
+    />
+
     <title>DOC Portal — Department of Commerce, CHRIST University</title>
+    <!--
+      Kept in step with the page's own H1 and hero paragraph, which the revamp
+      rewrote (see src/modules/landing/content.ts). This description is what
+      appears in a search result and a link preview, so a mismatch means the
+      snippet promises something the page no longer says.
+    -->
     <meta
       name="description"
-      content="The Department of Commerce at CHRIST (Deemed to be University): programmes, student clubs, and the staff and student portal for attendance claims and club operations."
+      content="Leadership opportunities, technical accounting standards taught to global practice, and student-led club operations — the Department of Commerce at CHRIST (Deemed to be University), and the portal for attendance claims and club operations."
     />
+
+    <!--
+      Canonical. Without it, the same page reached via a query string or a
+      trailing slash is a separate URL to a crawler.
+      Absolute by necessity; update if the domain changes.
+    -->
+    <link rel="canonical" href="https://commerce.christuniversity.in/" />
 
     <!-- There were zero of these. Every search result and every link preview
          for a university department page rendered as a bare URL with no icon. -->
@@ -16,16 +41,20 @@
     <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#0284c7" />
+    <!-- Tracks --color-accent in src/theme/docPortalTheme.ts. -->
+    <meta name="theme-color" content="#b8860b" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="DOC Portal" />
     <meta property="og:title" content="Department of Commerce — CHRIST (Deemed to be University)" />
     <meta
       property="og:description"
-      content="Programmes, student clubs, and the portal for attendance claims and club operations."
+      content="Leadership opportunities, technical accounting standards, and student-led club operations run on one department system."
     />
     <meta property="og:image" content="/icon-512.png" />
+    <!-- og:url was missing, so a shared link had no canonical target of its
+         own and some scrapers fell back to the URL that was pasted. -->
+    <meta property="og:url" content="https://commerce.christuniversity.in/" />
 
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Department of Commerce — CHRIST (Deemed to be University)" />

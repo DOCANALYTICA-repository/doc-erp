@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { api } from '../services/api';
-import { clearSession, getRefreshToken, writeSession } from '../services/session';
+import { clearSession, getRefreshToken, readSession, writeSession } from '../services/session';
+import { parseUserProfile } from '../api/contracts';
+import type { UserProfile } from '../api/types';
+import { queryClient } from '../lib/queryClient';
 
 export interface UserState {
   id: string;
@@ -31,7 +34,7 @@ interface PlatformStore {
   capabilities: Record<string, string>;
   isSearchOpen: boolean;
   isNotificationsOpen: boolean;
-  // True until App's session-restore effect has had a chance to run.
+  // True until restoreSession has finished, profile re-read included.
   // RequireAuth must wait on this before deciding to redirect to /login —
   // otherwise a hard refresh on a valid session incorrectly bounces the
   // user out before localStorage is read (confirmed race).
@@ -46,9 +49,10 @@ interface PlatformStore {
     refreshToken?: string | null,
   ) => void;
   logout: () => void;
+  /** Sign back in from storage, then re-read the profile so permission and capability changes apply. */
+  restoreSession: () => Promise<void>;
   setSearchOpen: (open: boolean) => void;
   setNotificationsOpen: (open: boolean) => void;
-  finishSessionRestore: () => void;
 
   // Helpers
   hasPermission: (permission: string) => boolean;
@@ -70,7 +74,26 @@ export const useStore = create<PlatformStore>((set, get) => ({
     set({ user, token, capabilities });
   },
 
-  finishSessionRestore: () => set({ isSessionRestoring: false }),
+  restoreSession: async () => {
+    const saved = readSession();
+    if (saved?.user && saved.token) {
+      get().login(saved.user as never, saved.token, saved.capabilities ?? {}, saved.refreshToken ?? null);
+      try {
+        // Refresh tokens slide, so a stored profile can predate any release; the server's copy is current.
+        const profile = parseUserProfile(await api.get<UserProfile>('/auth/me')) as UserProfile;
+        // Tokens may have rotated during the request; keep the current pair.
+        const current = readSession();
+        if (get().user && current?.token) {
+          get().login(profile as never, current.token, profile.capabilities ?? get().capabilities, current.refreshToken ?? null);
+        }
+      } catch {
+        // Offline or a server error: the stored profile stands, and the server still checks every request.
+      }
+    } else if (saved) {
+      clearSession();
+    }
+    set({ isSessionRestoring: false });
+  },
 
   logout: () => {
     // Tell the server first, so the refresh token stops working immediately
@@ -82,6 +105,13 @@ export const useStore = create<PlatformStore>((set, get) => ({
       void api.post('/auth/logout', { refresh_token: refreshToken }).catch(() => {});
     }
     clearSession();
+    // Every cached response goes with it. Query keys identify a REQUEST, not
+    // a person, so "/claims?view=actioned" is one key whoever asked — and the
+    // next person to sign in on this browser was served the previous one's
+    // claims until React Query got round to refetching. App.tsx already did
+    // this for a session that expired; a deliberate sign-out is the same
+    // event and was the one path that did not.
+    queryClient.clear();
     set({ user: null, token: null, capabilities: {} });
   },
 

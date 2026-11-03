@@ -7,18 +7,23 @@ their approval was three clicks inside a module they might not think to open.
 Ordering is by urgency then age: the oldest overdue thing is the thing most
 likely to be blocking somebody else.
 """
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import List, Optional
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, selectinload
 
-from app.core import faculty_scope
+from app.core import clock, faculty_scope, yellow_form_access
+from app.core import yellow_form_workflow as yf_workflow
+from app.core.config import settings
 from app.core.rbac import get_resolved_permissions
 from app.models.claim import AttendanceEntry, Claim
-from app.models.club import AnnualPlan, Club, Reimbursement
+from app.models.club import AnnualPlan, Club, ClubMember, Reimbursement
 from app.models.faculty import Meeting, Task
 from app.models.user import User
+from app.models.yellow_form import ClubClaimSheet, PreApprovalForm
 from app.schemas.action_queue import ActionItem, ActionQueue
+from app.services.engines.pipeline import CLAIM_SHEET_STAGE_SLA_DAYS, yellow_form_href
 
 # Mirrors clubs.ANNUAL_PLAN_STAGE_PERMISSIONS. Imported lazily inside the
 # function to avoid a circular import through the endpoints package.
@@ -57,6 +62,10 @@ class ActionQueueEngine:
         items += self._tasks_due(db, user, today)
         items += self._meetings_without_minutes(db, user, today)
         items += self._reimbursements_awaiting(db, user)
+        # Yellow-form deadlines are IST calendar days.
+        ist_today = clock.today()
+        items += self._yellow_forms_awaiting_review(db, user, ist_today)
+        items += self._yellow_forms_for_club(db, user, ist_today)
 
         items.sort(key=lambda i: (URGENCY_RANK.get(i.urgency, 3), i.due_date or "9999-12-31"))
 
@@ -116,7 +125,7 @@ class ActionQueueEngine:
             entries = db.query(AttendanceEntry).options(
                 selectinload(AttendanceEntry.participant)
             ).filter(
-                AttendanceEntry.subject_faculty_id == user.id,
+                or_(AttendanceEntry.subject_faculty_id == user.id, AttendanceEntry.co_faculty_id == user.id),
                 AttendanceEntry.status == "pending",
             ).all()
             for entry in entries:
@@ -125,17 +134,17 @@ class ActionQueueEngine:
                     add(claim, "Your attendance entry is pending")
 
         if is_admin or {"Course Coordinator", "HOD"} & tags:
+            # course_coordinator ONLY. A claim at attendance_office has been
+            # approved and forwarded out of this system; listing it as an
+            # action item asked the coordinator to do something about a claim
+            # they had already finished with.
             for c in db.query(Claim).filter(
-                Claim.current_workflow_stage.in_(["course_coordinator", "attendance_office"])
+                Claim.current_workflow_stage == "course_coordinator"
             ).all():
                 if is_admin or "HOD" in tags or faculty_scope.is_course_coordinator_for(
                     db, user.id, c.programme
                 ):
-                    add(c, (
-                        "Awaiting attendance office update"
-                        if c.current_workflow_stage == "attendance_office"
-                        else "Awaiting Course Coordinator approval"
-                    ))
+                    add(c, "Awaiting Course Coordinator approval")
 
         return list(found.values())
 
@@ -279,6 +288,191 @@ class ActionQueueEngine:
             )
             for r, club_name in rows
         ]
+
+    # ---- yellow forms -----------------------------------------------------
+
+    def _yellow_forms_awaiting_review(self, db: Session, user: User, today: date) -> List[ActionItem]:
+        """Pre-approvals and claim sheets at a stage this user reviews.
+
+        Scoped in SQL exactly as GET /yellow-forms/queue is: a Faculty
+        Coordinator only for their own clubs, and never a pre-approval whose
+        event has started, since nobody can approve it any more.
+        """
+        permissions = get_resolved_permissions(user)
+        is_admin = "*" in permissions
+        items: List[ActionItem] = []
+
+        conditions = []
+        for spec in yf_workflow.PRE_APPROVAL_STAGES.values():
+            if not (is_admin or spec.permission in permissions):
+                continue
+            condition = PreApprovalForm.status == spec.id
+            if spec.scope_check is not None and not is_admin:
+                club_ids = faculty_scope.get_club_coordinator_club_ids(db, user.id)
+                if not club_ids:
+                    continue
+                condition = and_(condition, PreApprovalForm.club_id.in_(club_ids))
+            conditions.append(condition)
+
+        if conditions:
+            rows = (
+                db.query(PreApprovalForm, Club.name)
+                .join(Club, Club.id == PreApprovalForm.club_id)
+                .filter(or_(*conditions), PreApprovalForm.event_start_date > today.isoformat())
+                .all()
+            )
+            for form, club_name in rows:
+                deadline = _parse_date(form.event_start_date) - timedelta(days=1)
+                stage_label = yf_workflow.PRE_APPROVAL_STAGES[form.status].label
+                items.append(ActionItem(
+                    id=f"pre_approval:{form.id}",
+                    kind="pre_approval_review",
+                    title=f"{club_name} pre-approval needs your approval",
+                    subtitle=f"“{form.event_name}” — awaiting {stage_label} approval",
+                    entity_type="pre_approval",
+                    entity_id=form.id,
+                    href=yellow_form_href(form.id),
+                    urgency=_urgency_for(deadline, today),
+                    due_date=deadline.isoformat(),
+                    waiting_since=form.submitted_at,
+                ))
+
+        sheet_spec = yf_workflow.CLAIM_SHEET_STAGES["claims_coordinator_review"]
+        if is_admin or sheet_spec.permission in permissions:
+            rows = (
+                db.query(ClubClaimSheet, PreApprovalForm.event_name, Club.name)
+                .join(PreApprovalForm, PreApprovalForm.id == ClubClaimSheet.pre_approval_id)
+                .join(Club, Club.id == ClubClaimSheet.club_id)
+                .filter(ClubClaimSheet.status == sheet_spec.id)
+                .all()
+            )
+            # Due by the pipeline's SLA for this stage, so the inbox and the
+            # escalation list agree on what is overdue.
+            sla = timedelta(days=CLAIM_SHEET_STAGE_SLA_DAYS[sheet_spec.id])
+            for sheet, event_name, club_name in rows:
+                submitted = _parse_date(sheet.submitted_at)
+                due = submitted + sla if submitted else None
+                late = " · filed late" if sheet.late_submission_flag else ""
+                items.append(ActionItem(
+                    id=f"claim_sheet:{sheet.id}",
+                    kind="claim_sheet_review",
+                    title=f"{club_name} claim sheet needs your review",
+                    subtitle=f"{sheet.reference_number} · “{event_name}”{late}",
+                    entity_type="claim_sheet",
+                    entity_id=sheet.id,
+                    href=yellow_form_href(sheet.id),
+                    urgency=_urgency_for(due, today),
+                    due_date=due.isoformat() if due else None,
+                    waiting_since=sheet.submitted_at,
+                ))
+
+        return items
+
+    def _yellow_forms_for_club(self, db: Session, user: User, today: date) -> List[ActionItem]:
+        """What a club's filers have to do next: file the claim sheet for a
+        pre-approved event that is over, or fix what a reviewer sent back.
+
+        Only for clubs this user may file for (yellow_form_access.can_file) —
+        a bottom-rank member can read the club's forms but has nothing to do.
+        """
+        if user.primary_role == "super_admin":
+            club_ids = None
+        elif user.primary_role == "faculty":
+            club_ids = faculty_scope.get_club_coordinator_club_ids(db, user.id)
+        else:
+            club_ids = [
+                club_id for (club_id,) in db.query(ClubMember.club_id)
+                .filter(ClubMember.student_id == user.id, ClubMember.status == "active")
+            ]
+        if club_ids is not None and not club_ids:
+            return []
+
+        today_iso = today.isoformat()
+        forms = (
+            db.query(PreApprovalForm, Club.name, ClubClaimSheet.id)
+            .join(Club, Club.id == PreApprovalForm.club_id)
+            .outerjoin(ClubClaimSheet, ClubClaimSheet.pre_approval_id == PreApprovalForm.id)
+            .filter(or_(
+                and_(
+                    PreApprovalForm.status == "approved",
+                    PreApprovalForm.event_end_date <= today_iso,
+                    # A draft sheet is not filed: only the club can see it.
+                    or_(ClubClaimSheet.id.is_(None), ClubClaimSheet.status == "draft"),
+                ),
+                # A returned form whose event has started can no longer be resubmitted.
+                and_(PreApprovalForm.status == "returned", PreApprovalForm.event_start_date > today_iso),
+            ))
+        )
+        sheets = (
+            db.query(ClubClaimSheet, PreApprovalForm.event_name, Club.name)
+            .join(PreApprovalForm, PreApprovalForm.id == ClubClaimSheet.pre_approval_id)
+            .join(Club, Club.id == ClubClaimSheet.club_id)
+            .filter(ClubClaimSheet.status == "returned")
+        )
+        if club_ids is not None:
+            forms = forms.filter(PreApprovalForm.club_id.in_(club_ids))
+            sheets = sheets.filter(ClubClaimSheet.club_id.in_(club_ids))
+
+        filer: dict = {}
+
+        def can_file(club_id: str) -> bool:
+            if club_id not in filer:
+                filer[club_id] = yellow_form_access.can_file(db, user, club_id)
+            return filer[club_id]
+
+        items: List[ActionItem] = []
+        for form, club_name, draft_sheet_id in forms.all():
+            if not can_file(form.club_id):
+                continue
+            href = f"/app/clubs/yellow-forms?club={form.club_id}&open={draft_sheet_id or form.id}"
+            if form.status == "approved":
+                due = _parse_date(form.event_end_date) + timedelta(days=settings.CLAIM_SUBMISSION_SLA_DAYS)
+                state = (
+                    "its claim sheet is a draft, not yet submitted" if draft_sheet_id
+                    else "the event is over and was pre-approved"
+                )
+                items.append(ActionItem(
+                    id=f"claim_sheet_due:{form.id}",
+                    kind="claim_sheet_due",
+                    title=f"File the claim sheet for “{form.event_name}”",
+                    subtitle=f"{club_name} · {state} ({form.reference_number})",
+                    entity_type="pre_approval",
+                    entity_id=form.id,
+                    href=href,
+                    urgency=_urgency_for(due, today),
+                    due_date=due.isoformat(),
+                    waiting_since=form.event_end_date,
+                ))
+            else:
+                deadline = _parse_date(form.event_start_date) - timedelta(days=1)
+                items.append(ActionItem(
+                    id=f"returned:{form.id}",
+                    kind="yellow_form_returned",
+                    title=f"Pre-approval for “{form.event_name}” was sent back",
+                    subtitle=f"{club_name} · {form.review_comments or 'See the reviewer’s comments'}",
+                    entity_type="pre_approval",
+                    entity_id=form.id,
+                    href=href,
+                    urgency=_urgency_for(deadline, today),
+                    due_date=deadline.isoformat(),
+                ))
+
+        for sheet, event_name, club_name in sheets.all():
+            if not can_file(sheet.club_id):
+                continue
+            items.append(ActionItem(
+                id=f"returned:{sheet.id}",
+                kind="yellow_form_returned",
+                title=f"Claim sheet for “{event_name}” was sent back",
+                subtitle=f"{club_name} · {sheet.review_comments or 'See the reviewer’s comments'}",
+                entity_type="claim_sheet",
+                entity_id=sheet.id,
+                href=f"/app/clubs/yellow-forms?club={sheet.club_id}&open={sheet.id}",
+                urgency="soon",
+                waiting_since=sheet.reviewed_at,
+            ))
+
+        return items
 
 
 action_queue_engine = ActionQueueEngine()

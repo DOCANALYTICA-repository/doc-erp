@@ -6,8 +6,8 @@ carrying a TOTAL is the opposite failure mode — the user can see there is more
 """
 from .conftest import auth_headers
 
-ADMIN = ("admin@christuniversity.in", "admin123")
-STUDENT = ("student.regular@christuniversity.in", "student123")
+ADMIN = ("admin@christuniversity.in", "123")
+STUDENT = ("student.regular@christuniversity.in", "123")
 
 
 def _page(client, creds, **params):

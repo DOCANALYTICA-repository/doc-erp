@@ -10,8 +10,11 @@ import { EmptyState } from '../../../components/ui/EmptyState';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
 import type { IsoDate } from '../../../lib/date';
 import { ClaimStatusStepper } from '../components/ClaimStatusStepper';
+import { ClaimDetailDrawer, ClaimReferenceButton } from '../components/ClaimDetailDrawer';
+import { PendingApprovals } from '../components/PendingApprovals';
 import { useClaimsWorkspace } from '../ClaimsContext';
 import { PagedFooter } from '../../../components/ui/PagedFooter';
+import { DataTable } from '../../../components/ui/DataTable';
 
 type DateRange = { start: IsoDate; end: IsoDate };
 
@@ -20,6 +23,7 @@ export const MyClaimsTab: React.FC = () => {
   const showToast = useToast();
 
   const [resubmittingId, setResubmittingId] = React.useState<string | null>(null);
+  const [viewingId, setViewingId] = React.useState<string | null>(null);
   const [dateRange, setDateRange] = React.useState<DateRange | null>(null);
   const [reason, setReason] = React.useState('');
   const [isSaving, setIsSaving] = React.useState(false);
@@ -60,84 +64,123 @@ export const MyClaimsTab: React.FC = () => {
     <div className="flex flex-col gap-4">
       <SectionHeader title="All claims" />
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
-          <caption className="sr-only">Your attendance claims</caption>
-          <thead className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            <tr>
-              <th scope="col" className="px-6 py-3">Reference</th>
-              <th scope="col" className="hidden px-6 py-3 sm:table-cell">Category</th>
-              <th scope="col" className="hidden px-6 py-3 sm:table-cell">Dates</th>
-              <th scope="col" className="px-6 py-3">Status</th>
-              <th scope="col" className="px-6 py-3 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 text-slate-700">
-            {claims.map(claim => (
-              <React.Fragment key={claim.id}>
-                <tr>
-                  <td className="px-6 py-4 font-medium text-slate-900">{claim.reference_number}</td>
-                  <td className="hidden px-6 py-4 uppercase text-slate-500 sm:table-cell">{claim.category}</td>
-                  <td className="hidden px-6 py-4 sm:table-cell">{claim.date_range}</td>
-                  <td className="px-6 py-4">
-                    <ClaimStatusStepper
-                      status={claim.status as never}
-                      currentStage={claim.current_workflow_stage as never}
-                      submissionType={claim.submission_type as never}
-                      referenceNumber={claim.reference_number}
-                      revisionReason={claim.revision_reason}
-                      lastRevisedStage={claim.last_revised_stage}
-                    />
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    {claim.status === 'returned' ? (
-                      <Button
-                        label="Resubmit"
-                        variant="secondary"
-                        size="sm"
-                        clickAction={() => setResubmittingId(resubmittingId === claim.id ? null : claim.id)}
-                      />
-                    ) : null}
-                  </td>
-                </tr>
+      {/*
+        * This was a hand-written <table> that copied DataTable's exact class
+        * strings, purely because DataTable could not do a detail row. Three
+        * tables then had to be restyled in lockstep with nothing to catch a
+        * drift — and two had already drifted. DataTable now supports
+        * `expandable`, so this is a column definition instead of a table.
+        */}
+      <DataTable
+        caption="Your attendance claims"
+        rows={claims}
+        getRowKey={claim => claim.id}
+        expandable={{
+          expandedKeys: resubmittingId ? [resubmittingId] : [],
+          onToggle: key => setResubmittingId(resubmittingId === key ? null : key),
+          // Only a claim that was sent back can be resubmitted — the old
+          // hand-rolled table expressed this by showing a "Resubmit" button
+          // solely on returned rows, and losing it would offer the form for
+          // claims the API would reject.
+          canExpand: claim => claim.status === 'returned',
+          toggleLabel: isOpen =>
+            isOpen ? 'Hide resubmission form' : 'Resubmit this claim',
+          renderDetail: claim => (
+            <div className="flex max-w-md flex-col gap-3">
+              <p className="text-sm text-secondary">
+                Sent back because: {claim.revision_reason || 'no reason was given.'}
+              </p>
+              <DateRangeInput
+                label="Updated date range"
+                value={dateRange}
+                onChange={setDateRange}
+              />
+              <label
+                className="text-sm font-medium text-secondary"
+                htmlFor={`resubmit-reason-${claim.id}`}
+              >
+                Updated reason
+              </label>
+              <textarea
+                id={`resubmit-reason-${claim.id}`}
+                rows={3}
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder={claim.reason ?? ''}
+                className="rounded-md border border-border bg-card px-3 py-2 text-sm"
+              />
+              <div>
+                <Button
+                  label={isSaving ? 'Resubmitting…' : 'Submit resubmission'}
+                  variant="primary"
+                  size="sm"
+                  isDisabled={isSaving}
+                  clickAction={() => resubmit(claim.id)}
+                />
+              </div>
+            </div>
+          ),
+        }}
+        columns={[
+          {
+            key: 'reference',
+            header: 'Reference',
+            render: claim => (
+              // The form a student submitted used to be write-once: they could
+              // see a status chip and never the claim behind it, which is
+              // exactly what they need when one comes back for correction.
+              <ClaimReferenceButton
+                reference={claim.reference_number}
+                onOpen={() => setViewingId(claim.id)}
+              />
+            ),
+          },
+          {
+            key: 'category',
+            header: 'Category',
+            secondary: true,
+            render: claim => (
+              <span className="uppercase text-secondary">{claim.category}</span>
+            ),
+          },
+          {
+            key: 'dates',
+            header: 'Dates',
+            secondary: true,
+            render: claim => claim.date_range,
+          },
+          {
+            key: 'status',
+            header: 'Status',
+            render: claim => (
+              <ClaimStatusStepper
+                status={claim.status as never}
+                currentStage={claim.current_workflow_stage as never}
+                submissionType={claim.submission_type as never}
+                referenceNumber={claim.reference_number}
+                revisionReason={claim.revision_reason}
+                lastRevisedStage={claim.last_revised_stage}
+                pendingApprovals={claim.pending_approvals}
+              />
+            ),
+          },
+          {
+            key: 'waiting_on',
+            header: 'Waiting on',
+            secondary: true,
+            render: claim => (
+              <span className="block max-w-[14rem] text-sm">
+                <PendingApprovals pending={claim.pending_approvals ?? []} variant="inline" />
+              </span>
+            ),
+          },
+        ]}
+      />
 
-                {resubmittingId === claim.id ? (
-                  <tr>
-                    <td colSpan={5} className="bg-slate-50 px-6 py-4">
-                      <div className="flex max-w-md flex-col gap-3">
-                        <p className="text-sm text-slate-600">
-                          Sent back because: {claim.revision_reason || 'no reason was given.'}
-                        </p>
-                        <DateRangeInput label="Updated date range" value={dateRange} onChange={setDateRange} />
-                        <label className="text-sm font-medium text-slate-600" htmlFor={`resubmit-reason-${claim.id}`}>
-                          Updated reason
-                        </label>
-                        <textarea
-                          id={`resubmit-reason-${claim.id}`}
-                          rows={3}
-                          value={reason}
-                          onChange={e => setReason(e.target.value)}
-                          placeholder={claim.reason ?? ''}
-                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                        />
-                        <div>
-                          <Button
-                            label={isSaving ? 'Resubmitting…' : 'Submit resubmission'}
-                            variant="primary"
-                            size="sm"
-                            isDisabled={isSaving}
-                            clickAction={() => resubmit(claim.id)}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ) : null}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ClaimDetailDrawer
+        claim={claims.find(c => c.id === viewingId)}
+        onClose={() => setViewingId(null)}
+      />
 
       <PagedFooter
         page={page}

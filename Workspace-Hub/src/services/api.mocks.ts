@@ -26,7 +26,9 @@ const MOCK_DATA = {
       id: "club_commerce",
       name: "Commerce Club",
       category: "Academic",
-      logo: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=150&h=150&fit=crop",
+      // No third-party host for the most-viewed element on the page — the
+      // UI renders initials. Matches backend/app/db/seed.py's logo=None.
+      logo: null,
       description: "Fostering academic excellence, analytical reasoning and industrial insights in finance and economics.",
       brand_colors: "#1e3a8a,#3b82f6",
       contact_email: "commerce.club@christuniversity.in",
@@ -36,7 +38,7 @@ const MOCK_DATA = {
       id: "club_cultural",
       name: "Cultural Committee",
       category: "Cultural",
-      logo: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150&h=150&fit=crop",
+      logo: null,
       description: "The heart of theatrical, musical, and artistic expression for the Department of Commerce.",
       brand_colors: "#9d174d,#ec4899",
       contact_email: "cultural.club@christuniversity.in",
@@ -72,12 +74,16 @@ const MOCK_DATA = {
   },
   reimbursements: {
     club_commerce: [
-      { id: "reimb_1", club_id: "club_commerce", requested_by: "Rahul Sharma", amount: 2500.0, status: "approved", receipt_url: "/receipt.pdf" }
+      // requested_by is a user id (the real POST handler always stores
+      // current_user.id, and the UI renders this field with no name
+      // lookup — see ReimbursementsTab.tsx), not a display name.
+      { id: "reimb_1", club_id: "club_commerce", requested_by: "std_president", amount: 2500.0, status: "approved", receipt_url: "/storage/reimbursements/receipt_reimb_1.pdf" },
+      { id: "reimb_2", club_id: "club_commerce", requested_by: "std_vp", amount: 1200.0, status: "pending", receipt_url: "/storage/reimbursements/receipt_reimb_2.pdf" }
     ]
   },
   sponsorships: {
     club_commerce: [
-      { id: "spon_1", club_id: "club_commerce", sponsor_name: "HDFC Bank", amount: 25000.0, status: "committed" }
+      { id: "spon_1", club_id: "club_commerce", sponsor_name: "HDFC Bank Limited", amount: 25000.0, status: "committed" }
     ]
   },
   claims: [
@@ -106,17 +112,20 @@ const MOCK_DATA = {
           student_name: "Vikram Aditya",
           status: "pending",
           entries: [
-            { id: "ae_1", subject: "Corporate Accounting", date: "2026-07-06", hour: "09:00 AM - 10:00 AM", subject_faculty_name: "Dr. Anil Kumar", status: "pending" },
-            { id: "ae_2", subject: "Financial Management", date: "2026-07-06", hour: "10:00 AM - 11:00 AM", subject_faculty_name: "Prof. Sarah Abraham", status: "pending" }
+            // fac_subject_2 = Prof. David D'Souza (Corporate Accounting),
+            // fac_subject_1 = Dr. Anil Kumar (Financial Management) — must
+            // match the faculty roster & timetable below.
+            { id: "ae_1", subject: "Corporate Accounting", date: "2026-07-06", hour: "09:00 AM - 10:00 AM", subject_faculty_name: "Prof. David D'Souza", status: "pending" },
+            { id: "ae_2", subject: "Financial Management", date: "2026-07-06", hour: "10:00 AM - 11:00 AM", subject_faculty_name: "Dr. Anil Kumar", status: "pending" }
           ]
         }
       ]
     }
   ],
   timetable: [
-    { id: "tt_m1", day_of_week: "Monday", subject: "Corporate Accounting", hour: "09:00 AM - 10:00 AM", faculty_name: "Dr. Anil Kumar", faculty_id: "fac_subject_2", programme: "B.Com (Hons)", semester: "5", section: "A" },
-    { id: "tt_m2", day_of_week: "Monday", subject: "Financial Management", hour: "10:00 AM - 11:00 AM", faculty_name: "Prof. Sarah Abraham", faculty_id: "fac_class_teacher", programme: "B.Com (Hons)", semester: "5", section: "A" },
-    { id: "tt_m3", day_of_week: "Monday", subject: "Taxation Law", hour: "11:15 AM - 12:15 PM", faculty_name: "Dr. Anil Kumar", faculty_id: "fac_subject_2", programme: "B.Com (Hons)", semester: "5", section: "A" }
+    { id: "tt_m1", day_of_week: "Monday", subject: "Corporate Accounting", hour: "09:00 AM - 10:00 AM", faculty_name: "Prof. David D'Souza", faculty_id: "fac_subject_2", programme: "B.Com (Hons)", semester: "5", section: "A" },
+    { id: "tt_m2", day_of_week: "Monday", subject: "Financial Management", hour: "10:00 AM - 11:00 AM", faculty_name: "Dr. Anil Kumar", faculty_id: "fac_subject_1", programme: "B.Com (Hons)", semester: "5", section: "A" },
+    { id: "tt_m3", day_of_week: "Monday", subject: "Taxation Law", hour: "11:15 AM - 12:15 PM", faculty_name: "Prof. Sarah Abraham", faculty_id: "fac_class_teacher", programme: "B.Com (Hons)", semester: "5", section: "A" }
   ],
   notes: [
     { id: "nt_1", owner_id: "fac_class_teacher", title: "Syllabus Completion Targets", content: "Must complete Unit 3 (Direct Taxes) by July 18. Schedule revision test on July 21.", is_pinned: true, is_favorite: true, tags: "Syllabus,Academic" }
@@ -131,8 +140,11 @@ const MOCK_DATA = {
     { id: "tsk_syllabus_audit", title: "Audit 3rd Semester Claim Files", description: "Verify medical documents submitted for claims in previous semester.", due_date: "2026-07-12", priority: "high", status: "pending", source_module: "faculty", assignee_id: "fac_class_teacher", creator_id: "fac_hod" }
   ],
   notifications: [
-    { id: "not_1", user_id: "fac_class_teacher", title: "New Claim Pending Initial Review", content: "Student Vikram Aditya has submitted a Medical Claim: ACP-2026-000101.", is_read: false, source_module: "claims" },
-    { id: "not_2", user_id: "std_president", title: "Recruitment Drive Created", content: "Your draft recruitment drive has been successfully registered.", is_read: true, source_module: "clubs" }
+    // cl_med_1 (ACP-2026-000101) has already cleared initial_review and
+    // sits at "subject_faculty", awaiting both assigned faculty.
+    { id: "not_2", user_id: "fac_subject_2", title: "Claim Pending Subject Faculty Review", content: "Vikram Aditya's Medical Claim ACP-2026-000101 is awaiting your review for Corporate Accounting.", is_read: false, source_module: "claims" },
+    { id: "not_3", user_id: "fac_subject_1", title: "Claim Pending Subject Faculty Review", content: "Vikram Aditya's Medical Claim ACP-2026-000101 is awaiting your review for Financial Management.", is_read: false, source_module: "claims" },
+    { id: "not_4", user_id: "std_president", title: "Recruitment Drive Created", content: "Your recruitment drive \"Junior Core Team Recruitment 2026\" has been published and is now accepting applications.", is_read: true, source_module: "clubs" }
   ]
 };
 

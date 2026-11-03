@@ -12,6 +12,8 @@ import { OverviewTab } from './tabs/OverviewTab';
 import { RemindersTab } from './tabs/RemindersTab';
 import { TasksTab } from './tabs/TasksTab';
 import { TabStrip } from '../../components/ui/TabStrip';
+import { PageShell } from '../../components/ui/PageShell';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 /**
  * The Faculty workspace shell.
@@ -41,27 +43,26 @@ export const FacultyDashboard: React.FC = () => {
   const ActiveTab = TAB_COMPONENTS[tab];
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] w-full flex-col bg-slate-50">
-      <TabStrip
-        label="Faculty workspace sections"
-        activeId={tab}
-        items={FACULTY_TABS.map(item => ({
-          id: item.id,
-          label: item.label,
-          to: `/app/faculty/${item.id}`,
-        }))}
+    <PageShell
+      maxWidth="6xl"
+      toolbar={
+        <TabStrip
+          label="Faculty workspace sections"
+          activeId={tab}
+          items={FACULTY_TABS.map(item => ({
+            id: item.id,
+            label: item.label,
+            to: `/app/faculty/${item.id}`,
+          }))}
+        />
+      }
+    >
+      <PageHeader
+        title="Faculty workspace"
+        description="Meetings, notes, documents, your timetable and the department directory."
       />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 overflow-y-auto p-6 md:p-8">
-        <header className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Faculty workspace</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Meetings, notes, documents, your timetable and the department directory.
-          </p>
-        </header>
-
-        <ActiveTab />
-      </main>
-    </div>
+      <ActiveTab />
+    </PageShell>
   );
 };

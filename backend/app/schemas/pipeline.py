@@ -12,7 +12,7 @@ from pydantic import BaseModel
 class PipelineItem(BaseModel):
     """One thing sitting at one stage."""
     id: str
-    kind: str  # claim | annual_plan
+    kind: str  # claim | annual_plan | pre_approval | claim_sheet
     reference: str
     title: str
 

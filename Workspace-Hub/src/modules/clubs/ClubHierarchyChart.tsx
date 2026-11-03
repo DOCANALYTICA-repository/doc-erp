@@ -4,6 +4,8 @@ import { Button } from '@astryxdesign/core/Button';
 import { Skeleton } from '@astryxdesign/core/Skeleton';
 import { Plus, Trash2 } from 'lucide-react';
 import type { ClubMember } from '../../api/types';
+import { describeError } from '../../services/errors';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 
 interface HierarchyLevel {
   id: string;
@@ -74,13 +76,36 @@ export const ClubHierarchyChart: React.FC<ClubHierarchyChartProps> = ({
     onMembersChanged();
   };
 
-  const deleteLevel = async (id: string) => {
+  /*
+   * Deleting a level, behind a confirmation.
+   *
+   * Two things were wrong before. It fired on a single click of a
+   * hover-revealed icon — permanently removing a position from the club's
+   * structure with nothing in between — and the failure path was
+   * `console.error(e)`. The server refuses a level that still has members
+   * assigned, so the common failure showed the user NOTHING: the level simply
+   * did not disappear, with no explanation anywhere they would look.
+   */
+  const [pendingDelete, setPendingDelete] = useState<HierarchyLevel | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setIsDeleting(true);
+    setDeleteError(null);
     try {
-      await api.delete(`/clubs/${clubId}/hierarchy/levels/${id}`);
+      await api.delete(`/clubs/${clubId}/hierarchy/levels/${pendingDelete.id}`);
+      setPendingDelete(null);
       load();
+      // The member list is keyed by level, so a removed level changes it.
+      onMembersChanged();
     } catch (e) {
-      // e.g. members still assigned to this level — surfaced inline is enough for now
-      console.error(e);
+      // Shown IN the dialog, which stays open: the usual reason is "members are
+      // still assigned to this level", and that is actionable.
+      setDeleteError(describeError(e));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -101,33 +126,35 @@ export const ClubHierarchyChart: React.FC<ClubHierarchyChartProps> = ({
   };
 
   return (
+    <>
     <div className="space-y-6">
-      <h3 className="font-bold text-slate-900 text-sm">Club Structure</h3>
-      <div className="p-8 rounded-2xl bg-white border border-slate-200/60 shadow-sm flex flex-col items-center gap-0">
+      <h3 className="font-heading font-semibold text-primary text-sm">Club Structure</h3>
+      <div className="p-8 rounded-lg bg-card border border-border shadow-sm flex flex-col items-center gap-0">
         {ranks.map((rank, rankIdx) => {
           const titlesAtRank = levels.filter(l => l.level_order === rank);
           const memberCountByLevel = (levelId: string) => members.filter(m => m.hierarchy_level_id === levelId).length;
           return (
             <React.Fragment key={rank}>
-              {rankIdx > 0 && <div className="w-px h-6 bg-slate-200" />}
+              {rankIdx > 0 && <div className="w-px h-6 bg-sand-300" />}
               <div className="flex flex-wrap gap-3 justify-center items-stretch">
                 {titlesAtRank.map(level => (
-                  <div key={level.id} className="px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-center min-w-[140px] relative group">
+                  <div key={level.id} className="px-4 py-3 rounded-lg border border-border bg-body text-center min-w-[140px] relative group">
                     {canEdit ? (
                       <input
                         defaultValue={level.title}
                         onBlur={(e) => { if (e.target.value.trim() && e.target.value !== level.title) renameLevel(level.id, e.target.value.trim()); }}
-                        className="w-full bg-transparent text-center font-bold text-slate-900 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 rounded"
+                        className="w-full bg-transparent text-center font-bold text-primary text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
                       />
                     ) : (
-                      <div className="font-bold text-slate-900 text-xs">{level.title}</div>
+                      <div className="font-bold text-primary text-xs">{level.title}</div>
                     )}
-                    <div className="text-xs text-slate-400 mt-1">{memberCountByLevel(level.id)} member(s)</div>
+                    <div className="text-xs text-secondary mt-1">{memberCountByLevel(level.id)} member(s)</div>
                     {canEdit && (
                       <button
-                        onClick={() => deleteLevel(level.id)}
+                        onClick={() => setPendingDelete(level)}
+                        aria-label={`Delete the ${level.title} position`}
                         title="Delete position"
-                        className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-rose-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-card border border-border text-secondary hover:text-error flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -140,7 +167,7 @@ export const ClubHierarchyChart: React.FC<ClubHierarchyChartProps> = ({
                       placeholder="+ position"
                       value={newTitleByRank[rank] || ''}
                       onChange={e => setNewTitleByRank(prev => ({ ...prev, [rank]: e.target.value }))}
-                      className="w-24 px-2 py-1 text-xs bg-white border border-dashed border-slate-300 rounded-lg"
+                      className="w-24 px-2 py-1 text-xs bg-card border border-dashed border-border-strong rounded-lg"
                     />
                     <Button label="Add" size="sm" variant="secondary" onClick={() => addSibling(rank)} />
                   </div>
@@ -157,11 +184,30 @@ export const ClubHierarchyChart: React.FC<ClubHierarchyChartProps> = ({
             placeholder="New bottom-level position title"
             value={newLevelTitle}
             onChange={e => setNewLevelTitle(e.target.value)}
-            className="text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg w-72"
+            className="text-xs px-3 py-2 bg-card border border-border rounded-lg w-72"
           />
           <Button label="Add Level" size="sm" variant="secondary" icon={<Plus className="w-3.5 h-3.5" />} onClick={addNewBottomLevel} />
         </div>
       )}
     </div>
+
+      <ConfirmDialog
+        isOpen={pendingDelete !== null}
+        title="Delete this position?"
+        body={
+          pendingDelete
+            ? `"${pendingDelete.title}" will be removed from the club's structure. This cannot be undone, and it will fail if members are still assigned to it.`
+            : ''
+        }
+        confirmLabel="Delete position"
+        isBusy={isDeleting}
+        error={deleteError ?? undefined}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => {
+          setPendingDelete(null);
+          setDeleteError(null);
+        }}
+      />
+    </>
   );
 };

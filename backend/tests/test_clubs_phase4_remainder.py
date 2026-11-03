@@ -22,11 +22,11 @@ def _fake_storage(monkeypatch):
     )
 
 
-PRESIDENT = ("student.president@christuniversity.in", "student123")
-FACULTY_COORDINATOR = ("faculty.accounting@christuniversity.in", "faculty123")
-CULTURAL_COORDINATOR = ("faculty.cultural@christuniversity.in", "faculty123")
-HOD = ("hod.commerce@christuniversity.in", "faculty123")
-OUTSIDER = ("student.regular2@christuniversity.in", "student123")
+PRESIDENT = ("student.president@christuniversity.in", "123")
+FACULTY_COORDINATOR = ("faculty.accounting@christuniversity.in", "123")
+CULTURAL_COORDINATOR = ("faculty.cultural@christuniversity.in", "123")
+HOD = ("hod.commerce@christuniversity.in", "123")
+OUTSIDER = ("student.regular2@christuniversity.in", "123")
 
 
 def test_annual_plan_full_approval_workflow(client):

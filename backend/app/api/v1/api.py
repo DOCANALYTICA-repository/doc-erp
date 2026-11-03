@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, clubs, claims, faculty, tasks, notifications, content, search, calendar, users, me
+from app.api.v1.endpoints import auth, clubs, claims, faculty, tasks, notifications, content, search, calendar, users, me, files, yellow_forms
 
 api_router = APIRouter()
 
@@ -14,3 +14,5 @@ api_router.include_router(search.router, prefix="/search", tags=["search"])
 api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(me.router, prefix="/me", tags=["me"])
+api_router.include_router(files.router, prefix="/files", tags=["files"])
+api_router.include_router(yellow_forms.router, prefix="/yellow-forms", tags=["yellow-forms"])

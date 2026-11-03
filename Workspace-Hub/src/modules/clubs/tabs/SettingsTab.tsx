@@ -7,6 +7,7 @@ import { api } from '../../../services/api';
 import { describeError } from '../../../services/errors';
 import { clubKeys } from '../../../lib/queryKeys';
 import { DataTable, type Column } from '../../../components/ui/DataTable';
+import { Card } from '../../../components/ui/Card';
 import { SectionHeader } from '../../../components/ui/SectionHeader';
 import type { ClubMember } from '../../../api/types';
 import { useClubWorkspace } from '../ClubWorkspaceContext';
@@ -63,7 +64,7 @@ export const SettingsTab: React.FC = () => {
   };
 
   const columns: Column<ClubMember>[] = [
-    { key: 'member', header: 'Member', render: m => <span className="font-medium text-slate-900">{m.student_name ?? m.student_id}</span> },
+    { key: 'member', header: 'Member', render: m => <span className="font-medium text-primary">{m.student_name ?? m.student_id}</span> },
     { key: 'role', header: 'Club role', secondary: true, render: m => m.role },
     {
       key: 'template', header: 'Permission template',
@@ -73,19 +74,19 @@ export const SettingsTab: React.FC = () => {
             aria-label={`Permission template for ${m.student_name ?? m.student_id}`}
             defaultValue={m.permission_template ?? ''}
             onChange={e => assignTemplate(m, e.target.value)}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-sm"
+            className="rounded-lg border border-border bg-body px-2 py-1 text-sm"
           >
             {TEMPLATES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
         ) : (
-          <span className="text-slate-500">{m.permission_template || 'Member'}</span>
+          <span className="text-secondary">{m.permission_template || 'Member'}</span>
         ),
     },
   ];
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <Card as="section" className="max-w-md">
         <SectionHeader title="Official contact email" />
         {capabilities.can_manage_settings ? (
           <div className="mt-4 flex gap-2">
@@ -97,14 +98,14 @@ export const SettingsTab: React.FC = () => {
               value={contactEmail}
               onChange={e => setContactEmail(e.target.value)}
               placeholder="club@christuniversity.in"
-              className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+              className="flex-1 rounded-lg border border-border bg-body px-3 py-2 text-sm"
             />
             <Button label={isSaving ? 'Saving…' : 'Save'} variant="primary" size="sm" isDisabled={isSaving} clickAction={saveEmail} />
           </div>
         ) : (
-          <p className="mt-3 text-sm text-slate-500">{club.contact_email || 'Not set.'}</p>
+          <p className="mt-3 text-sm text-secondary">{club.contact_email || 'Not set.'}</p>
         )}
-      </section>
+      </Card>
 
       <div className="flex flex-col gap-4">
         <SectionHeader

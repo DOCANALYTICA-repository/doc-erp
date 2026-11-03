@@ -8,7 +8,7 @@ def _titles(client, headers):
 
 
 def test_claim_submission_and_stage_progress_notify_the_student(client):
-    student_h = auth_headers(client, "student.regular2@christuniversity.in", "student123")
+    student_h = auth_headers(client, "student.regular2@christuniversity.in", "123")
     r = client.post("/api/v1/claims", json={
         "category": "medical", "academic_year": "2025-2026", "semester": "5",
         "programme": "B.Com (Hons)", "section": "A", "submission_type": "individual",
@@ -23,7 +23,7 @@ def test_claim_submission_and_stage_progress_notify_the_student(client):
 
     assert "Claim submitted" in _titles(client, student_h)
 
-    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "faculty123")
+    teacher_h = auth_headers(client, "teacher.class@christuniversity.in", "123")
     r = client.post(f"/api/v1/claims/{claim_id}/approve-stage?action=approve", headers=teacher_h)
     assert r.status_code == 200, r.text
     assert r.json()["new_stage"] == "subject_faculty"
@@ -35,31 +35,31 @@ def test_claim_submission_and_stage_progress_notify_the_student(client):
     # ...and the specific named Subject Faculty on the entry gets notified
     # that a claim is waiting on THEM specifically (not just anyone with
     # the claims:review_faculty permission).
-    subject_faculty_h = auth_headers(client, "faculty.accounting@christuniversity.in", "faculty123")
+    subject_faculty_h = auth_headers(client, "faculty.accounting@christuniversity.in", "123")
     assert "Claim pending your review" in _titles(client, subject_faculty_h)
 
 
 def test_event_creation_notifies_club_faculty_coordinators(client):
-    president_h = auth_headers(client, "student.president@christuniversity.in", "student123")
+    president_h = auth_headers(client, "student.president@christuniversity.in", "123")
     r = client.post("/api/v1/clubs/club_commerce/events", json={
         "title": "Budgeting Workshop", "date": "2026-08-01", "venue": "Room 101", "budget": 500.0,
         "club_id": "club_commerce",
     }, headers=president_h)
     assert r.status_code == 200, r.text
 
-    coordinator_h = auth_headers(client, "faculty.accounting@christuniversity.in", "faculty123")
+    coordinator_h = auth_headers(client, "faculty.accounting@christuniversity.in", "123")
     assert "New event proposal" in _titles(client, coordinator_h)
 
 
 def test_club_linked_meeting_notifies_club_leadership(client):
-    hod_h = auth_headers(client, "hod.commerce@christuniversity.in", "faculty123")
+    hod_h = auth_headers(client, "hod.commerce@christuniversity.in", "123")
     r = client.post("/api/v1/faculty/meetings", json={
         "title": "Commerce Club Sync", "type": "club", "date": "2026-08-05", "time": "03:00 PM",
         "venue": "Block IV", "club_id": "club_commerce",
     }, headers=hod_h)
     assert r.status_code == 200
 
-    president_h = auth_headers(client, "student.president@christuniversity.in", "student123")
+    president_h = auth_headers(client, "student.president@christuniversity.in", "123")
     assert "New club meeting scheduled" in _titles(client, president_h)
 
 

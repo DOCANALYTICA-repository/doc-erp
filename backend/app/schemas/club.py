@@ -78,6 +78,7 @@ class ClubCapabilities(BaseModel):
     can_assign_tasks: bool = False
     can_approve_plan: bool = False       # a reviewer at the plan's current stage
     can_manage_members: bool = False
+    can_file_yellow_forms: bool = False  # see app/core/yellow_form_access.py
 
 
 class ClubCounters(BaseModel):

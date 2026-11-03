@@ -8,9 +8,9 @@ from datetime import datetime, timedelta, timezone
 
 from .conftest import auth_headers
 
-HOD = ("hod.commerce@christuniversity.in", "faculty123")
-COORDINATOR = ("faculty.accounting@christuniversity.in", "faculty123")
-STUDENT = ("student.regular@christuniversity.in", "student123")
+HOD = ("hod.commerce@christuniversity.in", "123")
+COORDINATOR = ("faculty.accounting@christuniversity.in", "123")
+STUDENT = ("student.regular@christuniversity.in", "123")
 
 
 def _pipeline(client, creds=HOD):
@@ -30,7 +30,10 @@ def test_pipeline_covers_both_workflows(client):
     stage_ids = {s["id"] for s in body["stages"]}
 
     # Claims
-    assert {"initial_review", "subject_faculty", "course_coordinator", "attendance_office"} <= stage_ids
+    assert {"initial_review", "subject_faculty", "course_coordinator"} <= stage_ids
+    # attendance_office is terminal — an approved claim has left this system,
+    # so it is not a column anyone works and has no SLA to breach.
+    assert "attendance_office" not in stage_ids
     # Annual plans
     assert {"faculty_coordinator_review", "cultural_coordinator_review", "hod_review"} <= stage_ids
 

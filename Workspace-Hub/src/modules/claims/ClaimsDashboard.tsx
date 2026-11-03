@@ -1,18 +1,22 @@
 import React from 'react';
-import { Navigate, useParams } from 'react-router-dom';
+import { Navigate, useLocation, useParams } from 'react-router-dom';
 
 import { ErrorState } from '../../components/ui/ErrorState';
-import { PageLoader } from '../../components/ui/PageLoader';
+import { PageShell } from '../../components/ui/PageShell';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { PageSkeleton } from '../../components/ui/PageSkeleton';
+import { useStore } from '../../context/useStore';
 import { ClaimsProvider, useClaimsWorkspace } from './ClaimsContext';
 import {
-  CLAIMS_DEFAULT_TAB, CLAIMS_REVIEWER_TAB, REVIEWER_CLAIM_TABS, STUDENT_CLAIM_TABS,
-  isClaimTab,
+  CO_CURRICULAR_CAPABILITY, YELLOW_FORMS_TAB, claimTabsFor, claimsLandingTab, isClaimTab,
 } from './tabs';
 
 import { MyClaimsTab } from './tabs/MyClaimsTab';
 import { NewClaimTab } from './tabs/NewClaimTab';
 import { OverviewTab } from './tabs/OverviewTab';
 import { ReviewQueueTab } from './tabs/ReviewQueueTab';
+import { ReviewedClaimsTab } from './tabs/ReviewedClaimsTab';
+import { YellowFormsTab } from './tabs/YellowFormsTab';
 import { TabStrip } from '../../components/ui/TabStrip';
 
 /**
@@ -26,57 +30,67 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
   my_claims: MyClaimsTab,
   new_claim: NewClaimTab,
   review_queue: ReviewQueueTab,
+  reviewed: ReviewedClaimsTab,
+  yellow_forms: YellowFormsTab,
 };
 
 const ClaimsShell: React.FC = () => {
   const { tab } = useParams<{ tab: string }>();
+  const location = useLocation();
   const { isReviewer, isLoading, isError, error, refetch } = useClaimsWorkspace();
+  const hasPermission = useStore(s => s.hasPermission);
+  const user = useStore(s => s.user);
+  const coCurricularLive = useStore(s => s.isEnabled(CO_CURRICULAR_CAPABILITY));
 
   // Faculty cannot submit claims (backend-enforced), so they get only the
   // review queue rather than three tabs that would refuse them.
-  const tabs = isReviewer ? REVIEWER_CLAIM_TABS : STUDENT_CLAIM_TABS;
+  const tabs = claimTabsFor(isReviewer, hasPermission);
   const allowed = new Set<string>(tabs.map(t => t.id));
 
   if (!isClaimTab(tab) || !allowed.has(tab)) {
-    const fallback = isReviewer ? CLAIMS_REVIEWER_TAB : CLAIMS_DEFAULT_TAB;
-    return <Navigate to={`/app/claims/${fallback}`} replace />;
+    const landing = claimsLandingTab(isReviewer, user?.permissions ?? []);
+    // Keep ?open=, so a deep link that lands on the wrong tab still opens its form.
+    return <Navigate to={{ pathname: `/app/claims/${landing}`, search: location.search }} replace />;
   }
 
   const ActiveTab = TAB_COMPONENTS[tab];
+  // Yellow forms load their own lists, so the claims list must not gate them.
+  const dependsOnClaims = tab !== YELLOW_FORMS_TAB;
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] w-full flex-col bg-slate-50">
-      <TabStrip
-        label="Claims sections"
-        activeId={tab}
-        items={tabs.map(item => ({
-          id: item.id,
-          label: item.label,
-          to: `/app/claims/${item.id}`,
-        }))}
+    <PageShell
+      maxWidth="5xl"
+      toolbar={
+        <TabStrip
+          label="Claims sections"
+          activeId={tab}
+          items={tabs.map(item => ({
+            id: item.id,
+            label: item.label,
+            to: `/app/claims/${item.id}`,
+          }))}
+        />
+      }
+    >
+      <PageHeader
+        title="Attendance claims"
+        description={
+          isReviewer
+            ? 'Claims routed to you for approval at your stage of the workflow.'
+            : coCurricularLive
+              ? 'Medical and co-curricular attendance exemptions.'
+              : 'Medical attendance exemptions. Co-curricular claims (yellow forms) are filed by your club.'
+        }
       />
 
-      <main className="mx-auto w-full max-w-5xl flex-1 overflow-y-auto p-6 md:p-8">
-        <header className="mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-            Attendance claims
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {isReviewer
-              ? 'Claims routed to you for approval at your stage of the workflow.'
-              : 'Medical and co-curricular attendance exemptions.'}
-          </p>
-        </header>
-
-        {isLoading ? (
-          <PageLoader label="Loading claims..." />
-        ) : isError ? (
-          <ErrorState title="Claims didn't load" error={error} onRetry={refetch} />
-        ) : (
-          <ActiveTab />
-        )}
-      </main>
-    </div>
+      {dependsOnClaims && isLoading ? (
+        <PageSkeleton variant="table" label="Loading claims" />
+      ) : dependsOnClaims && isError ? (
+        <ErrorState title="Claims didn't load" error={error} onRetry={refetch} />
+      ) : (
+        <ActiveTab />
+      )}
+    </PageShell>
   );
 };
 

@@ -26,6 +26,7 @@ def get_unified_calendar(
             "programme": current_user.programme,
             "semester": current_user.semester,
             "section": current_user.section,
+            "batch": current_user.batch,
         }
     return calendar_engine.get_unified_events(
         db,
